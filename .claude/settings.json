@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(adb reverse *)",
+      "Bash(adb shell *)",
+      "Bash([ -s \"$SP/logcat3.txt\" ])",
+      "Bash(:)",
+      "Bash(curl -s -m 5 \"http://localhost:8081/status\")",
+      "Bash(curl -s -m 8 -o /dev/null -w \"manifest HTTP %{http_code}\\\\n\" \"http://localhost:8081/\")",
+      "Bash(curl -s -m 60 \"http://localhost:8081/node_modules/expo-router/entry.bundle?platform=android&dev=true\")",
+      "Bash([ -s \"$SP/logcat5.txt\" ])",
+      "Bash(curl -s -m 90 -o /dev/null -w \"entry.bundle HTTP %{http_code}\\\\n\" \"http://localhost:8081/node_modules/expo-router/entry.bundle?platform=android&dev=true\")",
+      "Bash(lsof -nP -iTCP:4000 -sTCP:LISTEN)",
+      "Bash(curl -s -m 4 -o /dev/null -w \"192.168.1.12:4000/api/flags -> HTTP %{http_code}\\\\n\" \"http://192.168.1.12:4000/api/flags\")",
+      "Bash(/usr/libexec/ApplicationFirewall/socketfilterfw --getglobalstate)",
+      "Bash(sudo -n /usr/libexec/ApplicationFirewall/socketfilterfw --getglobalstate)",
+      "Bash(curl -s -m 4 http://localhost:4000/api/flags)",
+      "Bash(python3 -c \"import sys,json;f=json.load\\(sys.stdin\\)['flags'];print\\('journal:',f['journal'],'| chadhava:',f['chadhava'],'| bhajan:',f['bhajan']\\)\")",
+      "Bash(lsof -nP -iTCP:4000)",
+      "Bash(awk '{print $2, $11, $12, $13}')",
+      "Bash(lsof -nP -iTCP -sTCP:LISTEN)",
+      "Bash(awk '{print $1, $2, $9}')",
+      "Bash(ls -la ~/.claude/projects/ 2>/dev/null | head -50)",
+      "Read(//Users/nitinmalhotra/.claude/projects/**)",
+      "Read(//Users/nitinmalhotra/.claude/projects/-Users-nitinmalhotra-projects-poojaappclone/**)",
+      "Bash(python3 -c \"import sys,json; l=sys.stdin.readline\\(\\); d=json.loads\\(l\\); print\\({k:d[k] for k in \\('sessionId','cwd','timestamp','version'\\) if k in d}\\)\")",
+      "Bash(python3 -c ' *)",
+      "Bash(cp -n /Users/nitinmalhotra/.claude/projects/-Users-nitinmalhotra-projects-poojaappclone/668a8b8f-7e29-4188-b772-cc1d044a95d6.jsonl /Users/nitinmalhotra/.claude/projects/-Users-nitinmalhotra-projects-pooja-proj/)",
+      "Bash(cp -n /Users/nitinmalhotra/.claude/projects/-Users-nitinmalhotra-projects-poojaappclone/79b7f7e2-e376-4077-a09d-1889be54b676.jsonl /Users/nitinmalhotra/.claude/projects/-Users-nitinmalhotra-projects-pooja-proj/)",
+      "Bash(python3 -)"
+    ]
+  },
+  "enabledPlugins": {
+    "expo@claude-plugins-official": true
+  }
+}
