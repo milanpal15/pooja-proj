@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
 
 import {
   ArchImage,
@@ -8,12 +8,14 @@ import {
   Button,
   Card,
   Icon,
-  IconButton,
   Screen,
   Type,
 } from '@/components/ui';
 import { AppBar } from '@/components/ui/surface';
+import { LivePlayer } from '@/components/darshan/live-player';
 import { DEITY_IMAGES } from '@/constants/deity-images';
+import { TEMPLES } from '@/constants/temples';
+import { useContent } from '@/context/content';
 import { useLanguage } from '@/context/language';
 import { Radius, Space, useTheme } from '@/theme';
 
@@ -28,49 +30,96 @@ import { Radius, Space, useTheme } from '@/theme';
 export default function DarshanScreen() {
   const router = useRouter();
   const { c } = useTheme();
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
+  const { announcement, deityArt, temples } = useContent();
   const [liked, setLiked] = useState(false);
+
+  /*
+   * Which temple this screen is showing.
+   *
+   * It used to hardcode "Kashi Vishwanath" and `DEITY_IMAGES.shiva`, so every
+   * deployment claimed the same temple regardless of what the dashboard held.
+   * First enabled temple wins; the bundled catalogue covers the backend being
+   * unreachable.
+   */
+  const remote = temples[0];
+  const templeName = remote?.name ?? TEMPLES[0]?.name ?? '';
+  const art = deityArt(remote?.deitySlug ?? 'shiva');
+
+  /*
+   * The feed, when the dashboard has published one for this temple.
+   *
+   * With a URL the screen plays the real stream and the LIVE badge is
+   * earned. Without one it falls back to the still artwork and shows no
+   * badge — a permanent "LIVE" over a photograph is a claim the app cannot
+   * keep, and that is what this screen used to do.
+   */
+  const liveUrl = (remote as { liveUrl?: string } | undefined)?.liveUrl?.trim();
+  const isLive = !!liveUrl;
 
   return (
     <Screen tabBar={false}>
       <AppBar
-        title={`${t('live_darshan')}: Kashi Vishwanath`}
-        right={<IconButton name="settings" label={t('settings')} size={40} />}
+        title={templeName ? `${t('live_darshan')}: ${templeName}` : t('live_darshan')}
       />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <ArchImage source={DEITY_IMAGES.shiva} height={400}>
+        <ArchImage source={art ?? DEITY_IMAGES.shiva} height={400}>
+          {/* The real feed sits inside the arch, over the still, so the
+              screen keeps its shape whether or not a stream exists. */}
+          {isLive && (
+            <View style={styles.feed}>
+              <LivePlayer url={liveUrl} height={400} label={t('live_darshan')} />
+            </View>
+          )}
           {/* Scrims top and bottom so the overlays stay legible whatever the
               frame behind them happens to be. */}
-          <View style={[styles.scrimTop, { backgroundColor: c.scrim }]} />
-          <View style={styles.topRow}>
-            <Badge label={t('live')} tone="live" />
-            <View style={styles.viewPill}>
-              <Icon name="star" size={13} color="#FFFFFF" />
-              <Type v="labelSm" color="#FFFFFF">
-                15.4K {t('views')}
-              </Type>
+          <View style={[styles.scrimTop, { backgroundColor: c.scrim }]} pointerEvents="none" />
+          {/* No invented view count. Nothing counts views, so there is no
+              number to show — the pill returns when something does. */}
+          {isLive && (
+            <View style={styles.topRow} pointerEvents="none">
+              <Badge label={t('live')} tone="live" />
             </View>
-          </View>
+          )}
 
           <View style={styles.overlayBtns}>
+            {/* Counts removed: "2.1K" likes and "950" shares were invented,
+                and nothing on the backend tallies either. The controls still
+                work; they just no longer report numbers nobody measured. */}
             <GlassPill
               icon="heart"
               filled={liked}
-              label="2.1K"
               onPress={() => setLiked((l) => !l)}
               accessibilityLabel={liked ? 'Unlike' : 'Like'}
             />
-            <GlassPill icon="share" label="950" accessibilityLabel="Share" />
+            <GlassPill
+              icon="share"
+              accessibilityLabel="Share"
+              onPress={() =>
+                Share.share({
+                  message: templeName
+                    ? lang === 'hi'
+                      ? `${templeName} के दर्शन करें`
+                      : `Darshan at ${templeName}`
+                    : t('live_darshan'),
+                }).catch(() => {})
+              }
+            />
           </View>
         </ArchImage>
 
-        <Card variant="sunken">
-          <Type v="bodyMd">
-            <Type v="titleMd">{t('temple_announcement')}: </Type>
-            {t('announcement_text')}
-          </Type>
-        </Card>
+        {/* The live announcement from the dashboard. This used to be one
+            hardcoded i18n string shown on every temple, forever. Hidden when
+            nothing is published rather than inventing a notice. */}
+        {!!announcement && (
+          <Card variant="sunken">
+            <Type v="bodyMd">
+              <Type v="titleMd">{announcement.title || t('temple_announcement')}: </Type>
+              {announcement.body}
+            </Type>
+          </Card>
+        )}
 
         <Button
           label={t('donate_now')}
@@ -92,7 +141,8 @@ function GlassPill({
   accessibilityLabel,
 }: {
   icon: 'heart' | 'share';
-  label: string;
+  /** Optional — omitted when there is no real number to report. */
+  label?: string;
   filled?: boolean;
   onPress?: () => void;
   accessibilityLabel: string;
@@ -112,9 +162,13 @@ function GlassPill({
         },
       ]}>
       <Icon name={icon} size={17} color={filled ? c.primary : c.goldInk} filled={filled} />
-      <Type v="labelMd" tone="goldInk" numeric>
-        {label}
-      </Type>
+      {/* Without a label the pill collapses to a round icon button, rather
+          than leaving a gap where an invented number used to sit. */}
+      {!!label && (
+        <Type v="labelMd" tone="goldInk" numeric>
+          {label}
+        </Type>
+      )}
     </Pressable>
   );
 }
@@ -122,6 +176,7 @@ function GlassPill({
 const styles = StyleSheet.create({
   scroll: { padding: Space.margin, gap: Space.lg },
 
+  feed: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
   scrimTop: { position: 'absolute', top: 0, left: 0, right: 0, height: 96, opacity: 0.55 },
   topRow: {
     flexDirection: 'row',

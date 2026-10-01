@@ -4,15 +4,16 @@ import { Alert, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-na
 
 import { RazorpayCheckout } from '@/components/payment/razorpay-checkout';
 import { TempleGlyph } from '@/components/pooja/temple-glyph';
-import { Button, Card, Chip, Divider, Field, Icon, Screen, Type } from '@/components/ui';
+import { Button, Card, Chip, Divider, Field, Icon, Screen, Type, useToast } from '@/components/ui';
 import { AppBar } from '@/components/ui/surface';
-import { PRASAD_DELIVERY, type Seva, sevasFor } from '@/constants/poojas';
+import { PRASAD_DELIVERY, type Seva } from '@/constants/poojas';
 import { TEMPLES } from '@/constants/temples';
 import { useAdmin } from '@/context/admin';
 import { useAuth } from '@/context/auth';
 import { useContent } from '@/context/content';
 import { useLanguage } from '@/context/language';
 import { Radius, Space, useTheme } from '@/theme';
+import { createBooking } from '@/lib/bookings';
 
 /**
  * Pooja Booking — a priest performs a seva at the physical temple, on a date
@@ -30,14 +31,25 @@ export default function BookingScreen() {
   const router = useRouter();
   const { c } = useTheme();
   const { t, lang } = useLanguage();
+  const toast = useToast();
   const { user } = useAuth();
   const { flags, logPayment } = useAdmin();
-  const { bookingEnabled } = useContent();
+  const { bookingEnabled, sevasFor, setting } = useContent();
 
   const { temple: templeId } = useLocalSearchParams<{ temple?: string }>();
   const temple = TEMPLES.find((tpl) => tpl.id === templeId) ?? TEMPLES[0];
 
-  const sevas = useMemo(() => sevasFor(temple.deity), [temple.deity]);
+  /*
+   * Rites and prices come from the dashboard, with the bundled catalogue as
+   * the offline fallback. They were compiled into the app, so a price change
+   * used to need a store release.
+   */
+  const sevas = useMemo(
+    () => sevasFor({ templeSlug: temple.id, deitySlug: temple.deity.toLowerCase() }),
+    [sevasFor, temple.id, temple.deity],
+  );
+  /** Courier fee, also admin-set; the bundled constant is the fallback. */
+  const prasadFee = setting('prasadDelivery', PRASAD_DELIVERY);
   const dates = useMemo(() => nextDays(7), []);
 
   const [seva, setSeva] = useState<Seva>(sevas[0]);
@@ -47,13 +59,13 @@ export default function BookingScreen() {
   const [prasad, setPrasad] = useState(true);
   const [payOpen, setPayOpen] = useState(false);
 
-  const total = seva.price + (prasad ? PRASAD_DELIVERY : 0);
+  const total = seva.price + (prasad ? prasadFee : 0);
   const allowed = bookingEnabled(temple.id);
   const canBook = allowed && !!name.trim();
 
   const onPay = () => {
     if (!flags.payments) {
-      Alert.alert(t('payments_off'), t('payments_off_msg'));
+      toast.info(t('payments_off'), { description: t('payments_off_msg') });
       return;
     }
     setPayOpen(true);
@@ -209,7 +221,7 @@ export default function BookingScreen() {
               />
             </View>
             <Type v="bodyMd" numeric tone={prasad ? 'onSurface' : 'onSurfaceFaint'}>
-              ₹{PRASAD_DELIVERY.toFixed(2)}
+              ₹{prasadFee.toFixed(2)}
             </Type>
           </View>
           <View style={{ paddingVertical: Space.sm }}>
@@ -245,9 +257,28 @@ export default function BookingScreen() {
             note: `booking · ${seva.id} · ${temple.name} · ${day}`,
           });
           if (status === 'success') {
+            createBooking({
+              templeId: temple.id,
+              templeName: temple.name,
+              templeLocation: temple.location,
+              sevaId: seva.id,
+              sevaName: seva.name,
+              sevaNameHi: seva.nameHi,
+              price: seva.price,
+              totalAmount: total,
+              date: day,
+              devoteeName: name.trim() || 'Devotee',
+              gotra: gotra.trim() || undefined,
+              prasad,
+              status: 'upcoming',
+            }).catch(() => {});
             setTimeout(() => {
               setPayOpen(false);
               Alert.alert('🙏', t('booking_done'), [
+                {
+                  text: t('my_poojas'),
+                  onPress: () => router.replace('/my-poojas'),
+                },
                 { text: 'OK', onPress: () => router.back() },
               ]);
             }, 900);

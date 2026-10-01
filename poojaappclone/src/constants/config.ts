@@ -16,5 +16,20 @@
  *
  * All calls are best-effort: if the backend is unreachable the app falls back
  * to the last-synced flags (or the built-in defaults) and keeps working.
+ *
+ * Set EXPO_PUBLIC_ADMIN_API in `.env` to point at a deployed backend; the
+ * literal below is only the USB-tunnel default for local development.
  */
-export const ADMIN_API = 'http://127.0.0.1:4000';
+export const ADMIN_API = process.env.EXPO_PUBLIC_ADMIN_API ?? 'http://127.0.0.1:4000';
+
+/**
+ * The **web** OAuth client id from your Firebase project (google-services.json
+ * → `oauth_client` → the entry with `client_type: 3`).
+ *
+ * Google Sign-In needs this to mint an ID token Firebase will accept. The
+ * Android client id will not do — with the wrong one, sign-in fails with a
+ * bare `DEVELOPER_ERROR` that names nothing.
+ *
+ * Set EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID in `.env`, or paste the value here.
+ */
+export const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? '';

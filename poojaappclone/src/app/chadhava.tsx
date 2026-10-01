@@ -1,20 +1,15 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
 
 import { RazorpayCheckout } from '@/components/payment/razorpay-checkout';
 import { TempleGlyph } from '@/components/pooja/temple-glyph';
-import {
-  Button,
-  Card,
-  Chip,
-  Divider,
-  Field,
-  Icon,
-  type IconName,
-  Screen,
-  Type,
-} from '@/components/ui';
+import { Button, Card, Chip, Divider, Field, Icon, Screen, Type, type IconName, useToast } from '@/components/ui';
 import { AppBar } from '@/components/ui/surface';
 import { TEMPLES } from '@/constants/temples';
 import { useAdmin } from '@/context/admin';
@@ -55,6 +50,7 @@ export default function ChadhavaScreen() {
   const { c } = useTheme();
   const { flags, logPayment } = useAdmin();
   const { t } = useLanguage();
+  const toast = useToast();
 
   const { temple: templeId } = useLocalSearchParams<{ temple?: string }>();
   const [temple, setTemple] = useState(
@@ -69,7 +65,7 @@ export default function ChadhavaScreen() {
 
   const onPay = () => {
     if (!flags.payments) {
-      Alert.alert(t('payments_off'), t('payments_off_msg'));
+      toast.info(t('payments_off'), { description: t('payments_off_msg') });
       return;
     }
     setPayOpen(true);
@@ -210,7 +206,7 @@ export default function ChadhavaScreen() {
           if (status === 'success') {
             setTimeout(() => {
               setPayOpen(false);
-              Alert.alert('🙏', t('offering_received'));
+              toast.success(t('offering_received'));
             }, 900);
           }
         }}

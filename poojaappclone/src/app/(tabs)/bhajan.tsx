@@ -35,12 +35,12 @@ const CATEGORIES: { key: string; labelKey: StringKey; icon: IconName }[] = [
 ];
 
 const TRACKS = [
-  { id: 't1', title: 'Om Jai Jagdish Hare', artist: 'Anup Jalota', len: '5:10' },
-  { id: 't2', title: 'Hanuman Chalisa', artist: 'Hariharan', len: '7:30' },
-  { id: 't3', title: 'Gayatri Mantra', artist: 'Suresh Wadkar', len: '6:15' },
-  { id: 't4', title: 'Shiv Tandav Stotram', artist: 'Shankar Mahadevan', len: '8:02' },
-  { id: 't5', title: 'Achyutam Keshavam', artist: 'Vivek Prakash', len: '5:45' },
-  { id: 't6', title: 'Aigiri Nandini', artist: 'Rajalakshmee', len: '6:30' },
+  { id: 't1', title: 'Om Jai Jagdish Hare', artist: 'Anup Jalota', len: '5:10', category: 'evening' },
+  { id: 't2', title: 'Hanuman Chalisa', artist: 'Hariharan', len: '7:30', category: 'morning' },
+  { id: 't3', title: 'Gayatri Mantra', artist: 'Suresh Wadkar', len: '6:15', category: 'morning' },
+  { id: 't4', title: 'Shiv Tandav Stotram', artist: 'Shankar Mahadevan', len: '8:02', category: 'evening' },
+  { id: 't5', title: 'Achyutam Keshavam', artist: 'Vivek Prakash', len: '5:45', category: 'meditation' },
+  { id: 't6', title: 'Aigiri Nandini', artist: 'Rajalakshmee', len: '6:30', category: 'meditation' },
 ];
 
 type Track = (typeof TRACKS)[number];
@@ -60,7 +60,10 @@ function BhajanBody() {
   const player = useAudioPlayer(SOUNDS.aarti);
   const [nowPlaying, setNowPlaying] = useState<Track | null>(null);
   const [playing, setPlaying] = useState(false);
-  const [category, setCategory] = useState('evening');
+  const [category, setCategory] = useState('morning');
+
+  // Filter tracks to the selected category.
+  const filteredTracks = TRACKS.filter((tr) => tr.category === category);
 
   const play = useCallback(
     (track: Track) => {
@@ -125,7 +128,7 @@ function BhajanBody() {
         </View>
 
         <View style={styles.list}>
-          {TRACKS.map((tr) => {
+          {filteredTracks.map((tr) => {
             const active = nowPlaying?.id === tr.id;
             return (
               <Pressable

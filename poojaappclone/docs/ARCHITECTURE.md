@@ -242,7 +242,7 @@ renders it **instead** of the procedural figure, and the halo, aarti orbit,
 marigolds and progress all keep working unchanged:
 
 ```ts
-image: require('@/assets/images/deities/shiva.png'),   // transparent PNG/WebP
+image: require('@/assets/images/deities/shiva.jpg'),   // JPEG; PNG/WebP if you need alpha
 ```
 
 ---

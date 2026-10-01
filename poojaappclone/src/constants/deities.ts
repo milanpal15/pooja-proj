@@ -32,9 +32,13 @@ export type Deity = {
   mace?: boolean;
   /**
    * Real murti artwork. When set, the sanctum renders this instead of the
-   * procedural figure — drop in a transparent PNG/WebP and everything else
-   * (halo, aarti orbit, marigolds) keeps working unchanged:
-   *   image: require('@/assets/images/deities/shiva.png'),
+   * procedural figure, and everything else (halo, aarti orbit, marigolds)
+   * keeps working unchanged:
+   *   image: require('@/assets/images/deities/shiva.jpg'),
+   *
+   * The shipped set is public-domain Ravi Varma oleographs — opaque JPEGs,
+   * rendered with `contain`. A transparent PNG/WebP still works and reads
+   * more like a murti than a framed painting, if you have one.
    */
   image?: ImageSourcePropType;
   /** Sacred mark floating above the idol. */

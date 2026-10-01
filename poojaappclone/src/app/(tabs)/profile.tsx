@@ -37,16 +37,25 @@ export default function ProfileScreen() {
   const scrollPad = useScrollPadding();
 
   const initial = user?.name?.trim()?.[0]?.toUpperCase() || 'ॐ';
-  const contact =
-    user?.method === 'phone' ? `+91 ${user.contact}` : (user?.contact ?? 'India');
+  // `contact` arrives already qualified — E.164 from a phone sign-in
+  // (+919876543210) or the Google account's email — so it is shown as-is.
+  // Space the country code out to keep a long number readable.
+  const contact = user?.contact
+    ? user.contact.replace(/^(\+\d{1,3})(\d+)$/, '$1 $2')
+    : 'India';
 
   const menu = [
-    { icon: 'diya' as const, title: t('my_poojas'), sub: t('my_poojas_sub'), onPress: () => {} },
+    {
+      icon: 'diya' as const,
+      title: t('my_poojas'),
+      sub: t('my_poojas_sub'),
+      onPress: () => router.push('/my-poojas'),
+    },
     {
       icon: 'temple' as const,
       title: t('saved_temples'),
       sub: t('saved_temples_sub'),
-      onPress: () => {},
+      onPress: () => router.push('/saved-temples'),
     },
     {
       icon: 'bell' as const,
@@ -64,7 +73,7 @@ export default function ProfileScreen() {
       icon: 'support' as const,
       title: t('help_support'),
       sub: t('help_support_sub'),
-      onPress: () => {},
+      onPress: () => router.push('/help-support'),
     },
   ];
 

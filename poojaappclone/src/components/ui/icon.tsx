@@ -51,7 +51,8 @@ export type IconName =
   | 'marigold'
   | 'shankh'
   | 'gift'
-  | 'support';
+  | 'support'
+  | 'google';
 
 export type IconProps = {
   name: IconName;
@@ -290,6 +291,34 @@ function render(
           <Path {...line} d="M3.6 10.4 h16.8 v2.4 H3.6 Z M5.2 12.8 V19 a1.6 1.6 0 0 0 1.6 1.6 h10.4 A1.6 1.6 0 0 0 18.8 19 v-6.2" />
           <Path {...line} d="M12 10.4 v10.2" />
           <Path {...line} d="M12 10.4 S10.6 6 8.4 6 a2.2 2.2 0 0 0 0 4.4 M12 10.4 S13.4 6 15.6 6 a2.2 2.2 0 0 1 0 4.4" />
+        </G>
+      );
+
+    /**
+     * The Google "G". The one icon in this set that ignores `color` and
+     * `strokeWidth`: Google's branding terms require the mark in its four
+     * official colours, unaltered, so theming it would be a licence problem
+     * rather than a design choice.
+     */
+    case 'google':
+      return (
+        <G>
+          <Path
+            fill="#4285F4"
+            d="M21.6 12.227c0-.709-.064-1.39-.182-2.045H12v3.868h5.382a4.6 4.6 0 0 1-1.996 3.018v2.51h3.232c1.891-1.742 2.982-4.305 2.982-7.35z"
+          />
+          <Path
+            fill="#34A853"
+            d="M12 21.6c2.7 0 4.964-.895 6.618-2.422l-3.232-2.51c-.895.6-2.04.955-3.386.955-2.605 0-4.81-1.76-5.597-4.123H3.064v2.59A9.6 9.6 0 0 0 12 21.6z"
+          />
+          <Path
+            fill="#FBBC05"
+            d="M6.403 13.5a5.8 5.8 0 0 1 0-3.7V7.21H3.064a9.6 9.6 0 0 0 0 8.59l3.34-2.3z"
+          />
+          <Path
+            fill="#EA4335"
+            d="M12 6.377c1.468 0 2.786.505 3.823 1.496l2.868-2.868C16.959 3.393 14.695 2.4 12 2.4a9.6 9.6 0 0 0-8.936 4.81l3.34 2.59C7.19 8.137 9.395 6.377 12 6.377z"
+          />
         </G>
       );
 

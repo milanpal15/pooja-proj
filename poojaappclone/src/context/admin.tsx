@@ -36,10 +36,22 @@ export type FeatureKey =
   | 'journal'
   | 'liveDarshan'
   | 'payments'
-  | 'announcements';
+  | 'announcements'
+  | 'phoneAuth';
 
 export type Flags = Record<FeatureKey, boolean>;
 
+/*
+ * Every flag defaults ON so an unreachable backend hides nothing — except
+ * `phoneAuth`, which defaults OFF.
+ *
+ * The usual fail-open reasoning inverts here. Firebase stopped sending
+ * verification SMS on the free Spark plan in September 2024; it now needs a
+ * Blaze billing account. Failing open would put a Mobile button on the login
+ * screen that cannot possibly work — every tap ends in BILLING_NOT_ENABLED.
+ * Offering a sign-in route that is guaranteed to fail is worse than not
+ * offering it, so this one stays off until the dashboard says otherwise.
+ */
 const DEFAULT_FLAGS: Flags = {
   virtualPooja: true,
   bhajan: true,
@@ -48,6 +60,7 @@ const DEFAULT_FLAGS: Flags = {
   liveDarshan: true,
   payments: true,
   announcements: true,
+  phoneAuth: false,
 };
 
 export const FEATURE_META: { key: FeatureKey; label: string; desc: string }[] = [
@@ -58,6 +71,7 @@ export const FEATURE_META: { key: FeatureKey; label: string; desc: string }[] = 
   { key: 'liveDarshan', label: 'Live Darshan', desc: 'Live temple stream' },
   { key: 'payments', label: 'Payments', desc: 'Razorpay checkout' },
   { key: 'announcements', label: 'Announcements', desc: 'Temple banners' },
+  { key: 'phoneAuth', label: 'Mobile OTP Sign-in', desc: 'Needs Firebase Blaze billing' },
 ];
 
 export type PaymentLog = {

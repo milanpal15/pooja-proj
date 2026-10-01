@@ -2,6 +2,7 @@ import { setAudioModeAsync, useAudioPlayer } from 'expo-audio';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   Easing,
@@ -55,6 +56,8 @@ export default function MandirScreen() {
   // Flowers only fall when the flowers option is toggled on or during Auto Aarti.
   const [flowersOn, setFlowersOn] = useState(false);
   const [musicOn, setMusicOn] = useState(false);
+  // Persisted total aarti completion count (the "coin" counter).
+  const [totalAartis, setTotalAartis] = useState(0);
 
   // Audio — no-ops safely while SOUNDS.* are null (no files added yet).
   const bellSound = useAudioPlayer(SOUNDS.bell);
@@ -95,6 +98,13 @@ export default function MandirScreen() {
     setAudioModeAsync({ playsInSilentMode: true }).catch(() => {});
   }, []);
 
+  // Load the persisted aarti counter on mount.
+  useEffect(() => {
+    AsyncStorage.getItem('pooja.totalAartis')
+      .then((raw) => { if (raw) setTotalAartis(parseInt(raw, 10) || 0); })
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     radius.value = withSpring(rRest);
   }, [rRest, radius]);
@@ -115,7 +125,15 @@ export default function MandirScreen() {
 
   const onCircles = useCallback((n: number) => {
     setCircles(Math.min(n, AARTI_CIRCLES));
-    if (n >= AARTI_CIRCLES) setDone(true);
+    if (n >= AARTI_CIRCLES) {
+      setDone(true);
+      // Increment and persist the aarti completion counter.
+      setTotalAartis((prev) => {
+        const next = prev + 1;
+        AsyncStorage.setItem('pooja.totalAartis', String(next)).catch(() => {});
+        return next;
+      });
+    }
   }, []);
 
   useAnimatedReaction(
@@ -371,7 +389,7 @@ export default function MandirScreen() {
             <Text style={styles.titleText}>{deity.title}</Text>
           </View>
           <View style={styles.coinPill}>
-            <Text style={styles.coinCount}>31</Text>
+            <Text style={styles.coinCount}>{totalAartis}</Text>
             <View style={styles.coin}>
               <Text style={styles.coinGlyph}>ॐ</Text>
             </View>

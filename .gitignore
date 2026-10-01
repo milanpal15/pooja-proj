@@ -41,3 +41,25 @@ example
 # generated native folders
 /ios
 /android
+
+# Secrets — never commit these
+.env
+.env.*
+!.env.example
+# Firebase Admin service-account key (backend)
+firebase-service-account.json
+**/firebase-service-account.json
+# Firebase client config (mobile app) — contains your project's API keys
+google-services.json
+GoogleService-Info.plist
+
+# Gradle output from local Expo modules. `poojaappclone/.gitignore` ignores
+# the generated `/android` project, but a module carries its own android/
+# folder whose source IS committed — only its build output is not.
+poojaappclone/modules/*/android/build/
+poojaappclone/modules/*/android/.gradle/
+poojaappclone/modules/*/android/local.properties
+
+# Devotee-uploaded images and audio. User content, not source — and the
+# server mkdir's the folder on boot, so it needs no placeholder here.
+pooja-admin/uploads/

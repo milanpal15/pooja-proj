@@ -1,6 +1,6 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { TempleGlyph } from '@/components/pooja/temple-glyph';
@@ -20,7 +20,8 @@ import { useContent } from '@/context/content';
 import { useLanguage } from '@/context/language';
 import { useLocation } from '@/hooks/use-location';
 import { byDistanceFrom, formatDistance } from '@/lib/geo';
-import { Space, useTheme } from '@/theme';
+import { useSavedTemples } from '@/lib/saved-temples';
+import { Radius, Space, useTheme } from '@/theme';
 
 /**
  * Temple directory, with a working "Near Me".
@@ -33,33 +34,55 @@ import { Space, useTheme } from '@/theme';
  * regardless of where you were standing.
  */
 
+/** 25000 → "25k" / "25 हज़ार". Keeps long counts from wrapping the row. */
+function formatCount(n: number, lang: 'en' | 'hi') {
+  if (n < 1000) return String(n);
+  const k = n / 1000;
+  const label = k >= 10 ? String(Math.round(k)) : k.toFixed(1).replace(/\.0$/, '');
+  return lang === 'hi' ? `${label} हज़ार` : `${label}k`;
+}
+
 export default function TemplesScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ search?: string }>();
   const { c } = useTheme();
   const { t, lang } = useLanguage();
-  const { bookingEnabled } = useContent();
+  const { bookingEnabled, templeRating } = useContent();
   const { flags } = useAdmin();
   const scrollPad = useScrollPadding();
   const { state: loc, request, clear } = useLocation();
+  const { savedIds, isSaved, toggleSave } = useSavedTemples();
 
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(params.search ?? '');
   const [nearMe, setNearMe] = useState(false);
+  const [onlySaved, setOnlySaved] = useState(false);
+  const [prevParamSearch, setPrevParamSearch] = useState(params.search);
+
+  if (params.search !== prevParamSearch) {
+    setPrevParamSearch(params.search);
+    setQuery(params.search ?? '');
+  }
 
   const q = query.trim().toLowerCase();
 
   // Ranked by distance only once we actually have a fix; otherwise the
   // catalogue keeps its curated order rather than silently reshuffling.
   const list = useMemo(() => {
+    let base = TEMPLES;
+    if (onlySaved) {
+      base = base.filter((tpl) => savedIds.includes(tpl.id));
+    }
+
     const ranked =
       nearMe && loc.status === 'granted'
-        ? byDistanceFrom(loc.coords, TEMPLES)
-        : TEMPLES.map((tpl) => ({ ...tpl, km: undefined as number | undefined }));
+        ? byDistanceFrom(loc.coords, base)
+        : base.map((tpl) => ({ ...tpl, km: undefined as number | undefined }));
 
     return ranked.filter(
       (tpl) =>
         tpl.name.toLowerCase().includes(q) || tpl.location.toLowerCase().includes(q),
     );
-  }, [nearMe, loc, q]);
+  }, [nearMe, loc, q, onlySaved, savedIds]);
 
   const toggleNearMe = () => {
     if (nearMe) {
@@ -88,6 +111,12 @@ export default function TemplesScreen() {
             icon="mapPin"
             selected={nearMe && loc.status === 'granted'}
             onPress={toggleNearMe}
+          />
+          <Chip
+            label={`${t('saved_temples_title')} (${savedIds.length})`}
+            icon="heart"
+            selected={onlySaved}
+            onPress={() => setOnlySaved(!onlySaved)}
           />
           <Chip
             label={t('view_on_map')}
@@ -142,15 +171,42 @@ export default function TemplesScreen() {
                 <TempleGlyph temple={tpl} size={72} />
               </View>
               <View style={{ flex: 1, gap: 3 }}>
-                <Type v="titleMd" numberOfLines={2}>
-                  {tpl.name}
-                </Type>
-                <View style={styles.metaRow}>
-                  <Icon name="star" size={13} color={c.gold} filled />
-                  <Type v="bodySm" tone="onSurfaceVariant">
-                    {t('stars_reviews')}
+                <View style={styles.titleRow}>
+                  <Type v="titleMd" numberOfLines={2} style={{ flex: 1 }}>
+                    {tpl.name}
                   </Type>
+                  <Pressable
+                    hitSlop={10}
+                    accessibilityRole="button"
+                    accessibilityLabel="Toggle saved"
+                    onPress={() => toggleSave(tpl.id)}
+                    style={[styles.heartBtn, { backgroundColor: c.accentContainer }]}>
+                    <Icon
+                      name="heart"
+                      size={18}
+                      color={isSaved(tpl.id) ? c.primary : c.onSurfaceFaint}
+                      filled={isSaved(tpl.id)}
+                    />
+                  </Pressable>
                 </View>
+                {/* Only shown when the dashboard has a real rating for this
+                    temple. It used to print one invented figure for all. */}
+                {(() => {
+                  const r = templeRating(tpl.id);
+                  if (!r) return null;
+                  return (
+                    <View style={styles.metaRow}>
+                      <Icon name="star" size={13} color={c.gold} filled />
+                      <Type v="bodySm" tone="onSurfaceVariant">
+                        {r.reviews
+                          ? t('stars_reviews_n')
+                              .replace('{rating}', r.rating.toFixed(1))
+                              .replace('{count}', formatCount(r.reviews, lang === 'hi' ? 'hi' : 'en'))
+                          : t('stars_only').replace('{rating}', r.rating.toFixed(1))}
+                      </Type>
+                    </View>
+                  );
+                })()}
                 <View style={styles.metaRow}>
                   <Icon name="mapPin" size={13} color={c.onSurfaceVariant} />
                   <Type v="bodySm" tone="onSurfaceVariant" numberOfLines={1} style={{ flex: 1 }}>
@@ -213,10 +269,19 @@ export default function TemplesScreen() {
 
         {list.length === 0 && (
           <View style={styles.empty}>
-            <Icon name="search" size={30} color={c.onSurfaceFaint} />
+            <Icon name={onlySaved ? 'heart' : 'search'} size={30} color={c.onSurfaceFaint} />
             <Type v="bodyMd" tone="onSurfaceVariant" center>
-              No temples match “{query}”.
+              {onlySaved
+                ? t('no_saved_temples_title')
+                : lang === 'hi'
+                  ? `"${query}" के लिए कोई मंदिर नहीं मिला।`
+                  : `No temples match “${query}”.`}
             </Type>
+            {onlySaved && (
+              <Type v="bodySm" tone="onSurfaceFaint" center style={{ marginTop: 4, paddingHorizontal: Space.lg }}>
+                {t('no_saved_temples_desc')}
+              </Type>
+            )}
           </View>
         )}
       </ScrollView>
@@ -231,6 +296,8 @@ const styles = StyleSheet.create({
 
   scroll: { padding: Space.margin, gap: Space.md },
   head2: { flexDirection: 'row', gap: Space.sm, alignItems: 'center' },
+  titleRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: Space.xs },
+  heartBtn: { width: 32, height: 32, borderRadius: Radius.full, alignItems: 'center', justifyContent: 'center' },
   glyphWrap: { width: 72, height: 72, justifyContent: 'center' },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
 

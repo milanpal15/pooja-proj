@@ -1,34 +1,28 @@
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import {
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 
 import { TempleGlyph } from '@/components/pooja/temple-glyph';
-import {
-  ArchImage,
-  Badge,
-  Card,
-  Icon,
-  type IconName,
-  IconButton,
-  Screen,
-  SectionBand,
-  SectionHeader,
-  Type,
-  useScrollPadding,
-} from '@/components/ui';
+import { ArchImage, Badge, Card, Icon, IconButton, Screen, SectionBand, SectionHeader, Type, type IconName, useScrollPadding, useToast } from '@/components/ui';
 import { AppBar } from '@/components/ui/surface';
 import { DEITIES } from '@/constants/deities';
-import { DEITY_IMAGES } from '@/constants/deity-images';
 import {
   DAILY,
   DEITY_KNOWLEDGE,
   QUICK_TILES,
   SCRIPTURE,
-  upcomingFestivals,
 } from '@/constants/home';
 import { TEMPLES } from '@/constants/temples';
 import { type FeatureKey, useAdmin } from '@/context/admin';
 import { useAuth } from '@/context/auth';
+import { useContent } from '@/context/content';
 import { type StringKey, useLanguage } from '@/context/language';
 import { Radius, Space, useTheme } from '@/theme';
 
@@ -63,14 +57,18 @@ export default function HomeScreen() {
   const { c } = useTheme();
   const { user } = useAuth();
   const { flags } = useAdmin();
+  // Admin-managed calendar, falling back to the bundled one.
+  const { deityArt, upcomingFestivals } = useContent();
   const { t, lang } = useLanguage();
+  const toast = useToast();
   const scrollPad = useScrollPadding();
   const hi = lang === 'hi';
 
   const features = FEATURES.filter((f) => flags[f.flag]);
-  const festivals = useMemo(() => upcomingFestivals(), []);
+  const festivals = useMemo(() => upcomingFestivals(2), [upcomingFestivals]);
 
   const go = (href?: string) => href && router.push(href as never);
+  const comingSoon = () => toast.info(t('coming_soon'), { description: t('coming_soon_msg') });
 
   return (
     <Screen watermark>
@@ -79,7 +77,12 @@ export default function HomeScreen() {
         back={false}
         right={
           <View style={styles.headerRight}>
-            <IconButton name="bell" label={t('daily_reminders')} size={38} />
+          <IconButton
+            name="bell"
+            label={t('daily_reminders')}
+            size={38}
+            onPress={() => router.push('/alarm')}
+          />
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={t('profile')}
@@ -111,7 +114,7 @@ export default function HomeScreen() {
                 accessibilityRole="button"
                 accessibilityState={{ disabled: soon }}
                 disabled={soon}
-                onPress={() => go(tile.href)}
+                onPress={() => tile.href ? go(tile.href) : comingSoon()}
                 style={({ pressed }) => [styles.quickTile, pressed && { opacity: 0.75 }]}>
                 <View
                   style={[
@@ -147,8 +150,15 @@ export default function HomeScreen() {
         <SectionBand
           title={hi ? 'आने वाले व्रत एवं त्योहार' : 'Upcoming Vrat & Festivals'}
           tone="crimson"
-          footerLabel={hi ? 'सारी तिथि देखें' : 'See all dates'}>
+          footerLabel={hi ? 'सारी तिथि देखें' : 'See all dates'}
+          onFooter={() => router.push('/festivals')}>
           <View style={styles.festRow}>
+            {/* A lunar calendar runs out. Say so rather than render a void. */}
+            {festivals.length === 0 && (
+              <Type v="bodySm" tone="onSurfaceFaint" center style={{ flex: 1, paddingVertical: Space.sm }}>
+                {hi ? 'आगामी तिथियाँ शीघ्र अपडेट होंगी।' : 'Upcoming dates will be updated soon.'}
+              </Type>
+            )}
             {festivals.slice(0, 2).map((f) => (
               <Card
                 key={f.id}
@@ -164,8 +174,8 @@ export default function HomeScreen() {
                     {formatDay(f.date, hi)}
                   </Type>
                 </View>
-                {DEITY_IMAGES[f.deity] && (
-                  <Image source={DEITY_IMAGES[f.deity]} style={styles.festArt} resizeMode="contain" />
+                {deityArt(f.deity) && (
+                  <Image source={deityArt(f.deity)!} style={styles.festArt} resizeMode="contain" />
                 )}
               </Card>
             ))}
@@ -181,7 +191,7 @@ export default function HomeScreen() {
             <Pressable
               key={d.id}
               accessibilityRole="button"
-              onPress={() => go(d.href)}
+              onPress={() => d.href ? go(d.href) : comingSoon()}
               style={({ pressed }) => [
                 styles.dailyRow,
                 { backgroundColor: c.containerLow },
@@ -276,7 +286,7 @@ export default function HomeScreen() {
           <View style={styles.knowRow}>
             {DEITY_KNOWLEDGE.map((id) => {
               const d = DEITIES.find((x) => x.id === id);
-              const art = DEITY_IMAGES[id];
+              const art = deityArt(id);
               return (
                 <Pressable
                   key={id}
@@ -340,6 +350,24 @@ export default function HomeScreen() {
 function Hero({ hi }: { hi: boolean }) {
   const { c } = useTheme();
   const router = useRouter();
+  const { deityArt, hero } = useContent();
+
+  /*
+   * Carousel copy comes from the dashboard. It was three slides hardcoded in
+   * this file — including "Shravan Special", which reads wrong for the ten
+   * months of the year that are not Shravan.
+   */
+  const slides = hero.length
+    ? hero.map((h) => ({
+        id: h.slug,
+        title: h.title,
+        titleHi: h.titleHi || h.title,
+        sub: h.subtitle ?? '',
+        subHi: h.subtitleHi || h.subtitle || '',
+        deity: h.deitySlug || 'shiva',
+        href: h.href,
+      }))
+    : HERO;
   const { width } = useWindowDimensions();
   const [page, setPage] = useState(0);
 
@@ -358,11 +386,15 @@ function Hero({ hi }: { hi: boolean }) {
         onMomentumScrollEnd={(e) =>
           setPage(Math.round(e.nativeEvent.contentOffset.x / e.nativeEvent.layoutMeasurement.width))
         }>
-        {HERO.map((h) => (
+        {slides.map((h) => (
           <Pressable
             key={h.id}
             accessibilityRole="button"
-            onPress={() => router.push({ pathname: '/pooja', params: { deity: h.deity } })}
+            onPress={() =>
+              (h as { href?: string }).href
+                ? router.push((h as { href?: string }).href as never)
+                : router.push({ pathname: '/pooja', params: { deity: h.deity } })
+            }
             style={[styles.heroPage, { width: pageW }]}>
             <View style={[styles.heroCard, { backgroundColor: c.accentContainer, borderColor: c.goldHairline }]}>
               <View style={{ flex: 1, gap: 6 }}>
@@ -373,8 +405,8 @@ function Hero({ hi }: { hi: boolean }) {
                   {hi ? h.subHi : h.sub}
                 </Type>
               </View>
-              {DEITY_IMAGES[h.deity] && (
-                <Image source={DEITY_IMAGES[h.deity]} style={styles.heroArt} resizeMode="contain" />
+              {deityArt(h.deity) && (
+                <Image source={deityArt(h.deity)!} style={styles.heroArt} resizeMode="contain" />
               )}
             </View>
           </Pressable>

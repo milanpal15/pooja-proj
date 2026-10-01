@@ -1,14 +1,22 @@
 import Constants from 'expo-constants';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useCallback, useRef, useState } from 'react';
-import { Alert, Image, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import {
+  Image,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
 
-import { Button, Card, Chip, Icon, Mandala, Screen, Type } from '@/components/ui';
+import { Button, Card, Chip, Icon, Mandala, Screen, Type, useToast } from '@/components/ui';
 import { AppBar } from '@/components/ui/surface';
 import { DEITIES } from '@/constants/deities';
 import { DEITY_IMAGES } from '@/constants/deity-images';
 import { WALLPAPER_STYLES } from '@/constants/reminders';
+import { useContent } from '@/context/content';
 import { useLanguage } from '@/context/language';
+import * as Wallpaper from '../../modules/expo-wallpaper';
 import { Ember, Fill, Kumkum, Radius, Saffron, Space, useTheme } from '@/theme';
 
 /**
@@ -20,17 +28,17 @@ import { Ember, Fill, Kumkum, Radius, Saffron, Space, useTheme } from '@/theme';
  * one for free, and a new deity added to the catalogue arrives with wallpapers
  * already made.
  *
- * ⚠️ Two separate limits, and the screen states both rather than implying
- * otherwise:
+ * Setting the wallpaper is the primary action; saving to the gallery is the
+ * fallback for anyone who wants the file. That needs Android's
+ * WallpaperManager, which no maintained community package still wraps, so it
+ * lives in the local `modules/expo-wallpaper` module.
  *
- *  1. The app SAVES to your gallery; it cannot set the wallpaper directly.
- *     That needs Android's WallpaperManager. Saving and letting you set it
- *     from the gallery is what most wallpaper apps do anyway.
- *  2. In Expo Go, saving does not work at all — `expo-media-library` throws
- *     the moment it is imported, so both it and the capture library are
- *     loaded lazily. Without that, importing them took the whole app down,
- *     since expo-router loads routes eagerly. The preview still renders; only
- *     the save is unavailable, and only until this runs as a dev build.
+ * ⚠️ Both paths need native code, so in Expo Go neither works —
+ * `expo-media-library` throws the moment it is imported, which is why it and
+ * the capture library are loaded lazily. Without that, importing them took
+ * the whole app down, since expo-router loads routes eagerly. The preview
+ * still renders; only the actions are unavailable, and only until this runs
+ * as a development build.
  */
 
 let capture: any = null;
@@ -71,64 +79,100 @@ const DEITY_IDS = Object.keys(DEITY_IMAGES);
 export default function WallpaperScreen() {
   const { c } = useTheme();
   const { lang } = useLanguage();
+  const { deityArt } = useContent();
+  const toast = useToast();
   const hi = lang === 'hi';
 
   const shotRef = useRef<View>(null);
   const [deityId, setDeityId] = useState(DEITY_IDS[0] ?? 'shiva');
   const [style, setStyle] = useState('sanctum');
   const [saving, setSaving] = useState(false);
+  const [applying, setApplying] = useState<Wallpaper.WallpaperTarget | null>(null);
 
+
+  // Resolved once: Expo Go and iOS have no native side at all.
+  const canSet = Wallpaper.isAvailable();
+  const splitTargets = canSet && Wallpaper.supportsLockScreen();
 
   const deity = DEITIES.find((d) => d.id === deityId);
-  const art = DEITY_IMAGES[deityId];
+  const art = deityArt(deityId);
+
+  /** Render the preview to a PNG on disk and hand back its file:// uri. */
+  const captureCanvas = useCallback(async (): Promise<string | null> => {
+    if (!(await loadCapture())) {
+      toast.info(hi ? 'Development build चाहिए' : 'Needs a development build', {
+        description: hi
+          ? 'Expo Go में यह सुविधा उपलब्ध नहीं है।'
+          : 'Expo Go cannot reach the native image APIs.',
+      });
+      return null;
+    }
+    // `tmpfile` rather than base64: the image is a few megapixels and both
+    // the media library and WallpaperManager want a path anyway.
+    return capture.captureRef(shotRef, { format: 'png', quality: 1, result: 'tmpfile' });
+  }, [hi, toast]);
+
+  /** Set the captured image as the device wallpaper. No gallery round-trip. */
+  const apply = useCallback(
+    async (target: Wallpaper.WallpaperTarget) => {
+      setApplying(target);
+      try {
+        const uri = await captureCanvas();
+        if (!uri) return;
+        await Wallpaper.setWallpaper(uri, target);
+        toast.success(hi ? 'वॉलपेपर सेट हो गया' : 'Wallpaper set', {
+          description:
+            target === 'lock'
+              ? hi
+                ? 'लॉक स्क्रीन पर लगा दिया गया।'
+                : 'Applied to your lock screen.'
+              : target === 'home'
+                ? hi
+                  ? 'होम स्क्रीन पर लगा दिया गया।'
+                  : 'Applied to your home screen.'
+                : hi
+                  ? 'होम और लॉक दोनों पर लगा दिया गया।'
+                  : 'Applied to both home and lock screens.',
+        });
+      } catch (e) {
+        toast.error(hi ? 'सेट नहीं हो सका' : 'Could not set wallpaper', {
+          description: e instanceof Error ? e.message : String(e),
+        });
+      } finally {
+        setApplying(null);
+      }
+    },
+    [captureCanvas, hi, toast],
+  );
 
   const save = useCallback(async () => {
     setSaving(true);
     try {
-      if (!(await loadCapture())) {
-        Alert.alert(
-          hi ? 'Expo Go में सहेजना उपलब्ध नहीं' : 'Saving needs a development build',
-          hi
-            ? 'गैलरी में सहेजने के लिए development build चाहिए। पूर्वावलोकन यहाँ काम करता है।'
-            : 'Expo Go cannot reach the media library. The preview works here; saving will work once the app runs as a development build.',
-        );
-        return;
-      }
+      const uri = await captureCanvas();
+      if (!uri) return;
+
       const perm = await media.requestPermissionsAsync();
       if (!perm.granted) {
-        Alert.alert(
-          hi ? 'अनुमति चाहिए' : 'Permission needed',
-          hi
+        toast.info(hi ? 'अनुमति चाहिए' : 'Permission needed', {
+          description: hi
             ? 'वॉलपेपर सहेजने के लिए गैलरी की अनुमति दें।'
             : 'Allow access to your photos so the wallpaper can be saved.',
-        );
+        });
         return;
       }
-
-      // `tmpfile` rather than base64: the image is a few megapixels and the
-      // media library wants a path anyway.
-      const uri = await capture.captureRef(shotRef, {
-        format: 'png',
-        quality: 1,
-        result: 'tmpfile',
-      });
       await media.saveToLibraryAsync(uri);
 
-      Alert.alert(
-        hi ? 'सहेज लिया' : 'Saved',
-        hi
-          ? 'वॉलपेपर आपकी गैलरी में है। वहाँ से इसे वॉलपेपर के रूप में सेट करें।'
-          : 'The wallpaper is in your gallery. Set it from there — the app cannot set it for you.',
-      );
+      toast.success(hi ? 'सहेज लिया' : 'Saved', {
+        description: hi ? 'वॉलपेपर आपकी गैलरी में है।' : 'The wallpaper is in your gallery.',
+      });
     } catch (e) {
-      Alert.alert(
-        hi ? 'सहेजा नहीं जा सका' : 'Could not save',
-        e instanceof Error ? e.message : String(e),
-      );
+      toast.error(hi ? 'सहेजा नहीं जा सका' : 'Could not save', {
+        description: e instanceof Error ? e.message : String(e),
+      });
     } finally {
       setSaving(false);
     }
-  }, [hi]);
+  }, [captureCanvas, hi, toast]);
 
   return (
     <Screen tabBar={false}>
@@ -188,12 +232,72 @@ export default function WallpaperScreen() {
           </View>
         </View>
 
+        {/*
+          Setting the wallpaper is the point of the screen, so it leads.
+          Saving to the gallery stays for anyone who wants the file itself.
+          Separate home/lock targets need Android 7+; below that the device
+          has one wallpaper and offering the choice would be a lie.
+        */}
+        {canSet ? (
+          splitTargets ? (
+            <>
+              <View style={styles.actionRow}>
+                <View style={{ flex: 1 }}>
+                  <Button
+                    label={hi ? 'होम स्क्रीन' : 'Home screen'}
+                    icon="home"
+                    size="lg"
+                    block
+                    loading={applying === 'home'}
+                    disabled={!!applying || saving}
+                    onPress={() => apply('home')}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Button
+                    label={hi ? 'लॉक स्क्रीन' : 'Lock screen'}
+                    variant="secondary"
+                    icon="star"
+                    size="lg"
+                    block
+                    loading={applying === 'lock'}
+                    disabled={!!applying || saving}
+                    onPress={() => apply('lock')}
+                  />
+                </View>
+              </View>
+              <Button
+                label={hi ? 'दोनों पर लगाएँ' : 'Set on both'}
+                variant="secondary"
+                icon="check"
+                size="lg"
+                block
+                loading={applying === 'both'}
+                disabled={!!applying || saving}
+                onPress={() => apply('both')}
+              />
+            </>
+          ) : (
+            <Button
+              label={hi ? 'वॉलपेपर सेट करें' : 'Set as wallpaper'}
+              icon="check"
+              size="lg"
+              block
+              loading={!!applying}
+              disabled={saving}
+              onPress={() => apply('both')}
+            />
+          )
+        ) : null}
+
         <Button
           label={hi ? 'गैलरी में सहेजें' : 'Save to gallery'}
+          variant={canSet ? 'ghost' : 'primary'}
           icon="share"
           size="lg"
           block
           loading={saving}
+          disabled={!!applying}
           onPress={save}
         />
 
@@ -218,6 +322,7 @@ export default function WallpaperScreen() {
 }
 
 const styles = StyleSheet.create({
+  actionRow: { flexDirection: 'row', gap: Space.sm },
   scroll: { padding: Space.margin, gap: Space.md },
   chips: { gap: Space.sm, paddingVertical: 2, paddingRight: Space.sm },
 

@@ -15,9 +15,9 @@ import {
 } from '@/components/ui';
 import { AppBar } from '@/components/ui/surface';
 import { DEITIES, deityById } from '@/constants/deities';
-import { DEITY_IMAGES } from '@/constants/deity-images';
 import { KNOWLEDGE_IDS, LORE } from '@/constants/knowledge';
 import { useAdmin } from '@/context/admin';
+import { useContent } from '@/context/content';
 import { useLanguage } from '@/context/language';
 import { Radius, Space, useTheme } from '@/theme';
 
@@ -35,6 +35,7 @@ export default function KnowledgeScreen() {
   const router = useRouter();
   const { c } = useTheme();
   const { t, lang } = useLanguage();
+  const { deityArt } = useContent();
   const { flags } = useAdmin();
   const hi = lang === 'hi';
 
@@ -45,7 +46,7 @@ export default function KnowledgeScreen() {
 
   const deity = deityById(id);
   const lore = LORE[id];
-  const art = DEITY_IMAGES[id];
+  const art = deityArt(id);
 
   return (
     <Screen tabBar={false}>

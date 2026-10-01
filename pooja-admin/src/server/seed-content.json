@@ -1,0 +1,710 @@
+{
+  "sevas": [
+    {
+      "slug": "archana",
+      "name": "Archana",
+      "nameHi": "अर्चना",
+      "description": "Your name and gotra offered with 108 recitations.",
+      "price": 251,
+      "duration": "~20 min",
+      "deitySlugs": [],
+      "order": 0
+    },
+    {
+      "slug": "abhishek",
+      "name": "Rudrabhishek",
+      "nameHi": "रुद्राभिषेक",
+      "description": "Ritual bathing of the lingam with milk, honey and Ganga jal.",
+      "price": 1100,
+      "duration": "~45 min",
+      "deitySlugs": [
+        "shiva"
+      ],
+      "order": 1
+    },
+    {
+      "slug": "sahasranama",
+      "name": "Sahasranama Archana",
+      "nameHi": "सहस्रनाम अर्चना",
+      "description": "The thousand names recited in your name.",
+      "price": 751,
+      "duration": "~40 min",
+      "deitySlugs": [
+        "vishnu",
+        "devi"
+      ],
+      "order": 2
+    },
+    {
+      "slug": "modak",
+      "name": "Modak Naivedya",
+      "nameHi": "मोदक नैवेद्य",
+      "description": "Twenty-one modaks offered, then couriered to you as prasad.",
+      "price": 501,
+      "duration": "~25 min",
+      "deitySlugs": [
+        "ganesha"
+      ],
+      "order": 3
+    },
+    {
+      "slug": "deep",
+      "name": "Deep Daan",
+      "nameHi": "दीप दान",
+      "description": "A ghee lamp lit in your name at the evening aarti.",
+      "price": 151,
+      "duration": "~10 min",
+      "deitySlugs": [],
+      "order": 4
+    }
+  ],
+  "faqs": [
+    {
+      "slug": "how-does-online-pooja-booking-work",
+      "category": "booking",
+      "categoryTitle": "Pooja & Seva Booking",
+      "categoryTitleHi": "पूजा और सेवा बुकिंग",
+      "question": "How does online Pooja booking work?",
+      "questionHi": "ऑनलाइन पूजा बुकिंग कैसे काम करती है?",
+      "answer": "Certified temple priests perform the sacred ritual at the physical temple on your selected date. Your name and gotra are recited in the holy sankalp. Sacred prasad is packed hygienically and dispatched to your address.",
+      "answerHi": "प्रमाणित मंदिर के पुजारी आपकी चुनी हुई तिथि पर भौतिक मंदिर में पवित्र अनुष्ठान करते हैं। पवित्र संकल्प में आपका नाम और गोत्र पढ़ा जाता है। प्रसाद को स्वच्छ रूप से पैक करके आपके पते पर भेजा जाता है।",
+      "order": 0
+    },
+    {
+      "slug": "can-i-book-a-pooja-on-behalf-of-family-members",
+      "category": "booking",
+      "categoryTitle": "Pooja & Seva Booking",
+      "categoryTitleHi": "पूजा और सेवा बुकिंग",
+      "question": "Can I book a pooja on behalf of family members?",
+      "questionHi": "क्या मैं परिवार के सदस्यों की ओर से पूजा बुक कर सकता हूँ?",
+      "answer": "Yes! During the booking process, you can enter the devotee’s full name and gotra so the priest recites their specific sankalp during the rite.",
+      "answerHi": "हाँ! बुकिंग के दौरान आप भक्त का पूरा नाम और गोत्र दर्ज कर सकते हैं ताकि पुजारी अनुष्ठान के दौरान उनका विशेष संकल्प बोल सकें।",
+      "order": 1
+    },
+    {
+      "slug": "how-far-in-advance-can-i-schedule-a-pooja",
+      "category": "booking",
+      "categoryTitle": "Pooja & Seva Booking",
+      "categoryTitleHi": "पूजा और सेवा बुकिंग",
+      "question": "How far in advance can I schedule a pooja?",
+      "questionHi": "मैं कितने दिन पहले पूजा का समय निर्धारित कर सकता हूँ?",
+      "answer": "You can schedule a seva up to 7 days in advance. Dates are aligned with daily temple schedules and auspicious tithis.",
+      "answerHi": "आप 7 दिन पहले तक सेवा का समय निर्धारित कर सकते हैं। तिथियां दैनिक मंदिर कार्यक्रम और शुभ मुहूर्त के अनुसार होती हैं।",
+      "order": 2
+    },
+    {
+      "slug": "what-is-included-in-the-consecrated-prasad-box",
+      "category": "prasad",
+      "categoryTitle": "Prasad & Delivery",
+      "categoryTitleHi": "प्रसाद और डिलीवरी",
+      "question": "What is included in the consecrated Prasad box?",
+      "questionHi": "पवित्र प्रसाद बॉक्स में क्या शामिल होता है?",
+      "answer": "Each prasad package contains holy vibhuti/chandan, sacred thread (Raksha Sutra), energized dry fruits/sweets, and a sanctified temple blessing card.",
+      "answerHi": "प्रत्येक प्रसाद पैकेज में पवित्र भस्म/चंदन, रक्षा सूत्र, अभिमंत्रित सूखे मेवे/मिठाई और एक पवित्र मंदिर आशीर्वाद कार्ड शामिल होता है।",
+      "order": 3
+    },
+    {
+      "slug": "how-long-does-prasad-delivery-take",
+      "category": "prasad",
+      "categoryTitle": "Prasad & Delivery",
+      "categoryTitleHi": "प्रसाद और डिलीवरी",
+      "question": "How long does prasad delivery take?",
+      "questionHi": "प्रसाद डिलीवरी में कितना समय लगता है?",
+      "answer": "Prasad is dispatched via express courier within 24 hours of pooja completion, reaching most domestic destinations across India within 3–5 business days.",
+      "answerHi": "पूजा संपन्न होने के 24 घंटे के भीतर प्रसाद एक्सप्रेस कूरियर से भेजा जाता है, जो भारत भर में 3–5 कार्यदिवसों में पहुँच जाता है।",
+      "order": 4
+    },
+    {
+      "slug": "what-is-e-chadhava-and-how-is-it-offered",
+      "category": "chadhava",
+      "categoryTitle": "E-Chadhava & Offerings",
+      "categoryTitleHi": "ई-चढ़ावा और अर्पण",
+      "question": "What is E-Chadhava and how is it offered?",
+      "questionHi": "ई-चढ़ावा क्या है और इसे कैसे अर्पित किया जाता है?",
+      "answer": "E-Chadhava enables devotees to offer flowers (Pushpam), bhog/food (Prasad), and deity attire (Vastram) digitally. Offerings are arranged directly at the temple sanctum on your behalf.",
+      "answerHi": "ई-चढ़ावा भक्तों को फूल (पुष्पम), भोग (प्रसाद) और वस्त्र डिजिटल रूप से अर्पित करने की सुविधा देता है। ये अर्पण मंदिर के गर्भगृह में आपकी ओर से व्यवस्थित किए जाते हैं।",
+      "order": 5
+    },
+    {
+      "slug": "how-do-i-perform-the-interactive-virtual-aarti",
+      "category": "virtual",
+      "categoryTitle": "Virtual Pooja & Aarti",
+      "categoryTitleHi": "वर्चुअल पूजा और आरती",
+      "question": "How do I perform the interactive Virtual Aarti?",
+      "questionHi": "मैं इंटरैक्टिव वर्चुअल आरती कैसे करूँ?",
+      "answer": "Go to the Pooja tab, hold and rotate the holy aarti thali in a clockwise circular motion around the deity. Completing 5 parikramas earns divine ॐ coins and sacred blessings.",
+      "answerHi": "पूजा टैब पर जाएँ, आरती की थाली को पकड़कर भगवान के चारों ओर घड़ी की दिशा में घुमाएँ। 5 परिक्रमाएँ पूरी करने पर दिव्य ॐ सिक्के और आशीर्वाद प्राप्त होते हैं।",
+      "order": 6
+    },
+    {
+      "slug": "how-do-i-set-up-daily-aarti-reminders",
+      "category": "virtual",
+      "categoryTitle": "Virtual Pooja & Aarti",
+      "categoryTitleHi": "वर्चुअल पूजा और आरती",
+      "question": "How do I set up daily Aarti reminders?",
+      "questionHi": "दैनिक आरती रिमाइंडर कैसे सेट करें?",
+      "answer": "Tap the Bell icon on the Home screen or visit Daily Reminders under Profile to schedule automated chime alerts for Mangala, Shringar, Sandhya, and Shayan aartis.",
+      "answerHi": "होम स्क्रीन पर घंटी आइकन टैप करें या मंगला, श्रृंगार, संध्या और शयन आरती के लिए स्वचालित रिमाइंडर शेड्यूल करने के लिए प्रोफ़ाइल में दैनिक रिमाइंडर पर जाएँ।",
+      "order": 7
+    },
+    {
+      "slug": "how-can-i-reach-customer-support-for-assistance",
+      "category": "account",
+      "categoryTitle": "Account & Support",
+      "categoryTitleHi": "खाता और सहायता",
+      "question": "How can I reach customer support for assistance?",
+      "questionHi": "सहायता के लिए मैं ग्राहक सेवा से कैसे संपर्क कर सकता हूँ?",
+      "answer": "Use the Call or Email buttons at the top of this screen — they open whichever channels this temple has published.",
+      "answerHi": "इस स्क्रीन के ऊपर दिए कॉल या ईमेल बटन का उपयोग करें — वे इस मंदिर द्वारा प्रकाशित माध्यम खोलते हैं।",
+      "order": 8
+    }
+  ],
+  "knowledge": [
+    {
+      "deitySlug": "shiva",
+      "epithet": "Mahadeva — the Great God",
+      "epithetHi": "महादेव",
+      "about": "One of the Trimurti, Shiva is the destroyer and transformer — the force that dissolves so that creation may begin again. He is worshipped most often as the lingam, and is the ascetic who holds the Ganga in his matted hair and the crescent moon at his brow.",
+      "aboutHi": "त्रिमूर्ति में शिव संहारक और परिवर्तनकारी हैं — वह शक्ति जो विलय करती है ताकि सृष्टि पुनः आरम्भ हो सके। उनकी पूजा प्रायः शिवलिंग के रूप में होती है। जटाओं में गंगा और मस्तक पर चंद्रमा धारण करने वाले वे महायोगी हैं।",
+      "facts": [
+        {
+          "k": "Abode",
+          "kHi": "धाम",
+          "v": "Mount Kailash",
+          "vHi": "कैलाश पर्वत"
+        },
+        {
+          "k": "Vahana",
+          "kHi": "वाहन",
+          "v": "Nandi, the bull",
+          "vHi": "नंदी"
+        },
+        {
+          "k": "Consort",
+          "kHi": "संगिनी",
+          "v": "Parvati",
+          "vHi": "पार्वती"
+        },
+        {
+          "k": "Sacred day",
+          "kHi": "शुभ दिन",
+          "v": "Monday",
+          "vHi": "सोमवार"
+        }
+      ],
+      "texts": [
+        "Shiva Purana",
+        "Sri Rudram",
+        "Shiva Tandava Stotram"
+      ],
+      "textsHi": [
+        "शिव पुराण",
+        "श्री रुद्रम्",
+        "शिव ताण्डव स्तोत्र"
+      ],
+      "festivals": [
+        "Mahashivratri",
+        "Shravan Somwar",
+        "Pradosh Vrat"
+      ],
+      "festivalsHi": [
+        "महाशिवरात्रि",
+        "सावन सोमवार",
+        "प्रदोष व्रत"
+      ],
+      "order": 0
+    },
+    {
+      "deitySlug": "vishnu",
+      "epithet": "Narayana — the Preserver",
+      "epithetHi": "नारायण",
+      "about": "The preserver of the Trimurti, Vishnu sustains dharma and descends as an avatar whenever it falters — most famously as Rama and Krishna. He reclines on the serpent Shesha upon the cosmic ocean.",
+      "aboutHi": "त्रिमूर्ति में विष्णु पालनकर्ता हैं। जब-जब धर्म की हानि होती है, वे अवतार लेकर प्रकट होते हैं — राम और कृष्ण उनके सर्वाधिक प्रसिद्ध अवतार हैं। वे क्षीरसागर में शेषनाग पर शयन करते हैं।",
+      "facts": [
+        {
+          "k": "Abode",
+          "kHi": "धाम",
+          "v": "Vaikuntha",
+          "vHi": "वैकुण्ठ"
+        },
+        {
+          "k": "Vahana",
+          "kHi": "वाहन",
+          "v": "Garuda, the eagle",
+          "vHi": "गरुड़"
+        },
+        {
+          "k": "Consort",
+          "kHi": "संगिनी",
+          "v": "Lakshmi",
+          "vHi": "लक्ष्मी"
+        },
+        {
+          "k": "Sacred day",
+          "kHi": "शुभ दिन",
+          "v": "Thursday",
+          "vHi": "गुरुवार"
+        }
+      ],
+      "texts": [
+        "Vishnu Sahasranama",
+        "Bhagavata Purana",
+        "Vishnu Purana"
+      ],
+      "textsHi": [
+        "विष्णु सहस्रनाम",
+        "भागवत पुराण",
+        "विष्णु पुराण"
+      ],
+      "festivals": [
+        "Ekadashi",
+        "Vaikuntha Ekadashi",
+        "Anant Chaturdashi"
+      ],
+      "festivalsHi": [
+        "एकादशी",
+        "वैकुण्ठ एकादशी",
+        "अनंत चतुर्दशी"
+      ],
+      "order": 1
+    },
+    {
+      "deitySlug": "ganesh",
+      "epithet": "Vighnaharta — remover of obstacles",
+      "epithetHi": "विघ्नहर्ता",
+      "about": "The elephant-headed son of Shiva and Parvati, Ganesha is invoked before every undertaking and every other deity. He is the patron of letters and learning, and is said to have written the Mahabharata as Vyasa dictated it.",
+      "aboutHi": "शिव और पार्वती के गजमुख पुत्र गणेश का आवाहन हर शुभ कार्य के आरम्भ में, सभी देवों से पहले किया जाता है। वे बुद्धि और लेखन के अधिपति हैं — व्यास जी के कहने पर महाभारत उन्होंने ही लिखी थी।",
+      "facts": [
+        {
+          "k": "Parents",
+          "kHi": "माता-पिता",
+          "v": "Shiva and Parvati",
+          "vHi": "शिव और पार्वती"
+        },
+        {
+          "k": "Vahana",
+          "kHi": "वाहन",
+          "v": "Mushak, the mouse",
+          "vHi": "मूषक"
+        },
+        {
+          "k": "Offering",
+          "kHi": "प्रिय भोग",
+          "v": "Modak",
+          "vHi": "मोदक"
+        },
+        {
+          "k": "Sacred day",
+          "kHi": "शुभ दिन",
+          "v": "Wednesday & Chaturthi",
+          "vHi": "बुधवार व चतुर्थी"
+        }
+      ],
+      "texts": [
+        "Ganesha Purana",
+        "Ganapati Atharvashirsha",
+        "Sankatnashan Ganesh Stotra"
+      ],
+      "textsHi": [
+        "गणेश पुराण",
+        "गणपति अथर्वशीर्ष",
+        "संकटनाशन गणेश स्तोत्र"
+      ],
+      "festivals": [
+        "Ganesh Chaturthi",
+        "Angarki Chaturthi"
+      ],
+      "festivalsHi": [
+        "गणेश चतुर्थी",
+        "अंगारकी चतुर्थी"
+      ],
+      "order": 2
+    },
+    {
+      "deitySlug": "hanuman",
+      "epithet": "Sankatmochan — dispeller of troubles",
+      "epithetHi": "संकटमोचन",
+      "about": "The son of Vayu and the foremost devotee of Rama, Hanuman is the emblem of strength joined to humility. He leapt the ocean to Lanka to find Sita, and is held to be chiranjivi — living still, wherever the Ramayana is recited.",
+      "aboutHi": "पवनपुत्र हनुमान श्रीराम के परम भक्त हैं और बल के साथ विनम्रता के प्रतीक हैं। सीता माता की खोज में उन्होंने समुद्र लांघा था। वे चिरंजीवी माने जाते हैं — जहाँ भी रामकथा होती है, वहाँ उपस्थित रहते हैं।",
+      "facts": [
+        {
+          "k": "Father",
+          "kHi": "पिता",
+          "v": "Vayu, the wind",
+          "vHi": "पवन देव"
+        },
+        {
+          "k": "Devoted to",
+          "kHi": "आराध्य",
+          "v": "Shri Rama",
+          "vHi": "श्री राम"
+        },
+        {
+          "k": "Offering",
+          "kHi": "प्रिय भोग",
+          "v": "Boondi laddu, sindoor",
+          "vHi": "बूंदी लड्डू, सिंदूर"
+        },
+        {
+          "k": "Sacred day",
+          "kHi": "शुभ दिन",
+          "v": "Tuesday & Saturday",
+          "vHi": "मंगलवार व शनिवार"
+        }
+      ],
+      "texts": [
+        "Hanuman Chalisa",
+        "Sundarkand",
+        "Bajrang Baan"
+      ],
+      "textsHi": [
+        "हनुमान चालीसा",
+        "सुंदरकाण्ड",
+        "बजरंग बाण"
+      ],
+      "festivals": [
+        "Hanuman Jayanti"
+      ],
+      "festivalsHi": [
+        "हनुमान जयंती"
+      ],
+      "order": 3
+    },
+    {
+      "deitySlug": "durga",
+      "epithet": "Mahishasuramardini — slayer of Mahishasura",
+      "epithetHi": "महिषासुरमर्दिनी",
+      "about": "Durga is the warrior form of the Devi, born of the combined light of all the gods to defeat the buffalo demon no man or god could kill. She carries a weapon from each deity in her many hands, and rides a lion into battle.",
+      "aboutHi": "दुर्गा देवी का योद्धा स्वरूप हैं। समस्त देवताओं के तेज से उनका प्राकट्य हुआ, ताकि उस महिषासुर का वध हो सके जिसे कोई देव या मनुष्य नहीं मार सकता था। उनके हाथों में हर देवता का अस्त्र है और वाहन सिंह है।",
+      "facts": [
+        {
+          "k": "Vahana",
+          "kHi": "वाहन",
+          "v": "Lion",
+          "vHi": "सिंह"
+        },
+        {
+          "k": "Consort",
+          "kHi": "संगिनी",
+          "v": "Shiva",
+          "vHi": "शिव"
+        },
+        {
+          "k": "Forms",
+          "kHi": "स्वरूप",
+          "v": "Navadurga — nine forms",
+          "vHi": "नवदुर्गा — नौ स्वरूप"
+        },
+        {
+          "k": "Sacred day",
+          "kHi": "शुभ दिन",
+          "v": "Friday & Ashtami",
+          "vHi": "शुक्रवार व अष्टमी"
+        }
+      ],
+      "texts": [
+        "Durga Saptashati",
+        "Devi Mahatmya",
+        "Aigiri Nandini"
+      ],
+      "textsHi": [
+        "दुर्गा सप्तशती",
+        "देवी माहात्म्य",
+        "अइगिरि नंदिनी"
+      ],
+      "festivals": [
+        "Navratri",
+        "Durga Puja",
+        "Vijayadashami"
+      ],
+      "festivalsHi": [
+        "नवरात्रि",
+        "दुर्गा पूजा",
+        "विजयादशमी"
+      ],
+      "order": 4
+    },
+    {
+      "deitySlug": "lakshmi",
+      "epithet": "Shri — goddess of fortune",
+      "epithetHi": "श्री",
+      "about": "Lakshmi is the goddess of wealth, fortune and abundance — not gold alone, but the prosperity of a well-kept home and an honest livelihood. She arose from the churning of the ocean and chose Vishnu as her consort.",
+      "aboutHi": "लक्ष्मी धन, वैभव और समृद्धि की देवी हैं — केवल स्वर्ण की नहीं, बल्कि सुव्यवस्थित गृह और सदाचारी जीविका की भी। समुद्र मंथन से प्रकट होकर उन्होंने विष्णु को वरण किया।",
+      "facts": [
+        {
+          "k": "Vahana",
+          "kHi": "वाहन",
+          "v": "Owl",
+          "vHi": "उल्लू"
+        },
+        {
+          "k": "Consort",
+          "kHi": "संगिनी",
+          "v": "Vishnu",
+          "vHi": "विष्णु"
+        },
+        {
+          "k": "Symbol",
+          "kHi": "प्रतीक",
+          "v": "Lotus and golden pot",
+          "vHi": "कमल और कलश"
+        },
+        {
+          "k": "Sacred day",
+          "kHi": "शुभ दिन",
+          "v": "Friday",
+          "vHi": "शुक्रवार"
+        }
+      ],
+      "texts": [
+        "Sri Suktam",
+        "Kanakadhara Stotram",
+        "Lakshmi Ashtakam"
+      ],
+      "textsHi": [
+        "श्री सूक्तम्",
+        "कनकधारा स्तोत्र",
+        "लक्ष्मी अष्टकम्"
+      ],
+      "festivals": [
+        "Diwali",
+        "Sharad Purnima",
+        "Varalakshmi Vrat"
+      ],
+      "festivalsHi": [
+        "दीपावली",
+        "शरद पूर्णिमा",
+        "वरलक्ष्मी व्रत"
+      ],
+      "order": 5
+    },
+    {
+      "deitySlug": "krishna",
+      "epithet": "Govinda — the eighth avatar",
+      "epithetHi": "गोविंद",
+      "about": "The eighth avatar of Vishnu, Krishna is at once the child of Gokul who stole butter, the flute-player of Vrindavan, and the charioteer who spoke the Bhagavad Gita to Arjuna on the field at Kurukshetra.",
+      "aboutHi": "विष्णु के आठवें अवतार कृष्ण एक साथ गोकुल के माखनचोर बालक, वृंदावन के बंसीधर, और कुरुक्षेत्र में अर्जुन को गीता का उपदेश देने वाले सारथी हैं।",
+      "facts": [
+        {
+          "k": "Abode",
+          "kHi": "धाम",
+          "v": "Vrindavan, Dwarka",
+          "vHi": "वृंदावन, द्वारका"
+        },
+        {
+          "k": "Consort",
+          "kHi": "संगिनी",
+          "v": "Radha, Rukmini",
+          "vHi": "राधा, रुक्मिणी"
+        },
+        {
+          "k": "Offering",
+          "kHi": "प्रिय भोग",
+          "v": "Makhan mishri",
+          "vHi": "माखन मिश्री"
+        },
+        {
+          "k": "Sacred day",
+          "kHi": "शुभ दिन",
+          "v": "Wednesday & Ashtami",
+          "vHi": "बुधवार व अष्टमी"
+        }
+      ],
+      "texts": [
+        "Bhagavad Gita",
+        "Bhagavata Purana",
+        "Madhurashtakam"
+      ],
+      "textsHi": [
+        "भगवद्गीता",
+        "भागवत पुराण",
+        "मधुराष्टकम्"
+      ],
+      "festivals": [
+        "Janmashtami",
+        "Holi",
+        "Govardhan Puja"
+      ],
+      "festivalsHi": [
+        "जन्माष्टमी",
+        "होली",
+        "गोवर्धन पूजा"
+      ],
+      "order": 6
+    },
+    {
+      "deitySlug": "shani",
+      "epithet": "Shanaishchara — the slow-mover",
+      "epithetHi": "शनैश्चर",
+      "about": "Son of Surya and lord of the planet Saturn, Shani is the strict accountant of karma. He is feared as a giver of hardship, but the hardship is understood as consequence rather than cruelty — he rewards patience, labour and honesty exactly as he punishes their absence.",
+      "aboutHi": "सूर्यपुत्र और शनि ग्रह के अधिपति शनिदेव कर्मों के कठोर न्यायाधीश हैं। कष्टदाता माने जाते हैं, किन्तु वह कष्ट क्रूरता नहीं, कर्म का फल है — धैर्य, परिश्रम और सत्य का वे उतना ही फल देते हैं जितना उनके अभाव का दंड।",
+      "facts": [
+        {
+          "k": "Father",
+          "kHi": "पिता",
+          "v": "Surya, the sun",
+          "vHi": "सूर्य देव"
+        },
+        {
+          "k": "Vahana",
+          "kHi": "वाहन",
+          "v": "Crow",
+          "vHi": "कौआ"
+        },
+        {
+          "k": "Offering",
+          "kHi": "प्रिय अर्पण",
+          "v": "Sesame oil, black cloth",
+          "vHi": "तिल का तेल, काला वस्त्र"
+        },
+        {
+          "k": "Sacred day",
+          "kHi": "शुभ दिन",
+          "v": "Saturday",
+          "vHi": "शनिवार"
+        }
+      ],
+      "texts": [
+        "Shani Chalisa",
+        "Dasharatha Shani Stotra"
+      ],
+      "textsHi": [
+        "शनि चालीसा",
+        "दशरथकृत शनि स्तोत्र"
+      ],
+      "festivals": [
+        "Shani Amavasya",
+        "Shani Jayanti"
+      ],
+      "festivalsHi": [
+        "शनि अमावस्या",
+        "शनि जयंती"
+      ],
+      "order": 7
+    }
+  ],
+  "templePatch": [
+    {
+      "slug": "kashi",
+      "mark": "ॐ",
+      "backdropFrom": "#2A1206",
+      "backdropTo": "#0B0503",
+      "accent": "#FFB63D",
+      "trim": "#E4572E",
+      "idol": "#C9A227",
+      "mapX": 330,
+      "mapY": 250,
+      "lat": 25.3109,
+      "lng": 83.0107,
+      "offerings": [
+        "Bilva Patra",
+        "Ganga Jal",
+        "Dhatura"
+      ]
+    },
+    {
+      "slug": "siddhivinayak",
+      "mark": "श्री",
+      "backdropFrom": "#3A0F16",
+      "backdropTo": "#0A0405",
+      "accent": "#FF7A45",
+      "trim": "#F2C14E",
+      "idol": "#E2703A",
+      "mapX": 175,
+      "mapY": 470,
+      "lat": 19.0169,
+      "lng": 72.8302,
+      "offerings": [
+        "Modak",
+        "Durva Grass",
+        "Red Hibiscus"
+      ]
+    },
+    {
+      "slug": "meenakshi",
+      "mark": "ऐं",
+      "backdropFrom": "#10233A",
+      "backdropTo": "#04080F",
+      "accent": "#4FD1C5",
+      "trim": "#F06595",
+      "idol": "#2F8F83",
+      "mapX": 285,
+      "mapY": 780,
+      "lat": 9.9195,
+      "lng": 78.1193,
+      "offerings": [
+        "Kumkum",
+        "Jasmine",
+        "Sarees"
+      ]
+    },
+    {
+      "slug": "jagannath",
+      "mark": "हरि",
+      "backdropFrom": "#2C1A3E",
+      "backdropTo": "#07040C",
+      "accent": "#B794F4",
+      "trim": "#F6AD55",
+      "idol": "#6B46C1",
+      "mapX": 430,
+      "mapY": 420,
+      "lat": 19.8048,
+      "lng": 85.818,
+      "offerings": [
+        "Tulsi Leaves",
+        "Mahaprasad",
+        "Chandan"
+      ]
+    },
+    {
+      "slug": "tirupati",
+      "mark": "ॐ",
+      "backdropFrom": "#0F2A22",
+      "backdropTo": "#030907",
+      "accent": "#F6E05E",
+      "trim": "#68D391",
+      "idol": "#276749",
+      "mapX": 330,
+      "mapY": 660,
+      "lat": 13.6833,
+      "lng": 79.3474,
+      "offerings": [
+        "Tulsi Mala",
+        "Laddu",
+        "Chandan"
+      ]
+    }
+  ],
+  "settings": [
+    {
+      "key": "prasadDelivery",
+      "value": "99",
+      "label": "Prasad delivery fee (₹)",
+      "desc": "Added to a booking when prasad delivery is chosen."
+    },
+    {
+      "key": "supportEmail",
+      "value": "",
+      "label": "Support email",
+      "desc": "Blank hides the Email button in Help & Support."
+    },
+    {
+      "key": "supportPhone",
+      "value": "",
+      "label": "Support phone",
+      "desc": "Dialable, e.g. +911800123456. Blank hides the Call button."
+    },
+    {
+      "key": "supportHours",
+      "value": "",
+      "label": "Support hours (EN)",
+      "desc": "Shown under the helpline heading."
+    },
+    {
+      "key": "supportHoursHi",
+      "value": "",
+      "label": "Support hours (HI)",
+      "desc": ""
+    }
+  ]
+}

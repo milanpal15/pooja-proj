@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Radius, Sacred, Space } from '@/constants/sacred';
 
+import { ToastProvider } from '@/components/ui';
 import { LanguageScreen } from '@/components/auth/language-screen';
 import { LoginScreen } from '@/components/auth/login-screen';
 import { AdminProvider, useAdmin } from '@/context/admin';
@@ -37,7 +38,11 @@ export default function TabLayout() {
             <AuthProvider>
               <AdminProvider>
                 <ContentProvider>
-                  <RootGate />
+                  {/* Innermost: toasts must draw above every screen, and any
+                      provider below could raise one during its own setup. */}
+                  <ToastProvider>
+                    <RootGate />
+                  </ToastProvider>
                 </ContentProvider>
               </AdminProvider>
             </AuthProvider>

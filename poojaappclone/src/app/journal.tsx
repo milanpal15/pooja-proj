@@ -1,17 +1,22 @@
-import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Card,
-  Field,
-  Icon,
-  IconButton,
-  ProgressRing,
-  Screen,
-  Type,
-} from '@/components/ui';
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
+
+import { Button, Card, Field, Icon, IconButton, ProgressRing, Screen, Type, useToast } from '@/components/ui';
 import { AppBar } from '@/components/ui/surface';
 import { useLanguage } from '@/context/language';
+import {
+  dayKey,
+  EMPTY_ENTRY,
+  hasContent,
+  type JournalMap,
+  readJournal,
+  writeEntry,
+} from '@/lib/journal';
 import { Radius, Space, useTheme } from '@/theme';
 
 /**
@@ -31,32 +36,144 @@ import { Radius, Space, useTheme } from '@/theme';
 
 const MALA = 108;
 
-const WEEK = [
-  { d: 'SUN', n: 23, dot: true },
-  { d: 'MON', n: 24, dot: true },
-  { d: 'TUE', n: 25, dot: true },
-  { d: 'WED', n: 26, active: true },
-  { d: 'THU', n: 27 },
-  { d: 'FRI', n: 28 },
-  { d: 'SAT', n: 29 },
-];
+/** Month label for the week strip, in the devotee's language. */
+const MONTHS_EN = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+
+/**
+ * The 7 days of the week containing `anchor` (Sun–Sat).
+ *
+ * `dot` marks days that actually have a saved entry — it used to mark "every
+ * day earlier than today", which drew a full week of gold dots for a devotee
+ * who had never written anything.
+ */
+function getWeek(anchor: Date, written: Set<string>) {
+  const DAY_LABELS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+  const todayKey = dayKey();
+  const anchorKey = dayKey(anchor);
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(anchor);
+    d.setDate(anchor.getDate() - anchor.getDay() + i);
+    const key = dayKey(d);
+    return {
+      d: DAY_LABELS[i],
+      n: d.getDate(),
+      key,
+      date: d,
+      dot: written.has(key),
+      active: key === anchorKey,
+      today: key === todayKey,
+      /** Nothing has been chanted tomorrow yet. */
+      future: key > todayKey,
+    };
+  });
+}
 
 export default function JournalScreen() {
   const { c } = useTheme();
-  const { t } = useLanguage();
-  const [count, setCount] = useState(108);
+  const { t, lang } = useLanguage();
+  const toast = useToast();
+
+  /** Which day is being written. Starts on today; the week strip moves it. */
+  const [anchor, setAnchor] = useState(() => new Date());
+  const [journal, setJournal] = useState<JournalMap>({});
+  const [count, setCount] = useState(0);
   const [gratitude, setGratitude] = useState('');
   const [notes, setNotes] = useState('');
+  const [loaded, setLoaded] = useState(false);
+
+  const key = dayKey(anchor);
+  const written = useMemo(
+    () => new Set(Object.keys(journal).filter((k) => hasContent(journal[k]))),
+    [journal],
+  );
+  const WEEK = useMemo(() => getWeek(anchor, written), [anchor, written]);
+
+  // Load the whole journal once; switching days then costs no storage read.
+  useEffect(() => {
+    let alive = true;
+    readJournal().then((all) => {
+      if (!alive) return;
+      setJournal(all);
+      const e = { ...EMPTY_ENTRY, ...all[dayKey()] };
+      setCount(e.count);
+      setGratitude(e.gratitude);
+      setNotes(e.notes);
+      setLoaded(true);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  /** Swap the editor over to another day, showing whatever that day holds. */
+  const selectDay = useCallback(
+    (d: Date) => {
+      const e = { ...EMPTY_ENTRY, ...journal[dayKey(d)] };
+      setAnchor(d);
+      setCount(e.count);
+      setGratitude(e.gratitude);
+      setNotes(e.notes);
+    },
+    [journal],
+  );
+
+  const shiftWeeks = useCallback(
+    (weeks: number) => {
+      const d = new Date(anchor);
+      d.setDate(d.getDate() + weeks * 7);
+      selectDay(d);
+    },
+    [anchor, selectDay],
+  );
+
+  /*
+   * Autosave, debounced.
+   *
+   * The Save button used to be the only way to persist, and it only raised an
+   * alert — so a devotee who counted a mala and backed out lost the lot. This
+   * writes as they go; Save is now just the acknowledgement.
+   */
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!loaded) return;
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => {
+      writeEntry(key, { count, gratitude, notes }).then((all) => all && setJournal(all));
+    }, 400);
+    return () => {
+      if (timer.current) clearTimeout(timer.current);
+    };
+  }, [loaded, key, count, gratitude, notes]);
 
   // One full mala per revolution, so 216 reads as two complete rounds.
   const progress = (count % MALA) / MALA || (count > 0 ? 1 : 0);
+
+  const monthLabel = useMemo(() => {
+    if (lang === 'hi') {
+      return anchor.toLocaleDateString('hi-IN', { month: 'long', year: 'numeric' });
+    }
+    return `${MONTHS_EN[anchor.getMonth()]} ${anchor.getFullYear()}`;
+  }, [anchor, lang]);
+
+  const saveEntry = useCallback(async () => {
+    const all = await writeEntry(key, { count, gratitude, notes });
+    if (all) setJournal(all);
+    toast.success(t('entry_saved'));
+  }, [key, count, gratitude, notes, t, toast]);
 
   return (
     <Screen tabBar={false}>
       <AppBar
         title={t('journal_title')}
         tinted
-        right={<IconButton name="calendar" label="Pick a date" size={40} />}
+        right={
+          <IconButton
+            name="calendar"
+            label="Go to today"
+            size={40}
+            onPress={() => selectDay(new Date())}
+          />
+        }
       />
 
       <ScrollView
@@ -66,17 +183,31 @@ export default function JournalScreen() {
         {/* Week strip */}
         <Card variant="sunken">
           <View style={styles.monthRow}>
-            <IconButton name="back" label="Previous month" size={32} />
-            <Type v="titleMd">OCT 2023</Type>
-            <IconButton name="forward" label="Next month" size={32} />
+            <IconButton
+              name="back"
+              label="Previous week"
+              size={32}
+              onPress={() => shiftWeeks(-1)}
+            />
+            <Type v="titleMd">{monthLabel}</Type>
+            <IconButton
+              name="forward"
+              label="Next week"
+              size={32}
+              onPress={() => shiftWeeks(1)}
+            />
           </View>
           <View style={styles.week}>
             {WEEK.map((w) => (
               <Pressable
-                key={w.d}
+                key={w.key}
                 accessibilityRole="button"
-                accessibilityState={{ selected: !!w.active }}
-                style={styles.day}>
+                accessibilityLabel={w.date.toDateString()}
+                accessibilityState={{ selected: !!w.active, disabled: w.future }}
+                // A day that has not happened cannot be journalled.
+                disabled={w.future}
+                onPress={() => selectDay(w.date)}
+                style={({ pressed }) => [styles.day, pressed && { opacity: 0.6 }]}>
                 <Type v="labelSm" tone="onSurfaceFaint">
                   {w.d}
                 </Type>
@@ -84,6 +215,9 @@ export default function JournalScreen() {
                   style={[
                     styles.dayNum,
                     w.active && { backgroundColor: c.primary },
+                    // Today stays findable once the devotee browses away from it.
+                    !w.active && w.today && { borderWidth: 1, borderColor: c.gold },
+                    w.future && { opacity: 0.35 },
                   ]}>
                   <Type v="titleSm" color={w.active ? c.onPrimary : c.onSurface}>
                     {w.n}
@@ -152,6 +286,14 @@ export default function JournalScreen() {
             multilineRows={4}
           />
         </View>
+
+        <Button
+          label={t('save')}
+          icon="check"
+          size="lg"
+          block
+          onPress={saveEntry}
+        />
       </ScrollView>
     </Screen>
   );

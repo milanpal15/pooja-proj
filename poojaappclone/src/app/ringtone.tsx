@@ -1,8 +1,13 @@
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
 
-import { Card, Icon, Screen, SectionBand, Type } from '@/components/ui';
+import { Card, Icon, Screen, SectionBand, Type, useToast } from '@/components/ui';
 import { AppBar } from '@/components/ui/surface';
 import { TONES, type ToneId } from '@/constants/reminders';
 import { SOUNDS } from '@/constants/sounds';
@@ -26,6 +31,7 @@ import { Radius, Space, useTheme } from '@/theme';
 export default function RingtoneScreen() {
   const { c } = useTheme();
   const { lang } = useLanguage();
+  const toast = useToast();
   const hi = lang === 'hi';
   const { state, setTone } = useReminders();
 
@@ -46,7 +52,7 @@ export default function RingtoneScreen() {
   // silent is indistinguishable from being broken here.
   useEffect(() => {
     setAudioModeAsync({ playsInSilentMode: true }).catch(() => {});
-  }, []);
+  }, [, toast]);
 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -108,10 +114,9 @@ export default function RingtoneScreen() {
       if (!status?.isLoaded) {
         // play() on an unloaded player no-ops without raising, which is
         // indistinguishable from broken. Say what actually happened.
-        Alert.alert(
-          hi ? 'ध्वनि अभी लोड नहीं हुई' : 'Tone still loading',
-          hi ? 'एक क्षण बाद फिर टैप करें।' : 'Give it a moment and tap again.',
-        );
+        toast.info(hi ? 'ध्वनि अभी लोड नहीं हुई' : 'Tone still loading', {
+          description: hi ? 'एक क्षण बाद फिर टैप करें।' : 'Give it a moment and tap again.',
+        });
         return;
       }
       try {
@@ -132,7 +137,7 @@ export default function RingtoneScreen() {
         // A missing asset should not take the screen down.
       }
     },
-    [bell, aarti, bellStatus, aartiStatus, hi, stopAll],
+    [bell, aarti, bellStatus, aartiStatus, hi, stopAll, toast],
   );
 
   return (

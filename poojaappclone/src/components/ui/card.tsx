@@ -23,7 +23,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-import { Fill, Radius, Space, useTheme } from '@/theme';
+import { Radius, Space, useTheme } from '@/theme';
 
 import { Icon, type IconName } from './icon';
 import { Mandala } from './mandala';
@@ -146,7 +146,14 @@ export function ArchImage({
         },
         style,
       ]}>
-      <Image source={source} resizeMode={fit} style={Fill} />
+      {/*
+        Sized with width/height rather than an absolute Fill. On Android an
+        absolutely-positioned child of a view that combines `overflow:'hidden'`
+        with a large corner radius gets clipped away entirely — the arch drew
+        its background and the label, and the deity never appeared. A
+        normally-laid-out child is clipped correctly.
+      */}
+      <Image source={source} resizeMode={fit} style={styles.archImage} />
       {children}
     </View>
   );
@@ -308,6 +315,7 @@ export function Badge({
 }
 
 const styles = StyleSheet.create({
+  archImage: { width: '100%', height: '100%' },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'baseline',

@@ -12,43 +12,87 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Field, Icon, IconButton, Mandala, Type } from '@/components/ui';
-import { type AuthMethod, useAuth } from '@/context/auth';
+import { GOOGLE_WEB_CLIENT_ID } from '@/constants/config';
+import { useAdmin } from '@/context/admin';
+import { useAuth } from '@/context/auth';
 import { useLanguage } from '@/context/language';
+import {
+  type AuthError,
+  confirmOtp,
+  type OtpConfirmation,
+  requestOtp,
+  signInWithGoogle,
+} from '@/lib/firebase-auth';
 import { Fill, Radius, Space, useTheme } from '@/theme';
 
 /**
- * Sign-in: Login Selection → Mobile/Email → OTP → Create Profile.
+ * Sign-in: Login Selection → Mobile → OTP → Create Profile, or Google in one tap.
  *
- * Rebuilt on the design system; the state machine below is unchanged.
+ * The OTP is a real one. Firebase sends the SMS and verifies the code on its
+ * servers; the app never sees or compares it, which is what makes this
+ * different from the on-device `demoOtp` this screen used to generate.
  *
- * ⚠️  The OTP here is still generated and compared **on the device**. That is
- * defect 2 in the low-level design and the reason phase P3 of the build plan
- * exists — anyone can type a stranger's number, read the code the app just
- * showed them, and become that account. The `demo_otp` hint is deliberately
- * visible so nobody mistakes this for working auth. Do not ship it.
- * P3-10 replaces this whole flow with `/v1/auth/otp/request` + `/verify`.
+ * Two consequences worth knowing:
+ *  - Android often verifies without any typing at all (SMS Retriever). When
+ *    that happens Firebase resolves the sign-in itself and `onAuthStateChanged`
+ *    fires — this screen simply unmounts mid-countdown. That is not a bug.
+ *  - `needsProfile` means Firebase already accepted the credential but the
+ *    account has no name. We open straight at Create Profile; making them
+ *    redo the SMS would cost another verification for nothing.
  */
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const OTP_LEN = 4;
+const OTP_LEN = 6; // Firebase SMS codes are six digits.
+const RESEND_SECONDS = 45;
 
 type Step = 'select' | 'entry' | 'otp' | 'profile';
 
 export function LoginScreen() {
-  const { signIn } = useAuth();
+  const { completeProfile, needsProfile, authError, clearAuthError } = useAuth();
   const { t, lang, toggleLang } = useLanguage();
+  /*
+   * SMS OTP is gated because Firebase bills per message and refuses to send
+   * at all without a Blaze billing account. Off, the screen offers Google
+   * only rather than a button that always fails.
+   */
+  const { flags } = useAdmin();
+  const phoneEnabled = flags.phoneAuth;
 
-  const [step, setStep] = useState<Step>('select');
-  const [method, setMethod] = useState<AuthMethod>('phone');
-  const [contact, setContact] = useState('');
+  const [localStep, setStep] = useState<Step>('select');
+  const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
-  const [demoOtp, setDemoOtp] = useState('');
   const [name, setName] = useState('');
   const [bio, setBio] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [resendIn, setResendIn] = useState(0);
+  const confirmation = useRef<OtpConfirmation | null>(null);
   const otpRef = useRef<TextInput>(null);
+
+  /*
+   * The provider outranks local navigation, so both are derived here rather
+   * than copied into state by an effect:
+   *  - `needsProfile` — Firebase accepted the credential but the account has
+   *    no name, so Create Profile is the only step that makes sense.
+   *  - `authError` — the session was just dropped (a blocked account), so
+   *    whatever step we were on no longer exists to go back to.
+   */
+  const step: Step =
+    needsProfile
+      ? 'profile'
+      : authError
+        ? 'select'
+        : // If the flag flips off mid-flow, fall back rather than strand the
+          // devotee on a step whose Send OTP can no longer work.
+          !phoneEnabled && (localStep === 'entry' || localStep === 'otp')
+          ? 'select'
+          : localStep;
+  const shownError = authError ? t(authError) : error;
+
+  /** Any fresh attempt clears the last failure, local or provider-side. */
+  const resetError = useCallback(() => {
+    setError('');
+    clearAuthError();
+  }, [clearAuthError]);
 
   useEffect(() => {
     if (resendIn <= 0) return;
@@ -56,39 +100,93 @@ export function LoginScreen() {
     return () => clearInterval(id);
   }, [resendIn]);
 
-  const contactValid = useMemo(() => {
-    if (method === 'email') return EMAIL_RE.test(contact.trim());
-    return contact.replace(/\D/g, '').length === 10;
-  }, [method, contact]);
+  const phoneValid = useMemo(() => phone.replace(/\D/g, '').length === 10, [phone]);
 
-  const startWith = useCallback((m: AuthMethod) => {
-    setMethod(m);
-    setContact('');
-    setError('');
-    setStep('entry');
-  }, []);
+  /**
+   * Normalise whatever arrived — typed, pasted, or autofilled — down to the
+   * ten digits the field accepts. Autofill hands over `+91 98765 43210`.
+   */
+  const acceptPhone = useCallback(
+    (raw: string) => {
+      const digits = raw.replace(/\D/g, '');
+      const local = digits.startsWith('91') && digits.length > 10 ? digits.slice(2) : digits;
+      setPhone(local.slice(0, 10));
+      resetError();
+    },
+    [resetError],
+  );
 
-  const sendOtp = useCallback(() => {
-    if (!contactValid) return setError(method === 'email' ? t('err_email') : t('err_phone'));
-    const code = String(Math.floor(1000 + Math.random() * 9000));
-    setDemoOtp(code);
-    setOtp('');
-    setError('');
-    setResendIn(45);
-    setStep('otp');
-  }, [contactValid, method, t]);
+  /** Turn an AuthError into a shown message; cancellations stay silent. */
+  const show = useCallback(
+    (e: unknown) => {
+      const err = e as AuthError;
+      if (err?.code === 'cancelled') return;
+      const key = err?.message || 'err_signin_failed';
+      if (err?.detail) console.warn('[auth]', err.code, err.detail);
+      setError(t(key));
+    },
+    [t],
+  );
 
-  const verifyOtp = useCallback(() => {
-    if (otp !== demoOtp) return setError(t('err_otp'));
-    setError('');
-    setStep('profile');
-  }, [otp, demoOtp, t]);
+  const sendOtp = useCallback(async () => {
+    if (!phoneValid) return setError(t('err_phone'));
+    setBusy(true);
+    resetError();
+    try {
+      confirmation.current = await requestOtp(phone);
+      setOtp('');
+      setResendIn(RESEND_SECONDS);
+      setStep('otp');
+    } catch (e) {
+      show(e);
+    } finally {
+      setBusy(false);
+    }
+  }, [phone, phoneValid, resetError, show, t]);
+
+  const verifyOtp = useCallback(async () => {
+    if (!confirmation.current) return setError(t('err_otp_expired'));
+    setBusy(true);
+    resetError();
+    try {
+      await confirmOtp(confirmation.current, otp);
+      // On success the auth provider takes over: it syncs the backend profile
+      // and either signs us in or flips `needsProfile`, which moves this
+      // screen to 'profile'. Nothing to do here.
+    } catch (e) {
+      show(e);
+    } finally {
+      setBusy(false);
+    }
+  }, [otp, resetError, show, t]);
+
+  const google = useCallback(async () => {
+    if (!GOOGLE_WEB_CLIENT_ID) {
+      return setError(t('err_google_not_configured'));
+    }
+    setBusy(true);
+    resetError();
+    try {
+      await signInWithGoogle();
+    } catch (e) {
+      show(e);
+    } finally {
+      setBusy(false);
+    }
+  }, [resetError, show, t]);
 
   const complete = useCallback(async () => {
     if (!name.trim()) return setError(t('err_name'));
     setBusy(true);
-    await signIn({ name: name.trim(), method, contact: contact.trim(), bio: bio.trim() });
-  }, [name, bio, method, contact, t, signIn]);
+    resetError();
+    try {
+      await completeProfile({ name: name.trim(), bio: bio.trim() });
+    } catch (e) {
+      show(e);
+    } finally {
+      setBusy(false);
+    }
+  }, [name, bio, completeProfile, resetError, show, t]);
 
   return (
     <Backdrop>
@@ -100,10 +198,18 @@ export function LoginScreen() {
             <SelectStep
               title={t('login_selection_title')}
               mobileLabel={t('login_with_mobile')}
-              emailLabel={t('login_with_email')}
+              googleLabel={t('login_with_google')}
+              showMobile={phoneEnabled}
+              error={shownError}
+              busy={busy}
               lang={lang}
               onToggleLang={toggleLang}
-              onPick={startWith}
+              onMobile={() => {
+                setPhone('');
+                resetError();
+                setStep('entry');
+              }}
+              onGoogle={google}
             />
           ) : (
             <ScrollView
@@ -112,72 +218,86 @@ export function LoginScreen() {
               showsVerticalScrollIndicator={false}>
               {step === 'entry' && (
                 <Stack
-                  title={method === 'email' ? t('entry_email_title') : t('entry_mobile_title')}
-                  onBack={() => setStep('select')}>
+                  title={t('entry_mobile_title')}
+                  onBack={() => {
+                    resetError();
+                    setStep('select');
+                  }}>
                   <Field
-                    label={method === 'email' ? t('ph_email') : t('ph_phone')}
-                    icon={method === 'email' ? 'globe' : 'person'}
-                    value={contact}
-                    onChangeText={(v) => {
-                      setContact(method === 'phone' ? v.replace(/\D/g, '').slice(0, 10) : v);
-                      setError('');
-                    }}
-                    placeholder={method === 'email' ? 'you@example.com' : '9876543210'}
-                    keyboardType={method === 'email' ? 'email-address' : 'number-pad'}
+                    label={t('ph_phone')}
+                    icon="person"
+                    value={phone}
+                    onChangeText={acceptPhone}
+                    /*
+                     * Android autofill can write straight into the native view
+                     * without `onChangeText` firing, which left a number
+                     * sitting in the box while React still thought it empty —
+                     * so Send OTP stayed disabled on a field that visibly had
+                     * a number in it. `onChange` catches the autofill write,
+                     * and declaring `autoComplete` lets the platform target
+                     * the field properly in the first place.
+                     */
+                    onChange={(e) => acceptPhone(e.nativeEvent.text)}
+                    autoComplete="tel"
+                    textContentType="telephoneNumber"
+                    placeholder="9876543210"
+                    keyboardType="number-pad"
                     autoCapitalize="none"
-                    error={error || undefined}
+                    error={shownError || undefined}
                     autoFocus
                   />
+                  <Type v="bodySm" tone="onSurfaceFaint" center>
+                    {t('otp_sms_note')}
+                  </Type>
                   <Button
                     label={t('send_otp')}
                     size="lg"
                     block
-                    disabled={!contactValid}
+                    loading={busy}
+                    disabled={!phoneValid || busy}
                     onPress={sendOtp}
                   />
                 </Stack>
               )}
 
               {step === 'otp' && (
-                <Stack title={t('otp_verification')} onBack={() => setStep('entry')}>
+                <Stack
+                  title={t('otp_verification')}
+                  onBack={() => {
+                    resetError();
+                    setStep('entry');
+                  }}>
                   <Type v="bodyMd" tone="onSurfaceVariant" center>
-                    {t('otp_sub_to')}{' '}
-                    <Type v="titleMd">
-                      {method === 'phone' ? `+91 ${contact}` : contact}
-                    </Type>
+                    {t('otp_sub_to')} <Type v="titleMd">+91 {phone}</Type>
                   </Type>
 
                   <OtpBoxes
                     value={otp}
                     onChange={(v) => {
                       setOtp(v);
-                      setError('');
+                      resetError();
                     }}
                     inputRef={otpRef}
-                    invalid={!!error}
+                    invalid={!!shownError}
                   />
 
-                  {/* Only honest because the code never leaves the device.
-                      Disappears with P3-10. */}
-                  <DemoHint label={`${t('demo_otp')} ${demoOtp}`} />
-
-                  {!!error && (
+                  {!!shownError && (
                     <Type v="labelMd" tone="error" center>
-                      {error}
+                      {shownError}
                     </Type>
                   )}
 
                   <View style={styles.resendRow}>
                     <Type v="bodySm" tone="onSurfaceFaint">
                       {resendIn > 0
-                        ? `Resend code in 00:${String(resendIn).padStart(2, '0')}`
-                        : 'Didn’t get the code?'}
+                        ? `${t('resend_in')} 00:${String(resendIn).padStart(2, '0')}`
+                        : t('no_code')}
                     </Type>
                     <Button
-                      label="Resend"
+                      label={t('resend')}
                       variant="ghost"
                       size="sm"
-                      disabled={resendIn > 0}
+                      disabled={resendIn > 0 || busy}
                       onPress={sendOtp}
                     />
                   </View>
@@ -186,24 +306,34 @@ export function LoginScreen() {
                     label={t('verify_proceed')}
                     size="lg"
                     block
-                    disabled={otp.length !== OTP_LEN}
+                    loading={busy}
+                    disabled={otp.length !== OTP_LEN || busy}
                     onPress={verifyOtp}
                   />
                 </Stack>
               )}
 
               {step === 'profile' && (
-                <Stack title={t('create_profile')} onBack={() => setStep('otp')}>
+                <Stack
+                  title={t('create_profile')}
+                  onBack={
+                    needsProfile
+                      ? undefined
+                      : () => {
+                          resetError();
+                          setStep('otp');
+                        }
+                  }>
                   <AvatarPicker label={t('change_photo')} initial={name.trim()[0]} />
                   <Field
                     label={t('full_name')}
                     value={name}
                     onChangeText={(v) => {
                       setName(v);
-                      setError('');
+                      resetError();
                     }}
                     placeholder={t('ph_full_name')}
-                    error={error || undefined}
+                    error={shownError || undefined}
                   />
                   <Field
                     label={t('bio_label')}
@@ -217,7 +347,7 @@ export function LoginScreen() {
                     size="lg"
                     block
                     loading={busy}
-                    disabled={!name.trim()}
+                    disabled={!name.trim() || busy}
                     onPress={complete}
                   />
                 </Stack>
@@ -254,17 +384,26 @@ function Backdrop({ children }: { children: React.ReactNode }) {
 function SelectStep({
   title,
   mobileLabel,
-  emailLabel,
+  googleLabel,
+  showMobile,
+  error,
+  busy,
   lang,
   onToggleLang,
-  onPick,
+  onMobile,
+  onGoogle,
 }: {
   title: string;
   mobileLabel: string;
-  emailLabel: string;
+  googleLabel: string;
+  /** False while SMS OTP is switched off — Google becomes the only route. */
+  showMobile: boolean;
+  error: string;
+  busy: boolean;
   lang: string | null;
   onToggleLang: () => void;
-  onPick: (m: AuthMethod) => void;
+  onMobile: () => void;
+  onGoogle: () => void;
 }) {
   const { c } = useTheme();
   return (
@@ -291,16 +430,34 @@ function SelectStep({
       </View>
 
       <View style={styles.selectButtons}>
-        <Button label={mobileLabel} icon="person" iconRight="forward" size="lg" block onPress={() => onPick('phone')} />
+        {showMobile && (
+          <Button
+            label={mobileLabel}
+            icon="person"
+            iconRight="forward"
+            size="lg"
+            block
+            disabled={busy}
+            onPress={onMobile}
+          />
+        )}
         <Button
-          label={emailLabel}
-          variant="secondary"
-          icon="globe"
+          label={googleLabel}
+          // Sole route while mobile is off, so it takes the primary weight.
+          variant={showMobile ? 'secondary' : 'primary'}
+          icon="google"
           iconRight="forward"
           size="lg"
           block
-          onPress={() => onPick('email')}
+          loading={busy}
+          disabled={busy}
+          onPress={onGoogle}
         />
+        {!!error && (
+          <Type v="labelMd" tone="error" center>
+            {error}
+          </Type>
+        )}
       </View>
 
       <Type v="mantra" tone="onSurfaceVariant" center style={styles.tagline}>
@@ -316,13 +473,18 @@ function Stack({
   children,
 }: {
   title: string;
-  onBack: () => void;
+  /** Omitted when there is nowhere to go back to (a half-finished sign-in). */
+  onBack?: () => void;
   children: React.ReactNode;
 }) {
   return (
     <>
       <View style={styles.header}>
-        <IconButton name="back" label="Go back" size={40} onPress={onBack} />
+        {onBack ? (
+          <IconButton name="back" label="Go back" size={40} onPress={onBack} />
+        ) : (
+          <View style={{ width: 40 }} />
+        )}
         <Type v="headlineMd" tone="goldInk" center style={{ flex: 1 }}>
           {title}
         </Type>
@@ -336,8 +498,8 @@ function Stack({
 /* ─────────────────────────────────────────────────────────── otp input ── */
 
 /**
- * Four boxes driven by one offscreen input — the platform keyboard and
- * autofill both behave far better with a single field than with four that
+ * Six boxes driven by one offscreen input — the platform keyboard and
+ * autofill both behave far better with a single field than with six that
  * hand focus to each other.
  */
 function OtpBoxes({
@@ -395,18 +557,6 @@ function OtpBoxes({
   );
 }
 
-function DemoHint({ label }: { label: string }) {
-  const { c } = useTheme();
-  return (
-    <View style={[styles.demoHint, { backgroundColor: c.errorContainer, borderColor: c.error }]}>
-      <Icon name="settings" size={14} color={c.error} />
-      <Type v="labelSm" tone="error">
-        {label}
-      </Type>
-    </View>
-  );
-}
-
 function AvatarPicker({ label, initial }: { label: string; initial?: string }) {
   const { c } = useTheme();
   return (
@@ -451,28 +601,17 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', marginBottom: Space.lg },
   stackBody: { gap: Space.md },
 
-  otpRow: { flexDirection: 'row', justifyContent: 'center', gap: Space.sm },
+  // Six boxes have to be narrower than the old four to still fit a 360dp screen.
+  otpRow: { flexDirection: 'row', justifyContent: 'center', gap: Space.xs },
   otpBox: {
-    width: 62,
-    height: 68,
+    width: 46,
+    height: 60,
     borderRadius: Radius.md,
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
   hiddenInput: { position: 'absolute', width: 1, height: 1, opacity: 0, left: -9999 },
-
-  demoHint: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    alignSelf: 'center',
-    borderWidth: 1,
-    borderRadius: Radius.sm,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
 
   resendRow: {
     flexDirection: 'row',
@@ -496,4 +635,3 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 });
-

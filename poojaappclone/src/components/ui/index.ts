@@ -20,4 +20,11 @@ export {
   type ScreenProps,
   useScrollPadding,
 } from './surface';
+export {
+  toast,
+  ToastProvider,
+  type ToastOptions,
+  type ToastVariant,
+  useToast,
+} from './toast';
 export { type Tone, Type, type TypeComponentProps } from './type';
