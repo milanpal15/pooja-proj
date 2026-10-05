@@ -27,7 +27,12 @@
       "Bash(python3 -c ' *)",
       "Bash(cp -n /Users/nitinmalhotra/.claude/projects/-Users-nitinmalhotra-projects-poojaappclone/668a8b8f-7e29-4188-b772-cc1d044a95d6.jsonl /Users/nitinmalhotra/.claude/projects/-Users-nitinmalhotra-projects-pooja-proj/)",
       "Bash(cp -n /Users/nitinmalhotra/.claude/projects/-Users-nitinmalhotra-projects-poojaappclone/79b7f7e2-e376-4077-a09d-1889be54b676.jsonl /Users/nitinmalhotra/.claude/projects/-Users-nitinmalhotra-projects-pooja-proj/)",
-      "Bash(python3 -)"
+      "Bash(python3 -)",
+      "Bash(npm view *)",
+      "WebFetch(domain:rnfirebase.io)",
+      "WebFetch(domain:react-native-google-signin.github.io)",
+      "Bash(npx expo *)",
+      "Bash(node -e \"const a=require\\('./app.json'\\);console.log\\(JSON.stringify\\(a.expo.plugins,null,2\\)\\)\")"
     ]
   },
   "enabledPlugins": {

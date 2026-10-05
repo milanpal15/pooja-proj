@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 
 import { Button, Card, Icon, Screen, SectionBand, Type } from '@/components/ui';
 import { AppBar } from '@/components/ui/surface';
@@ -33,11 +33,29 @@ import { Radius, Space, useTheme } from '@/theme';
 export default function AlarmScreen() {
   const router = useRouter();
   const { c } = useTheme();
-  const { lang } = useLanguage();
+  const { lang, t } = useLanguage();
   const hi = lang === 'hi';
 
   const { state, loaded, permission, activeCount, toggle, setTime, timeFor, prepareChannel } =
     useReminders();
+
+  /*
+   * `toggle` answers false when Android refuses the notification permission,
+   * and the caller used to drop that on the floor — the switch simply did not
+   * move and nothing said why. Android also stops showing its own dialog once
+   * the devotee has declined, so the only way back is Settings; that makes
+   * this a real choice, which is why it is an Alert rather than a toast.
+   */
+  const attemptToggle = useCallback(
+    async (id: ReminderId) => {
+      if (await toggle(id)) return;
+      Alert.alert(t('reminders_blocked_title'), t('reminders_blocked_msg'), [
+        { text: t('cancel'), style: 'cancel' },
+        { text: t('open_settings'), onPress: () => void Linking.openSettings().catch(() => {}) },
+      ]);
+    },
+    [toggle, t],
+  );
   const [editing, setEditing] = useState<ReminderId | null>(null);
 
   useEffect(() => {
@@ -128,7 +146,7 @@ export default function AlarmScreen() {
                   <View style={styles.switchCol}>
                     <Switch
                       value={on}
-                      onValueChange={() => void toggle(r.id)}
+                      onValueChange={() => void attemptToggle(r.id)}
                       trackColor={{ true: c.primary, false: c.outlineVariant }}
                       thumbColor={c.containerLowest}
                     />

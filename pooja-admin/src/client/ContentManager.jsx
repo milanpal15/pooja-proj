@@ -5,7 +5,9 @@ import { api } from './api.js';
 /**
  * Generic CRUD manager for a content resource.
  * `fields`: [{ key, label, type }] where type is
- * text | number | textarea | image | audio | csv | bool.
+ * text | number | textarea | image | audio | csv | bool | date | select |
+ * enumList. A field may also carry `default()` for the value a new row
+ * starts with.
  */
 /**
  * Normalise whatever is stored into one of the option values.
@@ -25,7 +27,16 @@ function toEnumValue(stored, options) {
   return options.some((o) => o.value === key) ? key : options[0].value;
 }
 
-export function ContentManager({ title, resource, fields, previewKey, rowAction }) {
+export function ContentManager({
+  title,
+  resource,
+  fields,
+  previewKey,
+  rowAction,
+  filterRows,
+  scopeNote,
+  onChange,
+}) {
   const [rows, setRows] = useState([]);
   const [err, setErr] = useState(null);
   const [editing, setEditing] = useState(null); // form object or null
@@ -36,6 +47,10 @@ export function ContentManager({ title, resource, fields, previewKey, rowAction 
   // 7th temple field, so it was never visible in the table — the one control
   // an operator most needs at a glance was reachable only through Edit.
   const columns = fields.some((f) => f.col) ? fields.filter((f) => f.col) : fields.slice(0, 4);
+
+  // Horoscopes accumulate twelve rows a day forever, so the tab scopes the
+  // table to one day. Everything else passes no filter and sees all of it.
+  const visible = filterRows ? rows.filter(filterRows) : rows;
 
   const load = useCallback(async () => {
     try {
@@ -53,6 +68,7 @@ export function ContentManager({ title, resource, fields, previewKey, rowAction 
   const blank = () =>
     Object.fromEntries(
       fields.map((f) => {
+        if (f.default) return [f.key, f.default()];
         switch (f.type) {
           case 'bool':
             return [f.key, true];
@@ -85,7 +101,8 @@ export function ContentManager({ title, resource, fields, previewKey, rowAction 
     if (body._id) await resource.update(body._id, body);
     else await resource.create(body);
     setEditing(null);
-    load();
+    await load();
+    onChange?.();
   };
 
   /** Flip a boolean straight from the table, optimistically. */
@@ -95,6 +112,7 @@ export function ContentManager({ title, resource, fields, previewKey, rowAction 
     setRows((rs) => rs.map((r) => (r._id === row._id ? { ...r, [key]: next } : r)));
     try {
       await resource.update(row._id, { [key]: next });
+      onChange?.();
     } catch (e) {
       setRows((rs) => rs.map((r) => (r._id === row._id ? { ...r, [key]: !next } : r)));
       setErr(e.message);
@@ -106,7 +124,8 @@ export function ContentManager({ title, resource, fields, previewKey, rowAction 
   const del = async (row) => {
     if (!confirm(`Delete "${row[previewKey] || row.name || row.title}"?`)) return;
     await resource.remove(row._id);
-    load();
+    await load();
+    onChange?.();
   };
 
   const onFile = async (field, file) => {
@@ -125,7 +144,10 @@ export function ContentManager({ title, resource, fields, previewKey, rowAction 
   return (
     <div className="panel">
       <div className="cm-head">
-        <span className="muted">{rows.length} items</span>
+        <span className="muted">
+          {visible.length} {visible.length === 1 ? 'item' : 'items'}
+          {scopeNote ? ` · ${scopeNote}` : ''}
+        </span>
         <button className="btn" onClick={() => setEditing(blank())}>
           + Add {title}
         </button>
@@ -142,7 +164,7 @@ export function ContentManager({ title, resource, fields, previewKey, rowAction 
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
+          {visible.map((row) => (
             <tr key={row._id}>
               <td>
                 {row.imageUrl ? (
@@ -272,6 +294,14 @@ export function ContentManager({ title, resource, fields, previewKey, rowAction 
                         <img className="thumb" src={api.asset(editing[f.key])} alt="" />
                       )}
                     </div>
+                  ) : f.type === 'date' ? (
+                    // A real picker, not free text: a mistyped date publishes
+                    // to a day nobody is looking at, silently.
+                    <input
+                      type="date"
+                      value={editing[f.key] ?? ''}
+                      onChange={(e) => setEditing({ ...editing, [f.key]: e.target.value })}
+                    />
                   ) : (
                     <input
                       type={f.type === 'number' ? 'number' : 'text'}

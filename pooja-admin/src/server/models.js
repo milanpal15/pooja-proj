@@ -358,6 +358,75 @@ const settingSchema = new Schema(
   { timestamps: true },
 );
 
+/**
+ * One rashi's reading for one day.
+ *
+ * Editorial, not computed — a prediction is somebody's words, and the app
+ * must never invent them. No row for today means the screen says nothing is
+ * published rather than filling the space.
+ *
+ * `rashi` is the English slug (`mesha`, `vrishabha`, …) and `date` is ISO
+ * `YYYY-MM-DD`; together they are unique, so publishing twice for the same
+ * sign and day updates rather than duplicates.
+ */
+const horoscopeSchema = new Schema(
+  {
+    rashi: { type: String, required: true, index: true },
+    date: { type: String, required: true, index: true },
+    prediction: String,
+    predictionHi: String,
+    /** Optional colour/number/time, shown only when filled in. */
+    luckyColor: String,
+    luckyColorHi: String,
+    luckyNumber: String,
+    enabled: { type: Boolean, default: true },
+  },
+  { timestamps: true },
+);
+horoscopeSchema.index({ rashi: 1, date: 1 }, { unique: true });
+
+/**
+ * A panchang override for one date.
+ *
+ * The app computes panchang on the device from the Sun and Moon, which is
+ * correct astronomy and needs no backend. But panchang is not only
+ * astronomy: it differs between the Smārta and Vaishnava traditions, between
+ * amānta and pūrṇimānta month reckoning, and a temple may observe its own
+ * sunrise rather than the computed one.
+ *
+ * So this is an override, not a source. **Every field is optional** — a row
+ * fills in only what it sets and the device keeps computing the rest. A
+ * temple that disagrees about the tithi alone sets the tithi alone.
+ *
+ * Times are plain strings (`6:12 AM`) rather than Dates: they are published
+ * as a temple states them, and parsing them into instants would invent a
+ * precision nobody intended.
+ */
+const panchangSchema = new Schema(
+  {
+    /** ISO `YYYY-MM-DD`, unique. */
+    date: { type: String, required: true, unique: true, index: true },
+    tithi: String,
+    paksha: String,
+    nakshatra: String,
+    yoga: String,
+    karana: String,
+    masa: String,
+    ritu: String,
+    sunrise: String,
+    sunset: String,
+    rahuKaal: String,
+    yamaganda: String,
+    gulika: String,
+    abhijit: String,
+    /** Shown to the devotee so an override is never silently authoritative. */
+    note: String,
+    noteHi: String,
+    enabled: { type: Boolean, default: true },
+  },
+  { timestamps: true },
+);
+
 export const Flag = model('Flag', flagSchema);
 export const Visitor = model('Visitor', visitorSchema);
 export const Event = model('Event', eventSchema);
@@ -367,6 +436,8 @@ export const Temple = model('Temple', templeSchema);
 export const Aarti = model('Aarti', aartiSchema);
 export const User = model('User', userSchema);
 export const Festival = model('Festival', festivalSchema);
+export const Horoscope = model('Horoscope', horoscopeSchema);
+export const Panchang = model('Panchang', panchangSchema);
 export const Seva = model('Seva', sevaSchema);
 export const Knowledge = model('Knowledge', knowledgeSchema);
 export const Faq = model('Faq', faqSchema);

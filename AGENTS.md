@@ -125,9 +125,17 @@ origin — `api.js` has no absolute base URL any more.
 
 **Client** — `src/client/`:
 - `App.jsx` — sidebar tabs: Overview, Feature Flags, Announcements, Rules,
-  Deities, Temples, Aartis, Festivals, Users, Payments, Visitors (hash-routed),
+  Deities, Temples, Aartis, Festivals, Sevas, Knowledge, FAQs, Home Slides,
+  Horoscope, Panchang, Settings, Users, Payments, Visitors (hash-routed),
   plus the field config for each content type.
 - `ContentManager.jsx` — generic CRUD table + edit modal; image/audio upload.
+  **The modal is the only place content is written.** Optional props:
+  `filterRows` (scope the table), `scopeNote` (what the count describes),
+  `onChange` (fired after a write so a sibling can restate itself).
+  A field may carry `type:'date'` (real picker) and `default()`.
+- `HoroscopeCopyDay.jsx` — the Horoscope tab's day bar. Picks the day the
+  table below is scoped to, counts how much of it is published, and seeds it
+  from the day before. It does **not** edit readings; see §5.
 - `Users.jsx` — user list with block/unblock/delete.
 - `api.js` — API client. **Same-origin by default**; `api.asset(url)` resolves
   relative upload paths.
@@ -363,6 +371,15 @@ anyone in. See `docs/FIREBASE_SETUP.md`.
   `useToast()` / `toast.success|error|info`. Keep `Alert` for real choices.
 - **`modules/expo-wallpaper` is a local native module** — changing its Kotlin
   needs a rebuild, not a Metro reload. Autolinking picks it up at prebuild.
+- **One way to write a thing.** The Horoscope tab briefly had two editors —
+  a twelve-sign grid on the page *and* the table's modal — which read as
+  clutter and left two code paths to keep in step. Readings are written only
+  through the modal now; the bar above it picks the day and copies the
+  previous one. `GET|PUT /api/horoscope/day/:date` still backs the copy, and
+  a sign left blank is **deleted**, never stored empty.
+- **Scope tables that grow per day.** Horoscopes are twelve rows a day
+  forever, so the table shows one day unless "Show all dates" is ticked.
+  Without that, today's twelve are buried in everything ever published.
 - **Don't invent social proof.** Ratings, review counts and the like are real
   data or they are hidden — `templeRating()` returns undefined rather than a
   default, and the row disappears.

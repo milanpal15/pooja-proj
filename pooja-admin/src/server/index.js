@@ -9,7 +9,7 @@ import morgan from 'morgan';
 
 import { announcements, policies } from './broadcast.js';
 import { auth } from './auth.js';
-import { content, publicContent, UPLOAD_DIR, users } from './content.js';
+import { content, horoscope, panchang, publicContent, UPLOAD_DIR, users } from './content.js';
 import { connectDb } from './db.js';
 import { router } from './routes.js';
 
@@ -30,6 +30,8 @@ app.use('/uploads', express.static(UPLOAD_DIR));
 app.use('/api/auth', auth); // Firebase-verified sign-in sync + profile
 app.use('/api', router);
 app.use('/api', publicContent); // GET /api/content for the app
+app.use('/api', horoscope); // GET /api/horoscope?date=YYYY-MM-DD
+app.use('/api', panchang); // GET /api/panchang?date=YYYY-MM-DD
 app.use('/api/content', content); // deities/temples/aartis CRUD + upload
 app.use('/api/users', users);
 app.use('/api', policies);

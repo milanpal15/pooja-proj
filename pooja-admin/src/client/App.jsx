@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { api } from './api.js';
 import { ContentManager } from './ContentManager.jsx';
+import { HoroscopeCopyDay } from './HoroscopeCopyDay.jsx';
 import { Policies } from './Policies.jsx';
 import { Users } from './Users.jsx';
 
@@ -18,6 +19,8 @@ const TABS = [
   'Knowledge',
   'FAQs',
   'Home Slides',
+  'Horoscope',
+  'Panchang',
   'Settings',
   'Users',
   'Payments',
@@ -160,6 +163,78 @@ const HERO_FIELDS = [
   { key: 'enabled', label: 'Visible', type: 'bool', col: true },
 ];
 
+/** Local date as YYYY-MM-DD — never `toISOString()`, which is UTC and so
+ *  rolls a day early for anyone east of Greenwich, India included. */
+const todayKey = () => {
+  const n = new Date();
+  const z = (x) => String(x).padStart(2, '0');
+  return `${n.getFullYear()}-${z(n.getMonth() + 1)}-${z(n.getDate())}`;
+};
+
+/**
+ * Daily readings, one row per sign per day.
+ *
+ * `rashi` + `date` are unique together. Editorial content — the app shows
+ * nothing at all for a day with no rows rather than inventing a prediction.
+ */
+const HOROSCOPE_FIELDS = [
+  {
+    key: 'rashi',
+    label: 'Rashi',
+    type: 'select',
+    col: true,
+    options: [
+      { value: 'mesha', label: 'Mesha (Aries)' },
+      { value: 'vrishabha', label: 'Vrishabha (Taurus)' },
+      { value: 'mithuna', label: 'Mithuna (Gemini)' },
+      { value: 'karka', label: 'Karka (Cancer)' },
+      { value: 'simha', label: 'Simha (Leo)' },
+      { value: 'kanya', label: 'Kanya (Virgo)' },
+      { value: 'tula', label: 'Tula (Libra)' },
+      { value: 'vrischika', label: 'Vrischika (Scorpio)' },
+      { value: 'dhanu', label: 'Dhanu (Sagittarius)' },
+      { value: 'makara', label: 'Makara (Capricorn)' },
+      { value: 'kumbha', label: 'Kumbha (Aquarius)' },
+      { value: 'meena', label: 'Meena (Pisces)' },
+    ],
+  },
+  { key: 'date', label: 'Date', type: 'date', col: true, default: todayKey },
+  { key: 'prediction', label: 'Reading (EN)', type: 'textarea', col: true },
+  { key: 'predictionHi', label: 'Reading (HI)', type: 'textarea' },
+  { key: 'luckyColor', label: 'Lucky colour (EN)', type: 'text' },
+  { key: 'luckyColorHi', label: 'Lucky colour (HI)', type: 'text' },
+  { key: 'luckyNumber', label: 'Lucky number', type: 'text' },
+  { key: 'enabled', label: 'Visible', type: 'bool', col: true },
+];
+
+/**
+ * Panchang override for one date.
+ *
+ * The app computes panchang on the device; this only overrides it. **Leave a
+ * field blank and the device keeps its own computed value** — fill in only
+ * what your tradition states differently. Times are free text, written the
+ * way the temple publishes them.
+ */
+const PANCHANG_FIELDS = [
+  { key: 'date', label: 'Date', type: 'date', col: true, default: todayKey },
+  { key: 'tithi', label: 'Tithi', type: 'text', col: true },
+  { key: 'paksha', label: 'Paksha', type: 'text', col: true },
+  { key: 'nakshatra', label: 'Nakshatra', type: 'text', col: true },
+  { key: 'yoga', label: 'Yoga', type: 'text' },
+  { key: 'karana', label: 'Karana', type: 'text' },
+  { key: 'masa', label: 'Masa', type: 'text' },
+  { key: 'ritu', label: 'Ritu', type: 'text' },
+  { key: 'sunrise', label: 'Sunrise (e.g. 5:51 AM)', type: 'text' },
+  { key: 'sunset', label: 'Sunset (e.g. 5:40 PM)', type: 'text' },
+  { key: 'abhijit', label: 'Abhijit Muhurat', type: 'text' },
+  { key: 'rahuKaal', label: 'Rahu Kaal', type: 'text' },
+  { key: 'yamaganda', label: 'Yamaganda', type: 'text' },
+  { key: 'gulika', label: 'Gulika Kaal', type: 'text' },
+  { key: 'note', label: 'Note shown to devotees (EN)', type: 'textarea' },
+  { key: 'noteHi', label: 'Note shown to devotees (HI)', type: 'textarea' },
+  { key: 'enabled', label: 'Visible', type: 'bool', col: true },
+];
+
 /** Single values: fees, support contacts. Stored as strings; the app coerces. */
 const SETTING_FIELDS = [
   { key: 'key', label: 'Key', type: 'text', col: true },
@@ -171,6 +246,21 @@ const SETTING_FIELDS = [
 export function App() {
   const [tab, setTabState] = useState(() => decodeURIComponent(location.hash.slice(1)) || 'Overview');
   const [online, setOnline] = useState(true);
+  // The Horoscope tab is scoped to one day: the bar and the table below it
+  // share this date, so "Copy previous day", the published counter and the
+  // rows on screen always describe the same editorial day.
+  const [horoDate, setHoroDate] = useState(todayKey);
+  const [horoAllDates, setHoroAllDates] = useState(false);
+  // Copying rewrites rows the table already listed — remount it to reload.
+  const [horoReload, setHoroReload] = useState(0);
+  // Any write, from either side, restates the bar's "N of 12 published".
+  const [horoTick, setHoroTick] = useState(0);
+  // A new reading starts on the day being edited, not blindly on today.
+  const horoscopeFields = useMemo(
+    () =>
+      HOROSCOPE_FIELDS.map((f) => (f.key === 'date' ? { ...f, default: () => horoDate } : f)),
+    [horoDate],
+  );
   const setTab = (t) => {
     setTabState(t);
     location.hash = encodeURIComponent(t);
@@ -240,6 +330,41 @@ export function App() {
         )}
         {tab === 'Home Slides' && (
           <ContentManager title="Slide" resource={api.hero} fields={HERO_FIELDS} previewKey="title" />
+        )}
+        {/* Readings are written one at a time in the table's modal; the bar
+            above only picks the day and seeds it from the one before. */}
+        {tab === 'Horoscope' && (
+          <HoroscopeCopyDay
+            date={horoDate}
+            onDateChange={setHoroDate}
+            allDates={horoAllDates}
+            onAllDatesChange={setHoroAllDates}
+            version={horoTick}
+            onCopied={() => {
+              setHoroReload((v) => v + 1);
+              setHoroTick((v) => v + 1);
+            }}
+          />
+        )}
+        {tab === 'Horoscope' && (
+          <ContentManager
+            key={horoReload}
+            title="Reading"
+            resource={api.horoscopes}
+            fields={horoscopeFields}
+            previewKey="rashi"
+            filterRows={horoAllDates ? undefined : (r) => r.date === horoDate}
+            scopeNote={horoAllDates ? 'all dates' : horoDate}
+            onChange={() => setHoroTick((v) => v + 1)}
+          />
+        )}
+        {tab === 'Panchang' && (
+          <ContentManager
+            title="Panchang"
+            resource={api.panchangs}
+            fields={PANCHANG_FIELDS}
+            previewKey="date"
+          />
         )}
         {tab === 'Settings' && (
           <ContentManager

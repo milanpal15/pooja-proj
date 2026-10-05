@@ -63,6 +63,13 @@ export const api = {
   faqs: resource('faqs'),
   hero: resource('hero'),
   settings: resource('settings'),
+  horoscopes: resource('horoscopes'),
+  panchangs: resource('panchangs'),
+
+  /** A whole day's readings, read and written in one call. */
+  horoscopeDay: (date) => req(`/horoscope/day/${date}`),
+  saveHoroscopeDay: (date, readings) =>
+    req(`/horoscope/day/${date}`, { method: 'PUT', body: JSON.stringify({ readings }) }),
 
   users: {
     list: () => req('/users'),

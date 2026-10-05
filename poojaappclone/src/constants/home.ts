@@ -28,12 +28,8 @@ export type QuickTile = {
 /** The 8-up grid under the hero. */
 export const QUICK_TILES: QuickTile[] = [
   { id: 'darshan', label: 'Darshan', labelKey: 'live_darshan', icon: 'temple', href: '/darshan', flag: 'liveDarshan', badge: 'new' },
-  { id: 'rashifal', label: 'Horoscope', labelKey: 'rashifal', icon: 'sparkle', badge: 'soon' },
-  // `soon`, not `new`: there is no Panchang route. Badged NEW it rendered
-  // bright and tappable and then answered "Coming soon", promising a
-  // feature that does not exist. Every other unbuilt tile is `soon`,
-  // which greys it and disables the press.
-  { id: 'panchang', label: 'Panchang', labelKey: 'panchang', icon: 'calendar', badge: 'soon' },
+  { id: 'rashifal', label: 'Horoscope', labelKey: 'rashifal', icon: 'sparkle', href: '/horoscope', badge: 'new' },
+  { id: 'panchang', label: 'Panchang', labelKey: 'panchang', icon: 'calendar', href: '/panchang', badge: 'new' },
   { id: 'bhajan', label: 'Bhajan', labelKey: 'tab_bhajan', icon: 'music', href: '/bhajan', flag: 'bhajan' },
   { id: 'wallpaper', label: 'Wallpaper', labelKey: 'wallpaper', icon: 'star', href: '/wallpaper' },
   { id: 'alarm', label: 'Alarm', labelKey: 'alarm', icon: 'bell', href: '/alarm', badge: 'new' },

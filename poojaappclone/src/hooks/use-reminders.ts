@@ -94,6 +94,39 @@ export function formatTime(hour: number, minute: number, hi = false): string {
   return `${h12}:${String(minute).padStart(2, '0')} ${ampm}`;
 }
 
+/**
+ * One notification channel per tone.
+ *
+ * On Android 8+ the **channel** owns the sound — `content.sound` on an
+ * individual notification is ignored once a channel exists. The app had a
+ * single `reminders` channel and set the tone per notification, so choosing
+ * "Temple Bell" changed nothing audible.
+ *
+ * A channel's sound is also immutable after creation, which is why each tone
+ * gets its own channel rather than one channel being re-configured.
+ *
+ * The old channel passed `sound: 'default'`. That string is read as the name
+ * of a bundled custom sound, not as "use the system default" — hence the
+ * `Custom sound 'default' not found` error on every launch. Omitting `sound`
+ * is how you ask for the system default.
+ */
+async function ensureToneChannels(N: NotificationsModule) {
+  for (const tone of TONES) {
+    const silent = tone.id === 'silent';
+    await N.setNotificationChannelAsync(channelFor(tone.id), {
+      name: `Aarti Reminders · ${tone.title}`,
+      importance: silent ? N.AndroidImportance.LOW : N.AndroidImportance.HIGH,
+      // Omitted entirely for the system default; `null` for silence.
+      ...(silent ? { sound: null } : tone.sound ? { sound: tone.sound } : {}),
+    });
+  }
+}
+
+/** Channel id for a tone. Stable, because channels cannot be edited later. */
+function channelFor(toneId: string) {
+  return `reminders-${toneId}`;
+}
+
 export function useReminders() {
   const [state, setState] = useState<ReminderState>(EMPTY);
   const [loaded, setLoaded] = useState(false);
@@ -156,6 +189,8 @@ export function useReminders() {
       // Settings still save without the module; they take effect on a build
       // that has it.
       if (!N) return;
+      // Channels must exist before anything is scheduled into them.
+      if (Platform.OS === 'android') await ensureToneChannels(N);
       await N.cancelAllScheduledNotificationsAsync();
 
       const tone = TONES.find((t) => t.id === next.tone);
@@ -172,8 +207,11 @@ export function useReminders() {
           content: {
             title: def.title,
             body: def.body,
+            // Android reads the sound off the channel; iOS reads it here.
+            // Both are set so neither platform is left silent by accident.
             sound: silent ? undefined : (tone?.sound ?? undefined),
             data: { reminderId: def.id },
+            ...(Platform.OS === 'android' ? { channelId: channelFor(next.tone) } : {}),
           },
           trigger: {
             type: N.SchedulableTriggerInputTypes.DAILY,
@@ -258,11 +296,7 @@ export function useReminders() {
       if (Platform.OS !== 'android') return;
       const N = await loadNotifications();
       if (!N) return;
-      await N.setNotificationChannelAsync('reminders', {
-        name: 'Aarti Reminders',
-        importance: N.AndroidImportance.HIGH,
-        sound: 'default',
-      });
+      await ensureToneChannels(N);
     }, []),
   };
 }

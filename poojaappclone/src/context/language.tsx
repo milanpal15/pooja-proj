@@ -22,6 +22,10 @@ const STRINGS = {
     // account / settings
     account_title: 'Account',
     settings: 'Settings',
+    open_settings: 'Open Settings',
+    reminders_blocked_title: 'Notifications are turned off',
+    reminders_blocked_msg:
+      'Aarti reminders arrive as notifications, so Android needs permission first. Turn them on in Settings and try again.',
     language: 'Language',
     sound: 'Sound',
     profile: 'Profile',
@@ -255,6 +259,10 @@ const STRINGS = {
     tab_account: 'खाता',
     account_title: 'खाता',
     settings: 'सेटिंग्स',
+    open_settings: 'सेटिंग्स खोलें',
+    reminders_blocked_title: 'सूचनाएँ बंद हैं',
+    reminders_blocked_msg:
+      'आरती स्मरण सूचना के रूप में आते हैं, इसलिए Android की अनुमति आवश्यक है। सेटिंग्स में चालू करके पुनः प्रयास करें।',
     language: 'भाषा',
     sound: 'ध्वनि',
     profile: 'प्रोफ़ाइल',
