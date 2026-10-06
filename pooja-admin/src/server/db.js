@@ -28,6 +28,52 @@ const BUNDLED = JSON.parse(
   readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'seed-content.json'), 'utf8'),
 );
 
+/**
+ * Fill in deity columns that did not exist when a database was first seeded.
+ *
+ * `insertMany` only runs on an empty collection, which is right — it must
+ * never trample an operator's edits. But it also means a deployment seeded
+ * before the murti palette and geometry existed keeps eight deities with
+ * those columns blank, and the app draws them grey and crownless forever.
+ *
+ * So: per field, set it only where it is currently absent. A colour someone
+ * chose in the dashboard is left exactly as it is; a column nobody has ever
+ * filled gets the bundled value. Running this on every boot is safe because
+ * the second run finds nothing to do.
+ */
+async function backfillDeities() {
+  const fields = ['body', 'robe', 'trim', 'crown', 'offerings', 'accent', 'mark', 'mantra'];
+  let touched = 0;
+
+  for (const seed of DEITIES) {
+    const doc = await Deity.findOne({ slug: seed.slug });
+    if (!doc) continue;
+
+    const $set = {};
+    for (const f of fields) {
+      const current = doc[f];
+      const blank =
+        current === undefined ||
+        current === null ||
+        current === '' ||
+        (Array.isArray(current) && current.length === 0);
+      if (blank && seed[f] !== undefined) $set[f] = seed[f];
+    }
+    // The three booleans are absent rather than false on an old row, and
+    // `false` is a real answer — only set them where the key is missing.
+    for (const f of ['crescent', 'serpent', 'elephant', 'mace']) {
+      if (doc[f] === undefined && seed[f] !== undefined) $set[f] = seed[f];
+    }
+
+    if (Object.keys($set).length) {
+      await Deity.updateOne({ _id: doc._id }, { $set });
+      touched++;
+    }
+  }
+
+  if (touched) console.log(`✓ Backfilled murti palette/geometry on ${touched} deities`);
+}
+
 export async function connectDb(uri) {
   mongoose.set('strictQuery', true);
   await mongoose.connect(uri);
@@ -136,6 +182,7 @@ const HERO_SLIDES = [
 /** Seed default content only when a collection is empty. */
 async function seedContent() {
   if ((await Deity.countDocuments()) === 0) await Deity.insertMany(DEITIES);
+  else await backfillDeities();
   if ((await Temple.countDocuments()) === 0) await Temple.insertMany(TEMPLES);
   if ((await Aarti.countDocuments()) === 0) await Aarti.insertMany(AARTIS);
   if ((await Festival.countDocuments()) === 0) await Festival.insertMany(FESTIVALS);
