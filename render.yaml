@@ -1,19 +1,21 @@
-# Render blueprint — the backend only.
+# Render blueprint — the whole deployment.
 #
-# The dashboard is a static bundle and lives on Netlify (see
-# pooja-admin/netlify.toml); only the API needs a Node process, and Render
-# hosts that.
+# Two services from one repo: the API (a Node process) and the dashboard (a
+# static bundle). They reference each other with `fromService`, so Render
+# fills in both URLs at deploy time and neither has to be typed anywhere.
 #
-# Deploy: Render → New → Blueprint → this repo. Secrets (`sync: false`) are
-# typed into Render; nothing secret belongs in this file.
+# Secrets (`sync: false`) are typed into Render; nothing secret belongs in
+# this file.
 #
-# ── Order matters on first deploy ──────────────────────────────────────
-# Netlify bakes this service's URL into the dashboard bundle at BUILD time,
-# so bring this up first. Once the dashboard has a URL of its own, come
-# back and set CORS_ORIGIN to it — until then the dashboard cannot call
-# this at all.
+# ── Adopting an existing service ──────────────────────────────────────
+# Render matches a blueprint to a service BY NAME. A service called
+# anything else is not touched by a sync — you get a second service and the
+# first one keeps failing. The API used to be a subfolder of the dashboard
+# and its service was called `pooja-admin`; rename it to `pooja-api` in
+# Render → Settings BEFORE syncing, or this creates a duplicate.
 
 services:
+  # ────────────────────────────────────────────────────────────── API ──
   - type: web
     name: pooja-api
     runtime: node
@@ -27,11 +29,23 @@ services:
     # reach production just because it was pushed.
     autoDeploy: false
 
+    # No disk, and none needed: uploaded media lives in MongoDB (GridFS),
+    # not on the container filesystem. That filesystem is ephemeral and the
+    # free plan cannot mount a disk, so anything written there was lost on
+    # every deploy — which, once the app stopped shipping media of its own,
+    # meant the whole sanctum went blank. The storage constraint is now the
+    # database's: Atlas M0 is 512MB for documents AND media together.
+
     envVars:
       - key: NODE_ENV
         value: production
       - key: NODE_VERSION
         value: 20.19.4
+      # Biggest file the dashboard may upload. Uploads are buffered in
+      # memory on their way to the database, so this is a memory ceiling
+      # as much as a policy one — the free instance has 512MB.
+      - key: MAX_UPLOAD_MB
+        value: 25
       - key: MONGODB_URI
         sync: false # must name a database of its OWN — see docs/DEPLOY.md
       - key: ADMIN_PASSWORD
@@ -40,14 +54,54 @@ services:
         generateValue: true
       - key: FIREBASE_SERVICE_ACCOUNT
         sync: false # the whole service-account JSON, on one line
-      # The dashboard is a different origin now, so this CANNOT stay '*':
-      # the browser refuses a wildcard origin on a credentialed request, and
-      # every dashboard call would fail. Set it to the Netlify URL.
+      # Filled in from the dashboard service below, so there is no step
+      # where this is wrong and every dashboard call is refused. It cannot
+      # be '*': the browser forbids a wildcard origin on a credentialed
+      # request, and the admin session is a cookie.
+      #
+      # `fromService` yields a bare host; the API prefixes https:// itself
+      # (see `allowedOrigins` in src/index.js). If Render ever rejects this
+      # block, replace it with `sync: false` and paste the dashboard URL.
       - key: CORS_ORIGIN
-        sync: false # e.g. https://pooja-admin.netlify.app
-      # The dashboard is a separate site, so the session cookie is
-      # cross-origin and `Strict` would stop the browser sending it at all —
+        fromService:
+          type: web
+          name: pooja-admin
+          property: host
+      # The dashboard is a separate origin, so the session cookie is
+      # cross-site and `Strict` would stop the browser sending it at all —
       # sign-in would appear to work and every call after it would 401.
       # `None` requires HTTPS, which Render terminates.
       - key: SESSION_SAMESITE
         value: None
+
+  # ──────────────────────────────────────────────────────── dashboard ──
+  - type: web
+    name: pooja-admin
+    runtime: static
+    rootDir: pooja-admin
+    # `--include=dev` is load-bearing: NODE_ENV=production makes `npm ci`
+    # skip devDependencies, and Vite is one of them, so the build dies with
+    # `vite: not found`. This has already cost one failed deploy.
+    buildCommand: npm ci --include=dev && npm run build
+    staticPublishPath: dist
+    autoDeploy: false
+
+    envVars:
+      - key: NODE_VERSION
+        value: 20.19.4
+      # Baked into the bundle at BUILD time, so pointing the dashboard at a
+      # different API is a rebuild, not a restart. Taken from the service
+      # above rather than typed, which also removes the old chicken-and-egg
+      # where the dashboard had to be built after the API had a URL.
+      - key: VITE_API_BASE
+        fromService:
+          type: web
+          name: pooja-api
+          property: host
+
+    # A single-page app: any path that is not a real file is a client
+    # route, so it must serve index.html rather than 404.
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

@@ -432,6 +432,35 @@ anyone in. See `docs/FIREBASE_SETUP.md`.
   second source of truth the dashboard could not correct without a store
   release. `assets/images/` is now icons and UI chrome only, and there is
   no `assets/audio/` at all.
+- **Uploaded media lives in MongoDB, in GridFS** (`src/files.js`, bucket
+  `media`), not on the filesystem. Render's container is wiped on every
+  deploy and the free plan cannot mount a disk, so a filesystem upload was
+  guaranteed to disappear — and once the app shipped no media of its own,
+  that was the entire sanctum. Things worth knowing:
+  - The URL shape did **not** change: still host-relative
+    `/uploads/<id>.<ext>`. Every row already stored keeps resolving, and
+    `assetUrl()` / `api.asset()` needed no edit.
+  - `/uploads` is served **outside `/api`**, so the gate does not apply —
+    deliberate, because the app fetches media with no session.
+  - The route answers **Range requests**. Android's `MediaPlayer` (the
+    alarm) and `expo-audio`'s seek both need them; without 206 every seek
+    re-downloads from the start. Verified for prefix, suffix and
+    unsatisfiable ranges.
+  - **Content-Type is inferred from the extension** when the browser says
+    `application/octet-stream`, because MediaPlayer picks its decoder from
+    that header and silently fails on a generic one.
+  - Files are immutable (a re-upload gets a new id), hence
+    `Cache-Control: immutable` plus an ETag.
+  - `npm run migrate:media` moves anything still on disk and rewrites the
+    documents that referenced it. Idempotent; `--dry-run` previews both
+    halves. The old `uploads/` directory is still served as a fallback
+    until then.
+  - **Not solved: orphans.** Replacing a deity's artwork leaves the old
+    file in GridFS. `DELETE /api/content/upload` with `{url}` removes one,
+    but nothing calls it automatically — reference-counting across every
+    content type is a bigger job than this was.
+  - Storage is now the database's problem: **Atlas M0 is 512MB** for
+    documents and media together.
 - **Read deity art via `useContent().deityArt(id)` / `deityImage(id)`,**
   never a bundled map — there is none. No upload means the **procedural
   murti**, which is drawn from plain Views and needs no assets, so an
@@ -483,7 +512,7 @@ anyone in. See `docs/FIREBASE_SETUP.md`.
   deletes the Firebase account too) to the open internet.
 - **CI deploys, Render does not.** `.github/workflows/ci.yml` runs the
   dashboard build + a real boot against a Mongo service container +
-  `pooja-admin/scripts/smoke.mjs`, and the app's typecheck/lint; only a green
+  `pooja-api/scripts/smoke.mjs`, and the app's typecheck/lint; only a green
   `main` triggers the Render deploy hook. `autoDeploy: false` in
   `render.yaml` is what makes that the only path to production.
 - **`scripts/smoke.mjs` is the gate's regression test.** It asserts the
@@ -496,7 +525,7 @@ anyone in. See `docs/FIREBASE_SETUP.md`.
   container keeps serving during a release and a plain health check passes
   against the version being replaced.
 - **Deployment lives in `docs/DEPLOY.md`** — Render + Mongo Atlas, via
-  `pooja-admin/render.yaml`. Two things bite: uploads need a mounted disk
+  `render.yaml` at the repo root. Two things bite: uploads need a mounted disk
   (`UPLOAD_DIR`) or they are wiped on every release, and
   `EXPO_PUBLIC_ADMIN_API` is baked into the app bundle at build time, so
   pointing the app at the deployed API needs a rebuild, not a reload.
