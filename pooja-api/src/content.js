@@ -35,7 +35,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  * container filesystem is wiped on every release, so this has to point at a
  * mounted disk or the images disappear with nothing in the logs to say why.
  */
-export const UPLOAD_DIR = process.env.UPLOAD_DIR || join(__dirname, '..', '..', 'uploads');
+export const UPLOAD_DIR = process.env.UPLOAD_DIR || join(__dirname, '..', 'uploads');
 if (!existsSync(UPLOAD_DIR)) mkdirSync(UPLOAD_DIR, { recursive: true });
 
 const storage = multer.diskStorage({

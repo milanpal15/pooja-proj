@@ -26,8 +26,8 @@ env:
 
 jobs:
   # ───────────────────────────────────────────────────────── dashboard ──
-  dashboard:
-    name: Dashboard — build, boot, prove the gate
+  api:
+    name: API — build, boot, prove the gate
     runs-on: ubuntu-latest
 
     services:
@@ -47,29 +47,22 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-          cache-dependency-path: pooja-admin/package-lock.json
+          cache-dependency-path: pooja-api/package-lock.json
 
-      # `--include=dev` mirrors render.yaml, where NODE_ENV=production
-      # otherwise drops vite and the build fails. Same command both places,
-      # so CI cannot pass on a build production will not reproduce.
       - name: Install
-        working-directory: pooja-admin
-        run: npm ci --include=dev
+        working-directory: pooja-api
+        run: npm ci
 
-      - name: Build the dashboard UI
-        working-directory: pooja-admin
-        run: npm run build
-
-      # Boots the real server against a real Mongo. A build that compiles but
+      # Boots the real server against a real Mongo. A build that installs but
       # cannot start is not a passing build.
       - name: Boot
-        working-directory: pooja-admin
+        working-directory: pooja-api
         env:
           PORT: '4000'
           MONGODB_URI: mongodb://127.0.0.1:27017/pooja_ci
           ADMIN_PASSWORD: ci-only-password
         run: |
-          node src/server/index.js > /tmp/server.log 2>&1 &
+          node src/index.js > /tmp/server.log 2>&1 &
           echo $! > /tmp/server.pid
           for i in $(seq 1 30); do
             curl -fsS http://127.0.0.1:4000/api/health >/dev/null 2>&1 && exit 0
@@ -80,7 +73,7 @@ jobs:
           exit 1
 
       - name: Smoke test — public open, admin shut
-        working-directory: pooja-admin
+        working-directory: pooja-api
         env:
           BASE: http://127.0.0.1:4000
           ADMIN_PASSWORD: ci-only-password
@@ -89,6 +82,28 @@ jobs:
       - name: Server log
         if: always()
         run: cat /tmp/server.log || true
+
+  # ───────────────────────────────────────────────────────── dashboard ──
+  dashboard:
+    name: Dashboard — build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: pooja-admin/package-lock.json
+      - name: Install
+        working-directory: pooja-admin
+        run: npm ci --include=dev
+      - name: Build
+        working-directory: pooja-admin
+        # The real URL is injected by Render at build time; any value proves
+        # it compiles.
+        env:
+          VITE_API_BASE: https://example.invalid
+        run: npm run build
 
   # ─────────────────────────────────────────────────────────────── app ──
   app:
@@ -121,7 +136,7 @@ jobs:
   # ──────────────────────────────────────────────────────────── deploy ──
   deploy:
     name: Deploy to Render
-    needs: [dashboard, app]
+    needs: [dashboard, api, app]
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     # Add required reviewers to this environment in repo settings if you ever
@@ -203,7 +218,7 @@ jobs:
       # is the one that would catch an env var set wrong in Render — a build
       # can be perfect and still ship with ADMIN_PASSWORD missing.
       - name: Smoke test the deployment
-        working-directory: pooja-admin
+        working-directory: pooja-api
         env:
           BASE: ${{ vars.DEPLOY_URL }}
           # Optional. Set it to also exercise sign-in against production.

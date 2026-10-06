@@ -2,12 +2,17 @@ import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
 /**
- * The dashboard and the API are one app now.
+ * The dashboard is a static site that talks to `pooja-api`.
  *
- * Express serves `dist/` in production, so the client calls `/api/...` on its
- * own origin and never needs an absolute URL. In dev, Vite runs alongside for
- * hot reload and proxies those same paths to the API — one code path for
- * both, no VITE_API_BASE, and no CORS between two localhost ports.
+ * It used to be served by that same Express process, so `/api/...` was
+ * same-origin and needed no base URL. The API is its own service now — the
+ * phone app's backend should not be a subfolder of the admin tool — so the
+ * built bundle needs to know where it lives:
+ *
+ *   VITE_API_BASE=https://pooja-api.onrender.com npm run build
+ *
+ * In dev that is unnecessary: Vite proxies /api and /uploads to a local API
+ * on :4000, so the browser still sees one origin and no CORS.
  */
 export default defineConfig({
   root: '.',

@@ -6,7 +6,8 @@ dashboard**. Two independently-runnable projects that talk over HTTP.
 ```
 pooja proj/
 ├── poojaappclone/     Expo / React Native app (the phone app)
-├── pooja-admin/       Admin dashboard — Express API + React UI in ONE app
+├── pooja-api/         The backend — Express + Mongoose over MongoDB
+├── pooja-admin/       Admin dashboard — a React/Vite static site on that API
 ├── docs/              FIREBASE_SETUP.md (auth setup — read before debugging sign-in)
 └── CLAUDE.md          includes this file via @AGENTS.md
 ```
@@ -69,12 +70,27 @@ reachability rules — this is the #1 source of "it doesn't work on the phone".
 
 ---
 
-## 2. The admin dashboard — `pooja-admin/`
+## 2. The backend — `pooja-api/`, and the dashboard — `pooja-admin/`
 
-**One app**, not two. Express serves the built React UI, so the dashboard and
-the API share a process, a port, a `package.json` and a `node_modules`. It
-used to be `client/` on :5173 and `server/` on :4000, started separately and
-wired together with `VITE_API_BASE` + CORS.
+**Three projects, not two.** The server used to live inside `pooja-admin/`,
+which made the phone app's backend a subfolder of the admin tool: the app
+could not be served unless the dashboard was running, and locking the
+dashboard down locked the app out. They are separate concerns over one
+MongoDB, and now separate deployables.
+
+- `pooja-api/` — Express + Mongoose. Serves BOTH surfaces, gated: the app's
+  endpoints are the allowlist in `admin.js`, everything else needs an
+  operator session. This is the only thing that talks to MongoDB.
+- `pooja-admin/` — a static React/Vite site that calls that API. It serves
+  nothing itself.
+
+**Cross-origin is the catch.** In dev Vite proxies `/api`, so the two share
+an origin and the default `SameSite=Strict` session cookie works. Deployed,
+the dashboard is its own site, and Strict means the browser never sends the
+cookie — sign-in looks fine and every call after it 401s. Production needs
+`SESSION_SAMESITE=None` (which forces `Secure`, so HTTPS) and `CORS_ORIGIN`
+set to the dashboard's exact URL, never `*`: the browser refuses a wildcard
+origin on a credentialed request.
 
 **Stack:** Express + Mongoose + MongoDB, React + Vite, multer for uploads.
 ESM throughout.
@@ -90,20 +106,20 @@ pooja-admin/
 └── dist/               built UI, served by Express (gitignored)
 ```
 
-**Run (needs MongoDB on `:27017`):**
+**Run (needs MongoDB on `:27017`) — two terminals:**
 ```bash
-cd pooja-admin
-cp .env.example .env && npm install
-npm start          # builds the UI, then serves UI + API on http://localhost:4000
-npm run dev        # Vite on :5173 (hot reload) + API on :4000, together
-npm run seed       # optional demo analytics data
+cd pooja-api   && cp .env.example .env && npm install && npm run dev   # :4000
+cd pooja-admin && npm install && npm run dev                           # :5173, proxies /api
 ```
+The dashboard is at http://localhost:5173. Building it for a deploy needs
+`VITE_API_BASE` — it is baked in at build time, so changing the API's URL
+is a rebuild, not a restart.
 
 `npm start` is the one to use unless you are editing the dashboard UI. In dev,
 Vite proxies `/api` and `/uploads` to :4000, so the client always calls its own
 origin — `api.js` has no absolute base URL any more.
 
-**Server** — `src/server/`:
+**Server** — `pooja-api/src/`:
 - `index.js` — entry; mounts `/uploads`, the `/api` routers, then `dist/` and
   an SPA fallback. There is deliberately **no `GET /` handler**: it used to
   return an API banner, which shadowed the dashboard once the UI moved here.
@@ -136,7 +152,7 @@ origin — `api.js` has no absolute base URL any more.
   (dashboard list/update/delete — the old unauthenticated `POST /users` now
   answers **410 Gone**), `publicContent` (`GET /content`).
 
-**Client** — `src/client/`:
+**Client** — `pooja-admin/src/client/`:
 - `App.jsx` — sidebar tabs: Overview, Feature Flags, Announcements, Rules,
   Deities, Temples, Aartis, Festivals, Sevas, Knowledge, FAQs, Home Slides,
   Horoscope, Panchang, Settings, Users, Payments, Visitors (hash-routed),

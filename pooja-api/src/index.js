@@ -1,7 +1,16 @@
-import { existsSync } from 'fs';
-import { dirname, join, resolve } from 'path';
-import { fileURLToPath } from 'url';
-
+/**
+ * The backend, as its own service.
+ *
+ * It used to live inside `pooja-admin/`, which made the phone app's API a
+ * subfolder of the admin tool: the app could not be served without the
+ * dashboard also running, and locking the dashboard down meant locking the
+ * app out. They are separate concerns on one database, and now separate
+ * processes — the app talks to this, the dashboard talks to this, and
+ * neither depends on the other being up.
+ *
+ * This serves BOTH surfaces, gated: the app's endpoints are the allowlist
+ * in `admin.js`, everything else wants an operator session.
+ */
 import cors from 'cors';
 import 'dotenv/config';
 import express from 'express';
@@ -20,8 +29,15 @@ const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/pooja_
 const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
 
 const app = express();
-// `credentials` so the admin session cookie survives a cross-origin
-// dashboard; harmless when the UI is served from this same process.
+/*
+ * The dashboard is a separate origin now, so `credentials` is load-bearing
+ * rather than incidental: without it the browser will not send the admin
+ * session cookie to this host at all.
+ *
+ * Which also means CORS_ORIGIN can no longer be '*' in production — the
+ * spec forbids a wildcard origin on a credentialed request, and the browser
+ * will refuse every dashboard call. Set it to the dashboard's URL.
+ */
 app.use(
   cors({
     origin: CORS_ORIGIN === '*' ? true : CORS_ORIGIN.split(','),
@@ -69,48 +85,13 @@ app.use('/api', operators);
 app.use('/api', policies);
 app.use('/api', announcements);
 
-/* ------------------------------------------------- the dashboard itself -- */
-
-/**
- * The admin UI is served by this same process.
- *
- * It used to be a second app on :5173 that you had to start separately and
- * point at the API with VITE_API_BASE — two terminals, two ports, and CORS
- * between them for no reason. Building the client and serving it from here
- * makes the dashboard one thing: `npm start` gives you API and UI on :4000.
- *
- * `npm run dev` still runs Vite separately for hot reload; it proxies /api
- * back here, so the client never needs to know an absolute API URL again.
- */
-const CLIENT_DIST = resolve(dirname(fileURLToPath(import.meta.url)), '../../dist');
-
-if (existsSync(CLIENT_DIST)) {
-  app.use(express.static(CLIENT_DIST));
-
-  // SPA fallback. Anything that is not an API call or an upload is a route
-  // inside the dashboard, so hand back index.html and let the client router
-  // sort it out. Registered last so it cannot shadow a real endpoint.
-  app.get(/^\/(?!api|uploads).*/, (_req, res) => {
-    res.sendFile(join(CLIENT_DIST, 'index.html'));
-  });
-} else {
-  console.warn(
-    '⚠ Dashboard UI not built — serving the API only.\n' +
-      '  Run `npm run build` in pooja-admin/ (or `npm start`, which builds first).',
-  );
-}
-
 connectDb(MONGODB_URI)
   // Operators live in the database now, so the first one can only be
   // created once there is a connection — not at import time.
   .then(ensureFirstOperator)
   .then(() => {
     app.listen(PORT, () =>
-      console.log(
-        existsSync(CLIENT_DIST)
-          ? `✓ Admin dashboard + API on http://localhost:${PORT}`
-          : `✓ API on http://localhost:${PORT} (dashboard not built)`,
-      ),
+      console.log(`✓ API on http://localhost:${PORT}`),
     );
   })
   .catch((err) => {

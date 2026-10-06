@@ -1,10 +1,12 @@
 /*
- * Same-origin by default.
+ * Where the API lives.
  *
- * The API serves this bundle in production and Vite proxies /api to it in
- * dev, so an empty base is correct in both — requests go to whatever host
- * the dashboard was loaded from. VITE_API_BASE remains only for the odd case
- * of pointing a local dashboard at a remote API.
+ * Empty means same-origin, which is right in dev: Vite proxies /api and
+ * /uploads to a local API, so the browser sees one origin.
+ *
+ * In production the dashboard is a static site and the API is a separate
+ * service, so the build needs VITE_API_BASE. Without it the dashboard will
+ * call itself and every request 404s — see pooja-admin/README.md.
  */
 const BASE = import.meta.env.VITE_API_BASE || '';
 

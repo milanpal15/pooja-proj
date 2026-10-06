@@ -144,6 +144,28 @@ function cookieValue(req, name) {
 
 export const sessionOf = (req) => read(cookieValue(req, COOKIE));
 
+/**
+ * How the session cookie travels.
+ *
+ * `Strict` is the default and the safer answer: another site cannot cause
+ * the browser to attach this cookie at all, which is what makes a CSRF
+ * token unnecessary. It works whenever the dashboard and the API share an
+ * origin — true in dev, where Vite proxies /api.
+ *
+ * A dashboard deployed as its own site is cross-origin, and Strict means
+ * the browser never sends the cookie: sign-in appears to succeed and every
+ * subsequent call is 401. That needs `SESSION_SAMESITE=None`, which the
+ * spec only honours alongside `Secure`, so it also requires HTTPS.
+ *
+ * What is given up with None, and why it is tolerable here: CORS is pinned
+ * to one origin, every write takes a JSON body (which a cross-site form
+ * cannot send without a preflight) and every destructive method is
+ * non-simple, so the browser preflights it and CORS refuses. A real CSRF
+ * token would still be better; this is the honest state of it.
+ */
+const SAMESITE = process.env.SESSION_SAMESITE || 'Strict';
+const CROSS_SITE = SAMESITE.toLowerCase() === 'none';
+
 function setCookie(res, token) {
   res.setHeader(
     'Set-Cookie',
@@ -151,11 +173,10 @@ function setCookie(res, token) {
       `${COOKIE}=${encodeURIComponent(token)}`,
       'Path=/',
       'HttpOnly',
-      // Strict is what makes a CSRF token unnecessary: another site cannot
-      // cause the browser to attach this cookie at all.
-      'SameSite=Strict',
+      `SameSite=${SAMESITE}`,
       `Max-Age=${Math.floor(MAX_AGE_MS / 1000)}`,
-      IS_PROD ? 'Secure' : '',
+      // SameSite=None is ignored without Secure, so it is not optional there.
+      IS_PROD || CROSS_SITE ? 'Secure' : '',
     ]
       .filter(Boolean)
       .join('; '),
@@ -230,7 +251,10 @@ export function mountAdminAuth(app) {
   });
 
   app.post('/api/admin/logout', (_req, res) => {
-    res.setHeader('Set-Cookie', `${COOKIE}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0`);
+    res.setHeader(
+      'Set-Cookie',
+      `${COOKIE}=; Path=/; HttpOnly; SameSite=${SAMESITE}; Max-Age=0${IS_PROD || CROSS_SITE ? '; Secure' : ''}`,
+    );
     res.json({ ok: true });
   });
 

@@ -1,0 +1,78 @@
+# Render blueprint — two services over one MongoDB.
+#
+# They were one. That made the phone app's backend a subfolder of the admin
+# tool: the app could not be served unless the dashboard was running, and
+# locking the dashboard down meant locking the app out. Split, the app
+# depends on `pooja-api` alone and the dashboard is just another client of
+# it — you can take the dashboard offline entirely and devotees notice
+# nothing.
+#
+# Deploy: Render → New → Blueprint → this repo. Secrets (`sync: false`) are
+# typed into Render; nothing secret belongs in this file.
+#
+# ── Order matters on first deploy ──────────────────────────────────────
+# The dashboard bakes the API's URL into its bundle at BUILD time, so
+# create `pooja-api` first, copy its URL into VITE_API_BASE below, and only
+# then deploy `pooja-admin`. Changing the URL later needs a rebuild, not a
+# restart.
+
+services:
+  # ───────────────────────────────────────────── the backend, for both ──
+  - type: web
+    name: pooja-api
+    runtime: node
+    plan: free
+    region: singapore
+    rootDir: pooja-api
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/health
+    # CI deploys, not Render: a push that fails the gate smoke test must not
+    # reach production just because it was pushed.
+    autoDeploy: false
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 20.19.4
+      - key: MONGODB_URI
+        sync: false # must name a database of its OWN — see docs/DEPLOY.md
+      - key: ADMIN_PASSWORD
+        sync: false # bootstraps the first operator; production will not boot without it
+      - key: ADMIN_SESSION_SECRET
+        generateValue: true
+      - key: FIREBASE_SERVICE_ACCOUNT
+        sync: false # the whole service-account JSON, on one line
+      # The dashboard is a different origin now, so this CANNOT stay '*':
+      # the browser refuses a wildcard origin on a credentialed request, and
+      # every dashboard call would fail. Set it to the dashboard's URL.
+      - key: CORS_ORIGIN
+        sync: false # e.g. https://pooja-admin.onrender.com
+      # The dashboard is a separate site, so the session cookie is
+      # cross-origin and `Strict` would stop the browser sending it at all —
+      # sign-in would appear to work and every call after it would 401.
+      # `None` requires HTTPS, which Render terminates.
+      - key: SESSION_SAMESITE
+        value: None
+
+  # ──────────────────────────────────────────── the dashboard, static ──
+  - type: web
+    name: pooja-admin
+    runtime: static
+    rootDir: pooja-admin
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+
+    # A single-page app: every path that is not a file is a client route.
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+    envVars:
+      - key: NODE_VERSION
+        value: 20.19.4
+      # Baked into the bundle at build time. Set it to pooja-api's URL.
+      - key: VITE_API_BASE
+        sync: false # e.g. https://pooja-api.onrender.com
