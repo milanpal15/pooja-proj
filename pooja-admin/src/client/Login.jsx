@@ -41,7 +41,7 @@ export function Login({ onAuthed }) {
     <div className="login-wrap">
       <form className="login-card" onSubmit={submit}>
         <div className="login-mark">ॐ</div>
-        <h1>Divine Temple</h1>
+        <h1>Bhakti</h1>
         <p className="muted">Admin Portal</p>
 
         <input

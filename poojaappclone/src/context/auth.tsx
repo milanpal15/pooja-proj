@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { StringKey } from '@/context/language';
-import { ApiError, type Profile, syncProfile, updateProfile } from '@/lib/api';
+import { ApiError, type Gender, type Profile, syncProfile, updateProfile } from '@/lib/api';
 import { firebaseSignOut, type FirebaseUser, watchAuthState } from '@/lib/firebase-auth';
 
 /** How the devotee proved who they are. */
@@ -15,6 +15,11 @@ export type User = {
   contact: string;
   /** optional short bio from Create Profile */
   bio?: string;
+  gender?: Gender | null;
+  /** YYYY-MM-DD. */
+  dob?: string | null;
+  /** True only when the provider supplied the email. */
+  emailVerified?: boolean;
   /** Firebase uid. Stable across sign-ins; the backend's real key. */
   uid: string;
   email?: string | null;
@@ -33,7 +38,15 @@ type AuthContextValue = {
    */
   needsProfile: boolean;
   /** Finish a first sign-in by naming the account. */
-  completeProfile: (input: { name: string; bio?: string }) => Promise<void>;
+  completeProfile: (input: {
+    name: string;
+    bio?: string;
+    gender?: Gender;
+    /** YYYY-MM-DD. */
+    dob?: string;
+    /** Phone sign-ins only — Google already supplies a verified address. */
+    email?: string;
+  }) => Promise<void>;
   /** Re-read the profile from the backend (e.g. after an admin edit). */
   refreshProfile: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -67,6 +80,9 @@ function toUser(p: Profile): User {
     bio: p.bio,
     uid: p.uid,
     email: p.email,
+    emailVerified: p.emailVerified,
+    gender: p.gender,
+    dob: p.dob,
     photoUrl: p.photoUrl,
   };
 }
@@ -90,6 +106,19 @@ function fromFirebase(fu: FirebaseUser): User {
   };
 }
 
+/**
+ * Whether we know enough to let someone in.
+ *
+ * Name, gender and date of birth are asked of everyone. An email is asked
+ * only of phone sign-ins, because Google already supplied a verified one —
+ * demanding it again would be asking for something we have.
+ */
+function profileComplete(u: User): boolean {
+  if (!u.name.trim() || !u.gender || !u.dob) return false;
+  if (u.method === 'phone' && !u.email) return false;
+  return true;
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [needsProfile, setNeedsProfile] = useState(false);
@@ -106,8 +135,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const apply = useCallback(
     (u: User | null) => {
-      if (u && !u.name.trim()) {
-        // Verified, but nameless — hold at Create Profile.
+      if (u && !profileComplete(u)) {
+        // Verified, but we do not know enough about them yet — hold at
+        // Create Profile rather than letting a half-made account through.
         setUser(null);
         setNeedsProfile(true);
         return;
@@ -187,18 +217,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [apply, cache, hardSignOut]);
 
   const completeProfile = useCallback(
-    async ({ name, bio }: { name: string; bio?: string }) => {
+    async ({
+      name,
+      bio,
+      gender,
+      dob,
+      email,
+    }: { name: string; bio?: string; gender?: Gender; dob?: string; email?: string }) => {
       const trimmed = name.trim();
       try {
-        apply(toUser(await updateProfile({ name: trimmed, bio })));
+        apply(toUser(await updateProfile({ name: trimmed, bio, gender, dob, email })));
       } catch {
         // Offline: let them in with what they typed. The next successful sync
         // pushes it up, because `syncProfile` sends the cached name.
         setNeedsProfile(false);
         setUser((prev) => {
           const next: User = prev
-            ? { ...prev, name: trimmed, bio }
-            : { name: trimmed, bio, method: 'phone', contact: '', uid: '' };
+            ? { ...prev, name: trimmed, bio, gender, dob }
+            : { name: trimmed, bio, gender, dob, method: 'phone', contact: '', uid: '' };
           cache(next);
           return next;
         });

@@ -11,10 +11,10 @@ import {
   Type,
   type IconName,
   useScrollPadding,
+  useToast,
 } from '@/components/ui';
-import { SOUNDS } from '@/constants/sounds';
 import { BottomTabInset } from '@/constants/theme';
-import { useContent } from '@/context/content';
+import { assetUrl, useContent } from '@/context/content';
 import { type StringKey, useLanguage } from '@/context/language';
 import { Radius, Space, useTheme } from '@/theme';
 
@@ -43,7 +43,15 @@ const CATEGORIES: { key: string; labelKey: StringKey; icon: IconName }[] = [
  * managed six aartis of its own — two lists, neither visible to the other,
  * and the one an operator could edit was the one nobody saw.
  */
-type Track = { id: string; title: string; artist: string; len: string; category: string };
+type Track = {
+  id: string;
+  title: string;
+  artist: string;
+  len: string;
+  category: string;
+  /** The track's own recording, or undefined if none has been uploaded. */
+  url?: string;
+};
 
 export default function BhajanScreen() {
   return (
@@ -58,7 +66,16 @@ function BhajanBody() {
   const { t } = useLanguage();
   const scrollPad = useScrollPadding(96);
   const { aartis } = useContent();
-  const player = useAudioPlayer(SOUNDS.aarti);
+  const toast = useToast();
+  /*
+   * One empty player, pointed at whichever track is tapped.
+   *
+   * It used to be created with a single bundled aarti loop, so every row on
+   * the shelf played the same recording no matter which one was tapped —
+   * the titles came from the dashboard, the audio did not. Each aarti
+   * carries its own `audioUrl` now.
+   */
+  const player = useAudioPlayer(null);
   const [nowPlaying, setNowPlaying] = useState<Track | null>(null);
   const [playing, setPlaying] = useState(false);
   const [category, setCategory] = useState('morning');
@@ -71,6 +88,7 @@ function BhajanBody() {
         artist: a.artist ?? '',
         len: a.duration ?? '',
         category: a.category ?? 'morning',
+        url: assetUrl(a.audioUrl),
       })),
     [aartis],
   );
@@ -79,21 +97,32 @@ function BhajanBody() {
 
   const play = useCallback(
     (track: Track) => {
+      setNowPlaying(track);
+      if (!track.url) {
+        // The shelf is the dashboard's list, and a row can exist before its
+        // recording has been uploaded. Selecting it is still honest; silently
+        // playing nothing would not be.
+        setPlaying(false);
+        toast.info(t('bhajan_no_audio'));
+        return;
+      }
       try {
+        player.replace({ uri: track.url });
         player.loop = true;
         player.seekTo(0);
         player.play();
+        setPlaying(true);
       } catch {
-        // A missing or unreadable asset shouldn't take the screen down; the
-        // row still selects so the UI stays honest about what was tapped.
+        // An unreachable recording shouldn't take the screen down; the row
+        // still selects so the UI stays honest about what was tapped.
+        setPlaying(false);
       }
-      setNowPlaying(track);
-      setPlaying(true);
     },
-    [player],
+    [player, t, toast],
   );
 
   const toggle = useCallback(() => {
+    if (!nowPlaying?.url) return;
     try {
       if (playing) player.pause();
       else player.play();
@@ -101,7 +130,7 @@ function BhajanBody() {
       /* see above */
     }
     setPlaying((p) => !p);
-  }, [player, playing]);
+  }, [player, playing, nowPlaying]);
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1 }}>

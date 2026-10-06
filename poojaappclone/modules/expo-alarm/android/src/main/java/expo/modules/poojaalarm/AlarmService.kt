@@ -187,45 +187,118 @@ class AlarmService : Service() {
 
   /* ──────────────────────────────────────────────────────────── sound ── */
 
+  /** This phone's own alarm sound — the fallback whenever a tone fails. */
+  private fun defaultUri(): Uri? =
+    RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+      ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+
   private fun soundUri(entry: AlarmEntry): Uri? {
     val name = entry.sound
     // Empty string is the devotee choosing silence; null is "use whatever
     // this phone's alarm sound is".
     if (name != null && name.isEmpty()) return null
-    if (name == null) {
-      return RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-        ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-    }
+    if (name == null) return defaultUri()
+    // Tones are uploaded from the dashboard now, so the usual case is a URL
+    // that MediaPlayer streams. The raw-resource lookup is kept for a tone
+    // saved before that change; neither matching means the phone's own.
+    if (name.startsWith("http://") || name.startsWith("https://")) return Uri.parse(name)
     val resId = resources.getIdentifier(name, "raw", packageName)
     return if (resId != 0) {
       Uri.parse("android.resource://$packageName/raw/$name")
     } else {
-      RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+      defaultUri()
     }
+  }
+
+  /** A player wired to the alarm stream, with its source set but not prepared. */
+  private fun build(uri: Uri): MediaPlayer =
+    MediaPlayer().apply {
+      setAudioAttributes(
+        AudioAttributes.Builder()
+          // USAGE_ALARM is what routes this to the alarm stream, and so
+          // what makes it audible on a silenced phone.
+          .setUsage(AudioAttributes.USAGE_ALARM)
+          .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+          .build(),
+      )
+      setDataSource(this@AlarmService, uri)
+      isLooping = true
+    }
+
+  private fun releaseQuietly(mp: MediaPlayer) {
+    try {
+      mp.release()
+    } catch (_: Throwable) {
+      // already gone
+    }
+  }
+
+  /**
+   * Ring `uri` on the alarm stream.
+   *
+   * Tones are uploaded from the dashboard, so the usual source is a network
+   * URL — and `prepare()` on one blocks until the server answers. This runs
+   * on the main thread (a service's `onStartCommand` does), so blocking
+   * there is an ANR waiting for a slow connection. A remote tone prepares
+   * asynchronously and starts the moment it is ready; a local one still
+   * prepares inline, which is immediate.
+   *
+   * `fallback` is false on the second attempt, so a device whose own alarm
+   * sound is also unplayable cannot loop here.
+   */
+  private fun play(uri: Uri, fallback: Boolean) {
+    val mp =
+      try {
+        build(uri)
+      } catch (_: Throwable) {
+        playDefaultInstead(uri, fallback)
+        return
+      }
+
+    mp.setOnErrorListener { _, _, _ ->
+      if (player === mp) player = null
+      releaseQuietly(mp)
+      playDefaultInstead(uri, fallback)
+      true
+    }
+
+    try {
+      if (uri.scheme == "http" || uri.scheme == "https") {
+        // Dismissing the alarm while the tone is still loading clears
+        // `player`; without this check the download would then start a
+        // sound nobody asked for, on a player that is being released.
+        mp.setOnPreparedListener { if (player === mp) it.start() }
+        player = mp
+        mp.prepareAsync()
+      } else {
+        mp.prepare()
+        mp.start()
+        player = mp
+      }
+    } catch (_: Throwable) {
+      if (player === mp) player = null
+      releaseQuietly(mp)
+      playDefaultInstead(uri, fallback)
+    }
+  }
+
+  /**
+   * Fall back to the phone's own alarm sound.
+   *
+   * The temple's tone lives on the network now, so an alarm can land with no
+   * connection or on a file that has moved. Waking the devotee with the
+   * phone's own alarm beats not waking them at all.
+   */
+  private fun playDefaultInstead(failed: Uri, allowed: Boolean) {
+    if (!allowed) return
+    val own = defaultUri() ?: return
+    if (own == failed) return
+    play(own, fallback = false)
   }
 
   private fun startSound(entry: AlarmEntry) {
     val uri = soundUri(entry) ?: return
-    try {
-      player = MediaPlayer().apply {
-        setAudioAttributes(
-          AudioAttributes.Builder()
-            // USAGE_ALARM is what routes this to the alarm stream, and so
-            // what makes it audible on a silenced phone.
-            .setUsage(AudioAttributes.USAGE_ALARM)
-            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-            .build(),
-        )
-        setDataSource(this@AlarmService, uri)
-        isLooping = true
-        prepare()
-        start()
-      }
-    } catch (_: Throwable) {
-      // A missing or unplayable tone must not cost the devotee the alarm:
-      // the notification and vibration still fire.
-      player = null
-    }
+    play(uri, fallback = true)
 
     // If the alarm volume is at zero the alarm is inaudible, which for an
     // alarm is a failure rather than a preference. Nudge it to something

@@ -105,62 +105,6 @@ export const REMINDERS: ReminderDef[] = [
  */
 export type ToneId = string;
 
-export type ToneDef = {
-  id: ToneId;
-  title: string;
-  titleHi: string;
-  desc: string;
-  descHi: string;
-  icon: IconName;
-  /** Maps to the notification sound name; null uses the platform default. */
-  sound: string | null;
-  /** Preview key into SOUNDS; null means nothing to preview. */
-  preview: 'bell' | 'aarti' | null;
-};
-
-export const TONES: ToneDef[] = [
-  {
-    id: 'bell',
-    title: 'Temple Bell',
-    titleHi: 'मंदिर की घंटी',
-    desc: 'A single ghanta strike',
-    descHi: 'एक घंटा नाद',
-    icon: 'bell',
-    sound: 'bell.wav',
-    preview: 'bell',
-  },
-  {
-    id: 'aarti',
-    title: 'Aarti Ambience',
-    titleHi: 'आरती ध्वनि',
-    desc: 'Drone and bells',
-    descHi: 'ध्वनि एवं घंटियाँ',
-    icon: 'music',
-    sound: 'aarti.wav',
-    preview: 'aarti',
-  },
-  {
-    id: 'default',
-    title: 'Phone Default',
-    titleHi: 'फ़ोन का डिफ़ॉल्ट',
-    desc: 'Whatever your phone uses',
-    descHi: 'जो आपके फ़ोन में सेट है',
-    icon: 'settings',
-    sound: null,
-    preview: null,
-  },
-  {
-    id: 'silent',
-    title: 'Silent',
-    titleHi: 'मौन',
-    desc: 'Show it, but stay quiet',
-    descHi: 'सूचना दिखे, ध्वनि नहीं',
-    icon: 'close',
-    sound: null,
-    preview: null,
-  },
-];
-
 /* ─────────────────────────────────────────────────────── wallpapers ── */
 
 /**

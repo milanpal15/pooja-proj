@@ -57,9 +57,18 @@ const REMINDERS_SEED = [
   { slug: 'mantra', title: 'Daily Mantra', titleHi: 'दैनिक मंत्र', body: 'A few minutes of japa.', bodyHi: 'कुछ क्षण जप के लिए।', hour: 7, minute: 0, icon: 'sparkle', order: 4 },
 ];
 
+/*
+ * `sound` is the URL of an uploaded recording.
+ *
+ * Bell and Aarti seed with none. They used to name `bell` and `aarti`,
+ * two files compiled into the app — those are gone, so naming them here
+ * would promise audio nothing can play. Upload a recording for each from
+ * the Tones tab; until then they fall back to the phone's own alarm sound,
+ * and the sanctum's bell and aarti ambience stay quiet.
+ */
 const TONES_SEED = [
-  { slug: 'bell', title: 'Temple Bell', titleHi: 'मंदिर की घंटी', desc: 'A single ghanta strike', descHi: 'एक घंटा नाद', sound: 'bell', icon: 'bell', order: 0 },
-  { slug: 'aarti', title: 'Aarti Ambience', titleHi: 'आरती ध्वनि', desc: 'Drone and bells', descHi: 'ध्वनि एवं घंटियाँ', sound: 'aarti', icon: 'music', order: 1 },
+  { slug: 'bell', title: 'Temple Bell', titleHi: 'मंदिर की घंटी', desc: 'A single ghanta strike', descHi: 'एक घंटा नाद', sound: null, icon: 'bell', order: 0 },
+  { slug: 'aarti', title: 'Aarti Ambience', titleHi: 'आरती ध्वनि', desc: 'Drone and bells', descHi: 'ध्वनि एवं घंटियाँ', sound: null, icon: 'music', order: 1 },
   { slug: 'default', title: 'Phone Default', titleHi: 'फ़ोन का डिफ़ॉल्ट', desc: 'Whatever your phone uses', descHi: 'जो आपके फ़ोन में सेट है', sound: null, icon: 'settings', order: 2 },
   { slug: 'silent', title: 'Silent', titleHi: 'मौन', desc: 'Show it, but stay quiet', descHi: 'सूचना दिखे, ध्वनि नहीं', sound: '', icon: 'close', order: 3 },
 ];

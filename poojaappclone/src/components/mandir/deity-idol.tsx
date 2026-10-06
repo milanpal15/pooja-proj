@@ -10,7 +10,6 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { Glow } from '@/components/pooja/flame';
-import { DEITY_IMAGES } from '@/constants/deity-images';
 import { useContent } from '@/context/content';
 import type { Deity } from '@/constants/deities';
 
@@ -45,10 +44,12 @@ export function DeityIdol({
     transform: [{ scale: 1 + breathe.value * 0.01 }],
   }));
 
-  // Prefer admin-managed remote artwork, then an explicit per-deity image, then
-  // the bundled image map, else draw the procedural murti.
+  // Admin-managed artwork, else draw the procedural murti. There used to be
+  // a third source — a map of oleographs compiled into the app — which meant
+  // a deity's picture could disagree with the dashboard and only a store
+  // release could settle it.
   const remote = useContent().deityImage(deity.id);
-  const artwork = remote ?? deity.image ?? DEITY_IMAGES[deity.id];
+  const artwork = remote ?? deity.image;
 
   return (
     <View style={[styles.root, { width: size, height: size * 1.05 }]} pointerEvents="none">

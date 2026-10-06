@@ -11,11 +11,19 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Button, Field, Icon, IconButton, Mandala, Type } from '@/components/ui';
+import {
+  Button,
+  Chip,
+  Field,
+  Icon,
+  IconButton,
+  Mandala,
+  Type,
+} from '@/components/ui';
 import { GOOGLE_WEB_CLIENT_ID } from '@/constants/config';
 import { useAdmin } from '@/context/admin';
 import { useAuth } from '@/context/auth';
-import { useLanguage } from '@/context/language';
+import { type StringKey, useLanguage } from '@/context/language';
 import {
   type AuthError,
   confirmOtp,
@@ -23,6 +31,7 @@ import {
   requestOtp,
   signInWithGoogle,
 } from '@/lib/firebase-auth';
+import type { Gender } from '@/lib/api';
 import { Fill, Radius, Space, useTheme } from '@/theme';
 
 /**
@@ -46,6 +55,78 @@ const RESEND_SECONDS = 45;
 
 type Step = 'select' | 'entry' | 'otp' | 'profile';
 
+
+/** The four options, in the order they are shown. */
+const GENDERS: { value: Gender; labelKey: StringKey }[] = [
+  { value: 'female', labelKey: 'gender_female' },
+  { value: 'male', labelKey: 'gender_male' },
+  { value: 'other', labelKey: 'gender_other' },
+  { value: 'prefer_not_to_say', labelKey: 'gender_private' },
+];
+
+/**
+ * Date of birth as three numeric boxes.
+ *
+ * Deliberately not a platform date picker: that is another native module
+ * and another rebuild, and a wheel scrolled back sixty years is worse than
+ * typing a year. Emits YYYY-MM-DD, or '' while incomplete, so the caller
+ * only ever sees a whole date or nothing.
+ */
+function DobField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const { c } = useTheme();
+  const [d, m, y] = value ? [value.slice(8, 10), value.slice(5, 7), value.slice(0, 4)] : ['', '', ''];
+
+  const emit = (dd: string, mm: string, yyyy: string) => {
+    if (dd.length === 2 && mm.length === 2 && yyyy.length === 4) {
+      onChange(`${yyyy}-${mm}-${dd}`);
+    } else {
+      onChange('');
+    }
+  };
+
+  const box = (
+    val: string,
+    place: string,
+    len: number,
+    set: (v: string) => void,
+    flex: number,
+  ) => (
+    <TextInput
+      value={val}
+      placeholder={place}
+      placeholderTextColor={c.onSurfaceFaint}
+      keyboardType="number-pad"
+      maxLength={len}
+      onChangeText={(t) => set(t.replace(/[^0-9]/g, '').slice(0, len))}
+      style={[
+        styles.dobBox,
+        { flex, color: c.onSurface, borderColor: c.outlineVariant, backgroundColor: c.containerLowest },
+      ]}
+    />
+  );
+
+  return (
+    <View style={{ gap: 6 }}>
+      <Type v="labelMd" tone="onSurfaceVariant">
+        {label}
+      </Type>
+      <View style={styles.dobRow}>
+        {box(d, 'DD', 2, (v) => emit(v, m, y), 1)}
+        {box(m, 'MM', 2, (v) => emit(d, v, y), 1)}
+        {box(y, 'YYYY', 4, (v) => emit(d, m, v), 1.6)}
+      </View>
+    </View>
+  );
+}
+
 export function LoginScreen() {
   const { completeProfile, needsProfile, authError, clearAuthError } = useAuth();
   const { t, lang, toggleLang } = useLanguage();
@@ -62,6 +143,17 @@ export function LoginScreen() {
   const [otp, setOtp] = useState('');
   const [name, setName] = useState('');
   const [bio, setBio] = useState('');
+  const [gender, setGender] = useState<Gender | null>(null);
+  /** YYYY-MM-DD, typed as three parts so no date picker native module is needed. */
+  const [dob, setDob] = useState('');
+  const [email, setEmail] = useState('');
+  /**
+   * Which provider just succeeded.
+   *
+   * Decides whether the profile step asks for an email: phone sign-in
+   * supplies none, Google supplies a verified one.
+   */
+  const [signedInBy, setSignedInBy] = useState<'phone' | 'google' | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [resendIn, setResendIn] = useState(0);
@@ -150,6 +242,7 @@ export function LoginScreen() {
     resetError();
     try {
       await confirmOtp(confirmation.current, otp);
+      setSignedInBy('phone');
       // On success the auth provider takes over: it syncs the backend profile
       // and either signs us in or flips `needsProfile`, which moves this
       // screen to 'profile'. Nothing to do here.
@@ -168,6 +261,7 @@ export function LoginScreen() {
     resetError();
     try {
       await signInWithGoogle();
+      setSignedInBy('google');
     } catch (e) {
       show(e);
     } finally {
@@ -175,18 +269,38 @@ export function LoginScreen() {
     }
   }, [resetError, show, t]);
 
+  /**
+   * Phone sign-in carries no email, so we ask for one. Google already
+   * supplied a verified address — asking again would be asking for
+   * something we have.
+   */
+  const needsEmail = signedInBy === 'phone';
+
   const complete = useCallback(async () => {
     if (!name.trim()) return setError(t('err_name'));
+    if (!gender) return setError(t('err_gender'));
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dob)) return setError(t('err_dob'));
+    if (dob > new Date().toISOString().slice(0, 10)) return setError(t('err_dob_future'));
+    if (needsEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) {
+      return setError(t('err_email'));
+    }
+
     setBusy(true);
     resetError();
     try {
-      await completeProfile({ name: name.trim(), bio: bio.trim() });
+      await completeProfile({
+        name: name.trim(),
+        bio: bio.trim(),
+        gender,
+        dob,
+        ...(needsEmail ? { email: email.trim() } : {}),
+      });
     } catch (e) {
       show(e);
     } finally {
       setBusy(false);
     }
-  }, [name, bio, completeProfile, resetError, show, t]);
+  }, [name, bio, gender, dob, email, needsEmail, completeProfile, resetError, show, t]);
 
   return (
     <Backdrop>
@@ -335,6 +449,55 @@ export function LoginScreen() {
                     placeholder={t('ph_full_name')}
                     error={shownError || undefined}
                   />
+                  <View style={{ gap: 6 }}>
+                    <Type v="labelMd" tone="onSurfaceVariant">
+                      {t('gender_label')}
+                    </Type>
+                    <View style={styles.genderRow}>
+                      {GENDERS.map((g) => (
+                        <Chip
+                          key={g.value}
+                          label={t(g.labelKey)}
+                          selected={gender === g.value}
+                          onPress={() => {
+                            setGender(g.value);
+                            resetError();
+                          }}
+                        />
+                      ))}
+                    </View>
+                  </View>
+
+                  <DobField
+                    label={t('dob_label')}
+                    value={dob}
+                    onChange={(v) => {
+                      setDob(v);
+                      resetError();
+                    }}
+                  />
+
+                  {/* Phone sign-in gives us no email; Google already did. */}
+                  {needsEmail && (
+                    <Field
+                      label={t('email_label')}
+                      value={email}
+                      onChangeText={(v) => {
+                        setEmail(v);
+                        resetError();
+                      }}
+                      placeholder={t('ph_email')}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      autoComplete="email"
+                    />
+                  )}
+                  {needsEmail && (
+                    <Type v="bodySm" tone="onSurfaceFaint">
+                      {t('email_why')}
+                    </Type>
+                  )}
+
                   <Field
                     label={t('bio_label')}
                     value={bio}
@@ -347,7 +510,7 @@ export function LoginScreen() {
                     size="lg"
                     block
                     loading={busy}
-                    disabled={!name.trim() || busy}
+                    disabled={!name.trim() || !gender || dob.length !== 10 || busy}
                     onPress={complete}
                   />
                 </Stack>
@@ -576,6 +739,17 @@ function AvatarPicker({ label, initial }: { label: string; initial?: string }) {
 /* ───────────────────────────────────────────────────────────── styles ── */
 
 const styles = StyleSheet.create({
+  genderRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Space.xs },
+  dobRow: { flexDirection: 'row', gap: Space.xs },
+  dobBox: {
+    height: 52,
+    borderWidth: 1.2,
+    borderRadius: Radius.md,
+    textAlign: 'center',
+    fontSize: 17,
+    fontVariant: ['tabular-nums'],
+    paddingHorizontal: 8,
+  },
   scroll: { padding: Space.margin, paddingBottom: Space.xxl },
   mandalaTop: { position: 'absolute', top: -100, left: -120 },
   mandalaBottom: { position: 'absolute', bottom: -80, right: -90 },

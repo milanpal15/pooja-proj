@@ -21,7 +21,7 @@ type Phase = 'form' | 'processing' | 'success' | 'failed';
 export function RazorpayCheckout({
   visible,
   amount,
-  name = 'Divine Temple Portal',
+  name = 'Bhakti',
   onClose,
   onResult,
 }: {

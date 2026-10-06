@@ -19,7 +19,7 @@ import {
   Type,
 } from '@/components/ui';
 import { AppBar } from '@/components/ui/surface';
-import { DEITY_IMAGES } from '@/constants/deity-images';
+import { useContent } from '@/context/content';
 import {
   type ColorRoles,
   contrast,
@@ -86,6 +86,12 @@ export default function GalleryScreen() {
 }
 
 function Preview() {
+  // A design-system showcase, so any published artwork will do — there is
+  // no bundled still to reach for any more, and none is fine: ArchImage
+  // renders its frame without one.
+  const { deityArt, deityList } = useContent();
+  const sampleArt = deityList.map((d) => deityArt(d.id)).find(Boolean);
+
   const { c, isSanctum } = useTheme();
 
   return (
@@ -258,7 +264,7 @@ function Preview() {
           DESIGN.md calls this the signature shape; the export never drew it —
           every featured image came back a plain rounded rectangle.
         </Type>
-        <ArchImage source={DEITY_IMAGES.shiva} height={210}>
+        <ArchImage source={sampleArt} height={210}>
           <View style={styles.archOverlay}>
             <Badge label="LIVE" tone="live" />
             <Badge label="15.4K VIEWS" tone="primary" />

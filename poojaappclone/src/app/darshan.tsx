@@ -13,7 +13,6 @@ import {
 } from '@/components/ui';
 import { AppBar } from '@/components/ui/surface';
 import { LivePlayer } from '@/components/darshan/live-player';
-import { DEITY_IMAGES } from '@/constants/deity-images';
 
 import { useContent } from '@/context/content';
 import { useLanguage } from '@/context/language';
@@ -37,7 +36,7 @@ export default function DarshanScreen() {
   /*
    * Which temple this screen is showing.
    *
-   * It used to hardcode "Kashi Vishwanath" and `DEITY_IMAGES.shiva`, so every
+   * It used to hardcode "Kashi Vishwanath" and a bundled Shiva still, so every
    * deployment claimed the same temple regardless of what the dashboard held.
    * First enabled temple wins; the bundled catalogue covers the backend being
    * unreachable.
@@ -64,7 +63,7 @@ export default function DarshanScreen() {
       />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <ArchImage source={art ?? DEITY_IMAGES.shiva} height={400}>
+        <ArchImage source={art} height={400}>
           {/* The real feed sits inside the arch, over the still, so the
               screen keeps its shape whether or not a stream exists. */}
           {isLive && (

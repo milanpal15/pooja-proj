@@ -1,21 +1,20 @@
 {
   "expo": {
-    "name": "poojaappclone",
-    "slug": "poojaappclone",
+    "name": "Bhakti",
+    "slug": "bhakti",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "poojaappclone",
+    "scheme": "bhakti",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon",
       "bundleIdentifier": "com.poojaapp.poojaapp",
       "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#93101A",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -47,9 +46,9 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#5A070E",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "imageWidth": 180
         }
       ],
       "expo-image",
@@ -57,8 +56,8 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Allow Divine Temple Portal to use your location to show which temples are nearest to you.",
-          "locationWhenInUsePermission": "Allow Divine Temple Portal to use your location to show which temples are nearest to you.",
+          "locationAlwaysAndWhenInUsePermission": "Allow Bhakti to use your location to show which temples are nearest to you.",
+          "locationWhenInUsePermission": "Allow Bhakti to use your location to show which temples are nearest to you.",
           "isAndroidBackgroundLocationEnabled": false
         }
       ],
@@ -66,18 +65,14 @@
         "expo-notifications",
         {
           "color": "#AF101A",
-          "defaultChannel": "reminders",
-          "sounds": [
-            "./assets/audio/bell.wav",
-            "./assets/audio/aarti.wav"
-          ]
+          "defaultChannel": "reminders"
         }
       ],
       [
         "expo-media-library",
         {
-          "photosPermission": "Allow Divine Temple Portal to save deity wallpapers to your gallery.",
-          "savePhotosPermission": "Allow Divine Temple Portal to save deity wallpapers to your gallery.",
+          "photosPermission": "Allow Bhakti to save deity wallpapers to your gallery.",
+          "savePhotosPermission": "Allow Bhakti to save deity wallpapers to your gallery.",
           "isAccessMediaLocationEnabled": false
         }
       ],

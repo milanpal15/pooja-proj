@@ -31,14 +31,13 @@ export type Deity = {
   /** Mace resting at the side (Hanuman). */
   mace?: boolean;
   /**
-   * Real murti artwork. When set, the sanctum renders this instead of the
-   * procedural figure, and everything else (halo, aarti orbit, marigolds)
-   * keeps working unchanged:
-   *   image: require('@/assets/images/deities/shiva.jpg'),
+   * Real murti artwork, uploaded from the dashboard. When set, the sanctum
+   * renders it instead of the procedural figure and everything else (halo,
+   * aarti orbit, marigolds) keeps working unchanged.
    *
-   * The shipped set is public-domain Ravi Varma oleographs — opaque JPEGs,
-   * rendered with `contain`. A transparent PNG/WebP still works and reads
-   * more like a murti than a framed painting, if you have one.
+   * No artwork ships with the app, so this is empty until the temple
+   * uploads some and the procedural murti is what a devotee sees. A
+   * transparent PNG/WebP reads more like a murti than a framed painting.
    */
   image?: ImageSourcePropType;
   /** Sacred mark floating above the idol. */

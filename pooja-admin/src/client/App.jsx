@@ -419,7 +419,7 @@ function Dashboard({ me, onSignOut }) {
         <div className="brand">
           <span className="om">ॐ</span>
           <div>
-            <div className="brand-title">Divine Temple</div>
+            <div className="brand-title">Bhakti</div>
             <div className="brand-sub">Admin Portal</div>
           </div>
         </div>

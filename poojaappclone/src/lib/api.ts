@@ -62,14 +62,33 @@ export type Profile = {
   contact: string;
   method: string;
   email: string | null;
+  /** True only when the provider supplied the address, not the devotee. */
+  emailVerified: boolean;
   phone: string | null;
   photoUrl: string | null;
   bio: string;
+  gender: Gender | null;
+  /** YYYY-MM-DD. A calendar date, not a timestamp. */
+  dob: string | null;
   blocked: boolean;
 };
 
+/** `prefer_not_to_say` is a real answer here, not an absent one. */
+export type Gender = 'female' | 'male' | 'other' | 'prefer_not_to_say';
+
 /** Create-or-refresh this devotee's row on the backend. */
-export function syncProfile(body: { name?: string; bio?: string; deviceId?: string }) {
+export function syncProfile(
+  body: {
+    name?: string;
+    bio?: string;
+    deviceId?: string;
+    gender?: Gender;
+    /** YYYY-MM-DD. */
+    dob?: string;
+    /** Only honoured for phone sign-ins; a Google address always wins. */
+    email?: string;
+  },
+) {
   return authedFetch('/api/auth/sync', {
     method: 'POST',
     body: JSON.stringify(body),
@@ -80,7 +99,13 @@ export function fetchProfile() {
   return authedFetch('/api/auth/me') as Promise<Profile>;
 }
 
-export function updateProfile(body: { name?: string; bio?: string }) {
+export function updateProfile(body: {
+  name?: string;
+  bio?: string;
+  gender?: Gender;
+  dob?: string;
+  email?: string;
+}) {
   return authedFetch('/api/auth/me', {
     method: 'PUT',
     body: JSON.stringify(body),

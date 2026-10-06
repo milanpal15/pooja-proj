@@ -62,8 +62,10 @@ npx tsc --noEmit            # typecheck
 - `content.tsx` — fetches `GET /api/content` and exposes remote deities/temples/
   aartis/**festivals** + `upcomingFestivals(n)` (admin calendar first, bundled
   list as fallback), `templeRating(slug)` (undefined unless a real rating is
-  entered) + `deityImage(id)` (admin-managed artwork overrides the bundled murti on
-  the pooja screen). `assetUrl()` resolves host-relative `/uploads/..` paths.
+  entered), `deityImage(id)` / `deityArt(id)` (dashboard artwork; no upload
+  means the procedural murti) and `toneSound(slug)` (a tone's recording, or
+  null when there is nothing to play). `assetUrl()` resolves host-relative
+  `/uploads/..` paths.
 
 **Backend URL:** `src/constants/config.ts` → `ADMIN_API`. See §3 for the
 reachability rules — this is the #1 source of "it doesn't work on the phone".
@@ -219,6 +221,26 @@ so the same stored value works from any host.
 ---
 
 ## 4. What was done in the most recent work
+
+**The app is called Bhakti.** `expo.name`, the Android `app_name`, the
+dashboard's masthead and the policy preamble. The `slug` and `scheme` moved
+to `bhakti` with it; the Android **package stays `com.poojaapp.poojaapp`**,
+because `google-services.json` and the registered SHA-1 are keyed to it and
+changing it would break sign-in for no gain.
+
+**Its icon is a gold ॐ on a maroon plate**, generated rather than sourced:
+the glyph is Noto Sans Devanagari (SIL OFL 1.1, which places no restriction
+on rendered output) and the plate is a gradient, so there is nothing to
+attribute and nothing to license. The generator and the measured glyph
+metrics are in the session scratchpad, not the repo — regenerating is a
+matter of re-rendering one `<text>` element, and the ink of ॐ sits high and
+left of its em box, so it has to be centred by its **rasterised bounds**,
+not by font metrics.
+
+**All bundled media is gone** — see the rules in §5. The sanctum bell, the
+aarti ambience, every bhajan and every murti now come from the dashboard,
+and `modules/expo-alarm` streams a tone URL instead of looking up a raw
+resource.
 
 **Everything the devotee reads or pays is now admin-managed.** Sevas and
 prices, FAQs, deity lore, Home carousel slides, temple palettes and map pins,
@@ -405,15 +427,29 @@ anyone in. See `docs/FIREBASE_SETUP.md`.
   children on Android.** That is what made `ArchImage` render its background
   and label but no image. Lay children out normally inside rounded, clipped
   containers.
-- **Deity artwork is public-domain Ravi Varma Press oleographs** (JPEG, in
-  `assets/images/deities/`, provenance in `ATTRIBUTION.md`). They replaced
-  watermarked stock renders the project had no licence to ship. They are
-  opaque rectangles rather than transparent cutouts, so screens render them
-  with `contain` over their own backdrop.
-- **Read deity art via `useContent().deityArt(id)`,** never `DEITY_IMAGES`
-  directly. Dashboard-uploaded artwork wins; the bundle is the offline
-  fallback. Six screens used to read the bundle directly and so ignored the
-  dashboard entirely.
+- **No media ships in the app.** Not artwork, not audio. The bundle used
+  to carry eight deity oleographs and two sound files, which made it a
+  second source of truth the dashboard could not correct without a store
+  release. `assets/images/` is now icons and UI chrome only, and there is
+  no `assets/audio/` at all.
+- **Read deity art via `useContent().deityArt(id)` / `deityImage(id)`,**
+  never a bundled map — there is none. No upload means the **procedural
+  murti**, which is drawn from plain Views and needs no assets, so an
+  unfilled dashboard still renders a sanctum.
+- **Audio is a URL from the dashboard.** `useContent().toneSound(slug)` for
+  an alert tone, `aarti.audioUrl` for a bhajan. Three consequences worth
+  knowing:
+  - An **Android channel sound must be a file bundled with the app**, so the
+    notification fallback can only ask for the device default. The tone the
+    devotee chose is played by `modules/expo-alarm`, which streams it.
+  - `MediaPlayer.prepare()` on a URL **blocks**, and `AlarmService` runs on
+    the main thread — remote tones use `prepareAsync`. Do not "simplify"
+    that back.
+  - An alarm can land with no connection, so the native side falls back to
+    the phone's own alarm sound rather than ringing silently.
+  - Seeded tones carry `sound: null` until someone uploads a recording.
+    Until then the sanctum bell and the aarti ambience are **silent** —
+    that is the honest empty state, not a bug.
 - **Toasts, not `Alert`, for anything the devotee cannot answer.**
   `useToast()` / `toast.success|error|info`. Keep `Alert` for real choices.
 - **`modules/expo-wallpaper` is a local native module** — changing its Kotlin

@@ -1,4 +1,4 @@
-import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import { setAudioModeAsync, useAudioPlayer } from 'expo-audio';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Pressable,
@@ -17,12 +17,11 @@ import {
   useToast,
 } from '@/components/ui';
 import { AppBar } from '@/components/ui/surface';
-import { SOUNDS } from '@/constants/sounds';
 import { useLanguage } from '@/context/language';
 import { useReminders } from '@/hooks/use-reminders';
 import { Radius, Space, useTheme } from '@/theme';
 import { type ToneId } from '@/constants/reminders';
-import { useContent } from '@/context/content';
+import { type RemoteTone, useContent } from '@/context/content';
 
 /**
  * Alert tone — the "Ringtone" tile.
@@ -38,7 +37,7 @@ import { useContent } from '@/context/content';
  * and is what most devotees actually want from this.
  */
 export default function RingtoneScreen() {
-  const { tones } = useContent();
+  const { tones, toneSound } = useContent();
   const { c } = useTheme();
   const { lang } = useLanguage();
   const toast = useToast();
@@ -46,15 +45,17 @@ export default function RingtoneScreen() {
   const { state, setTone } = useReminders();
 
   const [playing, setPlaying] = useState<ToneId | null>(null);
-  const bell = useAudioPlayer(SOUNDS.bell);
-  const aarti = useAudioPlayer(SOUNDS.aarti);
 
-  // Playback state, used to refuse a tap the player is not ready for.
-  // `play()` on an unloaded player no-ops without raising, which is
-  // indistinguishable from a broken asset — and cost two wrong diagnoses
-  // before the screen was made to report what it was actually doing.
-  const bellStatus = useAudioPlayerStatus(bell);
-  const aartiStatus = useAudioPlayerStatus(aarti);
+  /*
+   * One player, re-pointed at whichever tone was tapped.
+   *
+   * There used to be a player per bundled tone — two of them, named in the
+   * code — so a tone added from the dashboard could not be previewed at all,
+   * and picking several in a row layered their sounds over each other. No
+   * audio ships in the bundle now; every tone is a URL, and one player that
+   * gets `replace`d covers all of them however many the temple adds.
+   */
+  const player = useAudioPlayer(null);
 
   // Without this the preview is silent whenever the phone is on vibrate —
   // which, for an app people open in a temple, is most of the time. The pooja
@@ -79,16 +80,14 @@ export default function RingtoneScreen() {
       clearTimeout(timer.current);
       timer.current = null;
     }
-    for (const player of [bell, aarti]) {
-      try {
-        player.pause();
-        player.seekTo(0);
-      } catch {
-        /* not loaded */
-      }
+    try {
+      player.pause();
+      player.seekTo(0);
+    } catch {
+      /* nothing loaded */
     }
     setPlaying(null);
-  }, [bell, aarti]);
+  }, [player]);
 
   // Leaving the screen should not leave a bell ringing behind it.
   //
@@ -97,45 +96,50 @@ export default function RingtoneScreen() {
   // re-render that `setPlaying` triggers. So the effect's cleanup fired
   // milliseconds after play() and paused the sound every time. The tone was
   // playing; it was being stopped again immediately.
-  const playersRef = useRef({ bell, aarti });
+  const playerRef = useRef(player);
   useEffect(() => {
-    playersRef.current = { bell, aarti };
-  }, [bell, aarti]);
+    playerRef.current = player;
+  }, [player]);
 
   useEffect(
     () => () => {
-      for (const player of [playersRef.current.bell, playersRef.current.aarti]) {
-        try {
-          player.pause();
-        } catch {
-          /* already gone */
-        }
+      try {
+        playerRef.current.pause();
+      } catch {
+        /* already gone */
       }
     },
     [],
   );
 
   const preview = useCallback(
-    (id: ToneId, key: 'bell' | 'aarti' | null) => {
+    (tone: RemoteTone) => {
       stopAll();
-      if (!key) return;
-      const player = key === 'bell' ? bell : aarti;
-      const status = key === 'bell' ? bellStatus : aartiStatus;
-      if (!status?.isLoaded) {
-        // play() on an unloaded player no-ops without raising, which is
-        // indistinguishable from broken. Say what actually happened.
-        toast.info(hi ? 'ध्वनि अभी लोड नहीं हुई' : 'Tone still loading', {
-          description: hi ? 'एक क्षण बाद फिर टैप करें।' : 'Give it a moment and tap again.',
-        });
+      const source = toneSound(tone.slug);
+      if (!source) {
+        // Silent and Phone Default have nothing of their own to play, and
+        // that is the point of them — say nothing. Any other tone with no
+        // recording behind it is a row the dashboard has not finished, and
+        // saying so beats a tap that looks like it did nothing.
+        if (tone.slug !== 'default' && tone.slug !== 'silent') {
+          toast.info(hi ? 'इस ध्वनि की फ़ाइल नहीं है' : 'No audio for this tone', {
+            description: hi
+              ? 'डैशबोर्ड से इसकी ध्वनि अपलोड करें।'
+              : 'Upload one for it in the dashboard.',
+          });
+        }
         return;
       }
       try {
+        // Remote, so it buffers rather than being ready the instant it is
+        // asked for; play() queues until it is.
+        player.replace(source);
         player.play();
-        setPlaying(id);
+        setPlaying(tone.slug);
         // No completion callback on the player, so clear the indicator on a
         // timer. It is a preview affordance, not playback state.
         timer.current = setTimeout(() => {
-          setPlaying((p) => (p === id ? null : p));
+          setPlaying((p) => (p === tone.slug ? null : p));
           try {
             player.pause();
             player.seekTo(0);
@@ -144,10 +148,10 @@ export default function RingtoneScreen() {
           }
         }, 2500);
       } catch {
-        // A missing asset should not take the screen down.
+        // An unreachable file should not take the screen down.
       }
     },
-    [bell, aarti, bellStatus, aartiStatus, hi, stopAll, toast],
+    [player, toneSound, hi, stopAll, toast],
   );
 
   return (
@@ -168,9 +172,7 @@ export default function RingtoneScreen() {
                   accessibilityState={{ selected: on }}
                   onPress={() => {
                     setTone(tone.slug);
-                    // Only the two bundled tones can be previewed in-app;
-                    // a URL tone has nothing loaded to play here.
-                    preview(tone.slug, tone.sound === 'bell' || tone.sound === 'aarti' ? tone.sound : null);
+                    preview(tone);
                   }}
                   style={({ pressed }) => [styles.tone, pressed && { opacity: 0.8 }]}>
                   <View

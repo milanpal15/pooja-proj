@@ -11,7 +11,6 @@ import {
 
 import { Button, Card, Chip, Icon, Mandala, Screen, Type, useToast } from '@/components/ui';
 import { AppBar } from '@/components/ui/surface';
-import { DEITY_IMAGES } from '@/constants/deity-images';
 import { useContent } from '@/context/content';
 import { useLanguage } from '@/context/language';
 import * as Wallpaper from '../../modules/expo-wallpaper';
@@ -72,17 +71,17 @@ const WASHES: Record<string, readonly [string, string, string]> = {
   night: [Ember[900], Kumkum[800], '#05070D'],
 };
 
-const DEITY_IDS = Object.keys(DEITY_IMAGES);
-
 export default function WallpaperScreen() {
   const { c } = useTheme();
   const { lang } = useLanguage();
   const { deityArt, deityList, wallpaperStyles } = useContent();
+  // Only deities the dashboard has artwork for can make a wallpaper.
+  const deityIds = deityList.filter((d) => deityArt(d.id)).map((d) => d.id);
   const toast = useToast();
   const hi = lang === 'hi';
 
   const shotRef = useRef<View>(null);
-  const [deityId, setDeityId] = useState(DEITY_IDS[0] ?? 'shiva');
+  const [deityId, setDeityId] = useState(deityIds[0] ?? 'shiva');
   const [style, setStyle] = useState('sanctum');
   const [saving, setSaving] = useState(false);
   const [applying, setApplying] = useState<Wallpaper.WallpaperTarget | null>(null);
@@ -181,7 +180,7 @@ export default function WallpaperScreen() {
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-          {DEITY_IDS.map((id) => {
+          {deityIds.map((id) => {
             const d = deityList.find((x) => x.id === id);
             return (
               <Chip

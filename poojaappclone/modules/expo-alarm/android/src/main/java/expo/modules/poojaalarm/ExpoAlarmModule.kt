@@ -77,8 +77,8 @@ class ExpoAlarmModule : Module() {
      * Replace every registered alarm with this list.
      *
      * Each item: { id, title, body, hour, minute, sound, vibrate }.
-     * `sound` is a bundled raw resource name (`bell`), `null` for the
-     * device's alarm sound, or `""` for silence.
+     * `sound` is a tone URL, `null` for the device's alarm sound, or `""`
+     * for silence.
      *
      * Returns the next firing time of each, in epoch millis, so the app can
      * tell the devotee when it will actually go off.

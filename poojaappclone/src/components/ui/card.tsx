@@ -126,7 +126,12 @@ export function ArchImage({
    */
   fit = 'cover',
 }: {
-  source: ImageSourcePropType;
+  /**
+   * Optional: artwork comes from the dashboard, and a deity may not have
+   * any yet. The arch, its backdrop and any children still render — an
+   * empty frame is the honest answer, and better than a crash.
+   */
+  source?: ImageSourcePropType;
   height: number;
   style?: StyleProp<ViewStyle>;
   children?: React.ReactNode;
@@ -153,7 +158,7 @@ export function ArchImage({
         its background and the label, and the deity never appeared. A
         normally-laid-out child is clipped correctly.
       */}
-      <Image source={source} resizeMode={fit} style={styles.archImage} />
+      {source && <Image source={source} resizeMode={fit} style={styles.archImage} />}
       {children}
     </View>
   );

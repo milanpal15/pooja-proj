@@ -7,7 +7,7 @@ import { Platform } from 'react-native';
 import * as Alarm from '../../modules/expo-alarm';
 import type { IconName } from '@/components/ui';
 import { type ReminderId, type ToneId } from '@/constants/reminders';
-import { type RemoteReminder, type RemoteTone, useContent } from '@/context/content';
+import { assetUrl, type RemoteReminder, type RemoteTone, useContent } from '@/context/content';
 
 /**
  * Expo Go on Android cannot host these native modules, and the failure is not
@@ -196,20 +196,33 @@ async function ensureToneChannels(N: NotificationsModule, tones: RemoteTone[]) {
     await N.setNotificationChannelAsync(channelFor(tone.slug), {
       name: `Aarti Reminders · ${tone.title}`,
       importance: silent ? N.AndroidImportance.LOW : N.AndroidImportance.HIGH,
-      // Omitted entirely for the system default; `null` for silence.
       /*
-       * An Android channel sound must be a file bundled with the app, so a
-       * tone configured as a URL cannot be one. It still rings — the native
-       * alarm streams it — but on this fallback path it uses the device
-       * default rather than silently playing nothing.
+       * Omitted entirely for the system default; `null` for silence.
+       *
+       * An Android channel's sound must be a file bundled with the app, and
+       * none is any more — every tone is uploaded from the dashboard. So
+       * this path can only ask for the device's own sound. The tone the
+       * devotee actually chose is played by the native alarm, which streams
+       * it; the notification is what is left when the alarm did not fire.
        */
-      ...(silent
-        ? { sound: null }
-        : tone.sound && !/^https?:\/\//.test(tone.sound)
-          ? { sound: `${tone.sound}.wav` }
-          : {}),
+      ...(silent ? { sound: null } : {}),
     });
   }
+}
+
+/**
+ * What to hand the native alarm for a tone.
+ *
+ * `''` silence, `null` the device's own alarm sound, otherwise an absolute
+ * URL. The field used to carry a bundled resource name like `bell`; no audio
+ * ships in the app any more, so a leftover bare name resolves to the device
+ * default rather than to nothing audible.
+ */
+function toneUri(tone: RemoteTone | undefined, silent: boolean): string | null {
+  if (silent || tone?.sound === '') return '';
+  const sound = tone?.sound;
+  if (!sound || !/^(https?:\/\/|\/)/.test(sound)) return null;
+  return assetUrl(sound) ?? null;
 }
 
 /** Channel id for a tone. Stable, because channels cannot be edited later. */
@@ -241,10 +254,9 @@ async function armAlarms(
       body: def.body,
       hour: def.hour,
       minute: def.minute,
-      // The native side wants a raw resource NAME; `bell.wav` is the
-      // filename expo-notifications wants. Empty string means silence,
-      // null means the device's own alarm sound.
-      sound: silent ? '' : (tone?.sound?.replace(/\.[^.]+$/, '') ?? null),
+      // '' is silence, null is the device's own alarm sound, anything
+      // else is a URL the native side streams.
+      sound: toneUri(tone, silent),
       vibrate: !silent,
     })),
   );
@@ -368,9 +380,6 @@ export function useReminders() {
       if (Platform.OS === 'android') await ensureToneChannels(N, tones);
       await N.cancelAllScheduledNotificationsAsync();
 
-      const tone = tones.find((t) => t.slug === next.tone);
-      const silent = next.tone === 'silent';
-
       for (const def of resolveReminders(next, cycle)) {
         if (!next.enabled[def.id]) continue;
         const { hour, minute } = def;
@@ -379,9 +388,12 @@ export function useReminders() {
           content: {
             title: def.title,
             body: def.body,
-            // Android reads the sound off the channel; iOS reads it here.
-            // Both are set so neither platform is left silent by accident.
-            sound: silent ? undefined : (tone?.sound ?? undefined),
+            /*
+             * Android reads the sound off the channel. iOS reads it here and
+             * wants the filename of a sound bundled with the app — which a
+             * dashboard upload is not — so there is nothing to name, and the
+             * device default is the honest answer on this fallback path.
+             */
             data: { reminderId: def.id },
             ...(Platform.OS === 'android' ? { channelId: channelFor(next.tone) } : {}),
           },

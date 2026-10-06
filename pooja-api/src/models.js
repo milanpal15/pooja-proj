@@ -280,11 +280,21 @@ const userSchema = new Schema(
     contact: { type: String, required: true, unique: true, index: true },
     name: String,
     method: String, // phone | google
-    /** Verified from the token when present — never trusted from the body. */
+    /**
+     * Verified from the token where the provider supplies one — Google
+     * does, phone sign-in does not. A phone devotee may give an email on
+     * the profile screen, and that one is self-declared, not verified.
+     */
     email: String,
+    /** True only when the email came from the identity token. */
+    emailVerified: { type: Boolean, default: false },
     phone: String,
     photoUrl: String,
     bio: String,
+    /** Self-declared. `prefer_not_to_say` is a real answer, not a blank. */
+    gender: { type: String, enum: ['female', 'male', 'other', 'prefer_not_to_say'] },
+    /** Date of birth as YYYY-MM-DD — a calendar date, never a timestamp. */
+    dob: String,
     deviceId: String,
     blocked: { type: Boolean, default: false },
     /** Which policy version this devotee accepted, per policy key. */

@@ -17,7 +17,7 @@ export const policies = Router();
 /** The seed rules, inserted once so the dashboard opens on something real. */
 const DEFAULT_TERMS = `## Rules & Regulations
 
-Welcome to **Divine Temple Portal**. By continuing you agree to the following.
+Welcome to **Bhakti**. By continuing you agree to the following.
 
 ### 1. Devotional conduct
 - Treat the app, its imagery and its rituals with the same respect you would

@@ -25,7 +25,6 @@ import { HangingBell, TempleBackdrop, Toran } from '@/components/mandir/temple-s
 import { Thali } from '@/components/mandir/thali';
 import { Flame } from '@/components/pooja/flame';
 import { AARTI_CIRCLES, type Deity } from '@/constants/deities';
-import { SOUNDS } from '@/constants/sounds';
 import { BottomTabInset, TopTabInset } from '@/constants/theme';
 import { useAuth } from '@/context/auth';
 import { useLanguage } from '@/context/language';
@@ -51,7 +50,7 @@ export default function MandirScreen() {
   // The sanctum draws whatever the dashboard publishes. With nothing
   // published there is no murti to perform an aarti to, and the screen says
   // so rather than inventing one.
-  const { deityById, deityList } = useContent();
+  const { deityById, deityList, toneSound } = useContent();
 
   /*
    * The real panchang for today.
@@ -84,9 +83,16 @@ export default function MandirScreen() {
   // Persisted total aarti completion count (the "coin" counter).
   const [totalAartis, setTotalAartis] = useState(0);
 
-  // Audio — no-ops safely while SOUNDS.* are null (no files added yet).
-  const bellSound = useAudioPlayer(SOUNDS.bell);
-  const aartiSound = useAudioPlayer(SOUNDS.aarti);
+  /*
+   * The ghanta and the aarti ambience, both from the dashboard's tone list.
+   *
+   * These were two files compiled into the app, which meant the temple could
+   * not change what its own sanctum sounds like without a store release.
+   * Both players no-op safely while the tone has no audio uploaded yet —
+   * `useAudioPlayer` keys on the source, so they pick it up once it arrives.
+   */
+  const bellSound = useAudioPlayer(toneSound('bell'));
+  const aartiSound = useAudioPlayer(toneSound('aarti'));
 
   // Geometry of the aarti orbit, derived from the measured sanctum.
   const cx = stage.w / 2;

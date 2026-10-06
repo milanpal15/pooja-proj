@@ -7,8 +7,10 @@ import org.json.JSONObject
 /**
  * One alarm, as the devotee set it.
  *
- * `sound` is a raw resource name (`bell`, `aarti`), or null for the device's
- * own alarm sound. Empty string means silent — show it, make no noise.
+ * `sound` is the URL of a tone uploaded from the dashboard, or null for the
+ * device's own alarm sound. Empty string means silent — show it, make no
+ * noise. A bare name is read as a bundled raw resource, which is how tones
+ * saved before the audio moved to the dashboard still resolve.
  */
 data class AlarmEntry(
   val id: String,

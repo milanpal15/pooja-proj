@@ -4,7 +4,6 @@ import type { ImageSourcePropType } from 'react-native';
 
 import { ADMIN_API } from '@/constants/config';
 import { type CrownKind, type Deity } from '@/constants/deities';
-import { DEITY_IMAGES } from '@/constants/deity-images';
 import { type Festival, FESTIVALS } from '@/constants/home';
 import { type Seva } from '@/constants/poojas';
 import { type Temple } from '@/constants/temples';
@@ -128,8 +127,13 @@ export type RemoteReminder = {
 };
 
 /**
- * An alert tone. `sound` is a bundled resource name, an absolute URL, or
- * '' for silent; null means the device's own default.
+ * An alert tone.
+ *
+ * `sound` is an uploaded or absolute URL, '' for silent, null for the
+ * device's own default. It used to also accept a bare name like 'bell',
+ * meaning a file compiled into the app; no audio ships in the bundle any
+ * more, so a bare name now resolves to nothing and the tone falls back to
+ * the device default rather than playing silence people cannot explain.
  */
 export type RemoteTone = {
   slug: string;
@@ -198,7 +202,9 @@ type ContentContextValue = Content & {
    * The artwork to actually render: admin-managed when the dashboard has one,
    * the bundled murti otherwise.
    *
-   * Screens should use this rather than reaching for `DEITY_IMAGES` directly.
+   * Undefined when the dashboard has no artwork for this deity — screens
+   * fall back to the procedural murti, which is why the palette and the
+   * geometry flags live in the dashboard too.
    * Doing so is what made the deity row ignore the dashboard entirely — the
    * bundled art is the *fallback*, not the source of truth, and the app has
    * to keep working with the backend unreachable either way.
@@ -217,6 +223,11 @@ type ContentContextValue = Content & {
    */
   deityList: Deity[];
   templeList: Temple[];
+  /**
+   * A tone's audio, ready for `useAudioPlayer` — null when there is nothing
+   * to play (silent, device default, or no file uploaded yet).
+   */
+  toneSound: (slug: string) => { uri: string } | null;
   /** A deity's display name for a slug; the slug itself if unknown. */
   deityName: (slug: string) => string;
   /**
@@ -326,12 +337,13 @@ const ContentContext = createContext<ContentContextValue>({
   // show — the same answer the provider gives before anything loads.
   deityList: [],
   templeList: [],
+  toneSound: () => null,
   deityName: (slug) => slug,
   deityById: () => undefined,
   templeById: () => undefined,
   deityImage: () => undefined,
   // Outside a provider there is no dashboard, so the bundled murti is it.
-  deityArt: (id) => DEITY_IMAGES[id],
+  deityArt: () => undefined,
   bookingEnabled: () => true,
   // Outside a provider nothing has been fetched, so there is nothing.
   upcomingFestivals: () => [],
@@ -495,7 +507,7 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
 
     const artFor = (slug: string): ImageSourcePropType | undefined => {
       const url = assetUrl(imageBySlug.get(slug));
-      return url ? { uri: url } : DEITY_IMAGES[slug];
+      return url ? { uri: url } : undefined;
     };
 
     /*
@@ -540,7 +552,15 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
       },
       deityArt: (id) => {
         const url = assetUrl(imageBySlug.get(id));
-        return url ? { uri: url } : DEITY_IMAGES[id];
+        return url ? { uri: url } : undefined;
+      },
+      toneSound: (slug) => {
+        const sound = content.tones.find((t) => t.slug === slug)?.sound;
+        // Only a real location is playable. Anything else — '', null, or a
+        // leftover bundled name — has no file behind it.
+        if (!sound || !/^(https?:\/\/|\/)/.test(sound)) return null;
+        const url = assetUrl(sound);
+        return url ? { uri: url } : null;
       },
       bookingEnabled: (slug) => templeBySlug.get(slug)?.bookingEnabled !== false,
       sevasFor: ({ templeSlug, deitySlug }) => {

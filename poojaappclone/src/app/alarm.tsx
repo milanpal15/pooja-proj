@@ -23,7 +23,8 @@ import {
   Type,
 } from '@/components/ui';
 import { AppBar } from '@/components/ui/surface';
-import { type ReminderId, TONES } from '@/constants/reminders';
+import { type ReminderId } from '@/constants/reminders';
+import { useContent } from '@/context/content';
 import { useLanguage } from '@/context/language';
 import { formatTime, useReminders } from '@/hooks/use-reminders';
 import { Radius, Space, useTheme } from '@/theme';
@@ -74,6 +75,7 @@ export default function AlarmScreen() {
     nextAt,
     previewAlarm,
   } = useReminders();
+  const { tones } = useContent();
 
   /*
    * `toggle` answers false when Android refuses the notification permission,
@@ -179,7 +181,10 @@ export default function AlarmScreen() {
     return () => clearTimeout(id);
   }, [addOpen]);
 
-  const tone = TONES.find((x) => x.id === state.tone);
+  // The tone list is the dashboard's, the same one the Ringtone screen
+  // renders. Reading the bundled array here meant this row could name a
+  // tone the picker no longer offered.
+  const tone = tones.find((x) => x.slug === state.tone);
 
   /**
    * "in 11h 48m".
