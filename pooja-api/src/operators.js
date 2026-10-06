@@ -1,5 +1,4 @@
-import { Router } from 'express';
-
+import { asyncRouter } from './async.js';
 import { hashPassword, sessionOf } from './admin.js';
 import { Operator } from './models.js';
 
@@ -12,7 +11,7 @@ import { Operator } from './models.js';
  * Nothing here ever returns a password hash. There is no reason for one to
  * cross the wire, and a hash on screen is a hash in someone's clipboard.
  */
-export const operators = Router();
+export const operators = asyncRouter();
 
 const PUBLIC_FIELDS = 'username role active lastLogin createdAt';
 
