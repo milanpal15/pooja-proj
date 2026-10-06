@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { ImageSourcePropType } from 'react-native';
 
@@ -14,7 +15,24 @@ export type RemoteDeity = {
   mark?: string;
   mantra?: string;
   imageUrl?: string;
+  offerings?: string[];
+  /**
+   * How to DRAW this deity when no photograph is set.
+   *
+   * The sanctum builds a procedural murti from these. They used to live only
+   * in `constants/deities.ts`, which meant a deity created in the dashboard
+   * rendered grey and crownless — there was no bundled entry to match it to.
+   * All optional; the app keeps its own defaults for whatever is missing.
+   */
   accent?: string;
+  body?: string;
+  robe?: string;
+  trim?: string;
+  crown?: string;
+  crescent?: boolean;
+  serpent?: boolean;
+  elephant?: boolean;
+  mace?: boolean;
 };
 export type RemoteTemple = {
   slug: string;
@@ -233,39 +251,71 @@ const ContentContext = createContext<ContentContextValue>({
   sevasFor: () => BUNDLED_SEVAS,
 });
 
+/** Where the last good /api/content response is kept. */
+const CACHE_KEY = 'pooja.content.v1';
+
+const normalise = (data: Partial<Content> | null): Content => ({
+  deities: data?.deities ?? [],
+  temples: data?.temples ?? [],
+  aartis: data?.aartis ?? [],
+  festivals: data?.festivals ?? [],
+  sevas: data?.sevas ?? [],
+  knowledge: data?.knowledge ?? [],
+  faqs: data?.faqs ?? [],
+  hero: data?.hero ?? [],
+  settings: data?.settings ?? {},
+  announcement: data?.announcement ?? null,
+});
+
 export function ContentProvider({ children }: { children: React.ReactNode }) {
   const [content, setContent] = useState<Content>(EMPTY);
   const [loading, setLoading] = useState(true);
 
+  /*
+   * Cache first, then network.
+   *
+   * The bundled catalogues used to be the offline story: no network meant
+   * falling back to a copy of the content compiled into the app. That made
+   * the bundle a second source of truth which drifted from the dashboard
+   * and could not be corrected without a store release.
+   *
+   * Last-known-good caching replaces it. The first launch on a new device
+   * still needs the network — there is nothing honest to show before the
+   * temple has ever been reached — but every launch after that renders
+   * instantly from disk and reconciles in the background.
+   */
   useEffect(() => {
+    let alive = true;
+
+    AsyncStorage.getItem(CACHE_KEY)
+      .then((raw) => {
+        if (!alive || !raw) return;
+        // Only fills the gap before the network answers; a live response
+        // always wins, so a slow read cannot clobber fresh content.
+        setContent((current) => (current === EMPTY ? normalise(JSON.parse(raw)) : current));
+      })
+      .catch(() => {});
+
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 5000);
     fetch(`${ADMIN_API}/api/content`, { signal: controller.signal })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
-        if (data) {
-          setContent({
-            deities: data.deities ?? [],
-            temples: data.temples ?? [],
-            aartis: data.aartis ?? [],
-            festivals: data.festivals ?? [],
-            sevas: data.sevas ?? [],
-            knowledge: data.knowledge ?? [],
-            faqs: data.faqs ?? [],
-            hero: data.hero ?? [],
-            settings: data.settings ?? {},
-            announcement: data.announcement ?? null,
-          });
-        }
+        if (!data || !alive) return;
+        setContent(normalise(data));
+        AsyncStorage.setItem(CACHE_KEY, JSON.stringify(data)).catch(() => {});
       })
       .catch(() => {
-        // offline / backend down — screens fall back to local constants
+        // Offline, or the temple is unreachable. Whatever the cache gave us
+        // stays on screen; a first-ever launch shows empty states.
       })
       .finally(() => {
         clearTimeout(timer);
-        setLoading(false);
+        if (alive) setLoading(false);
       });
+
     return () => {
+      alive = false;
       clearTimeout(timer);
       controller.abort();
     };

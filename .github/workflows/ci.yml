@@ -144,8 +144,32 @@ jobs:
             exit 1
           }
 
+      # Checks the shape before calling it. A wrong value here fails with a
+      # bare `curl: (22) ... 404`, which says nothing about what to fix —
+      # and the usual mistake is pasting the service URL rather than the
+      # hook from Settings → Deploy Hook.
       - name: Trigger the deploy
-        run: curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" -o /dev/null
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          case "$HOOK" in
+            https://api.render.com/deploy/srv-*) ;;
+            *)
+              echo "::error::RENDER_DEPLOY_HOOK_URL does not look like a Render deploy hook."
+              echo "Expected: https://api.render.com/deploy/srv-XXXXXXXX?key=YYYYYYYY"
+              echo "Got a value starting: $(printf '%.30s' "$HOOK")…"
+              echo "Copy it from Render → your service → Settings → Deploy Hook."
+              exit 1
+              ;;
+          esac
+
+          CODE=$(curl -sS -o /tmp/hook.out -w '%{http_code}' -X POST "$HOOK")
+          echo "deploy hook responded $CODE"
+          if [ "$CODE" != "200" ] && [ "$CODE" != "201" ]; then
+            echo "::error::Deploy hook returned $CODE. A 404 means the service id or key in the URL is wrong — re-copy it from Render → Settings → Deploy Hook."
+            cat /tmp/hook.out
+            exit 1
+          fi
 
       # Polls for THIS commit rather than for "is it up": the old container
       # keeps serving during a deploy, so a plain health check passes

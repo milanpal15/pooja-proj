@@ -45,15 +45,25 @@ async function seedFlags() {
   }
 }
 
+/**
+ * The eight deities, with everything the app needs to draw them.
+ *
+ * The palette (body/robe/trim) and the geometry flags (crown, crescent,
+ * serpent, elephant, mace) used to exist only in the app's own
+ * `constants/deities.ts`, so a deity ADDED from the dashboard came out
+ * untinted and crownless — the bundle had no entry to match it against.
+ * Seeded here so the dashboard is the whole truth; the app keeps defaults
+ * for anything left blank.
+ */
 const DEITIES = [
-  { slug: 'shiva', name: 'शिव जी', title: 'भगवान शिव', mark: 'ॐ', mantra: 'ॐ नमः शिवाय', accent: '#FFC13D', order: 0 },
-  { slug: 'shani', name: 'शनि देव', title: 'शनि देव', mark: 'शं', mantra: 'ॐ शं शनैश्चराय नमः', accent: '#63B3ED', order: 1 },
-  { slug: 'vishnu', name: 'विष्णु जी', title: 'भगवान विष्णु', mark: 'हरि', mantra: 'ॐ नमो नारायणाय', accent: '#F6E05E', order: 2 },
-  { slug: 'ganesh', name: 'गणेश जी', title: 'श्री गणेश', mark: 'श्री', mantra: 'ॐ गं गणपतये नमः', accent: '#FF9F45', order: 3 },
-  { slug: 'hanuman', name: 'हनुमान जी', title: 'श्री हनुमान', mark: 'राम', mantra: 'ॐ हनुमते नमः', accent: '#FF8A3D', order: 4 },
-  { slug: 'durga', name: 'दुर्गा माँ', title: 'माँ दुर्गा', mark: 'ऐं', mantra: 'ॐ दुं दुर्गायै नमः', accent: '#F06595', order: 5 },
-  { slug: 'lakshmi', name: 'लक्ष्मी माँ', title: 'माँ लक्ष्मी', mark: 'श्रीं', mantra: 'ॐ श्रीं महालक्ष्म्यै नमः', accent: '#FFD166', order: 6 },
-  { slug: 'krishna', name: 'कृष्ण जी', title: 'श्री कृष्ण', mark: 'कृष्ण', mantra: 'ॐ नमो भगवते वासुदेवाय', accent: '#7DD3C0', order: 7 },
+  {"slug":"shiva","name":"शिव जी","title":"भगवान शिव","mark":"ॐ","mantra":"ॐ नमः शिवाय","accent":"#FFC13D","body":"#E8DCC8","robe":"#C8862F","trim":"#E4572E","crown":"jata","crescent":true,"serpent":true,"offerings":["बिल्व पत्र","गंगा जल","धतूरा"],"order":0},
+  {"slug":"shani","name":"शनि देव","title":"शनि देव","mark":"शं","mantra":"ॐ शं शनैश्चराय नमः","accent":"#63B3ED","body":"#4A5568","robe":"#1A202C","trim":"#2C5282","crown":"tall","offerings":["तिल तेल","काला वस्त्र","उड़द"],"order":1},
+  {"slug":"vishnu","name":"विष्णु जी","title":"भगवान विष्णु","mark":"हरि","mantra":"ॐ नमो नारायणाय","accent":"#F6E05E","body":"#5A7FC7","robe":"#F6C453","trim":"#3C5FA8","crown":"mukut","offerings":["तुलसी दल","पंचामृत","चंदन"],"order":2},
+  {"slug":"ganesh","name":"गणेश जी","title":"श्री गणेश","mark":"श्री","mantra":"ॐ गं गणपतये नमः","accent":"#FF9F45","body":"#E2703A","robe":"#F6C453","trim":"#C0392B","crown":"mukut","elephant":true,"offerings":["मोदक","दूर्वा","लाल फूल"],"order":3},
+  {"slug":"hanuman","name":"हनुमान जी","title":"श्री हनुमान","mark":"राम","mantra":"ॐ हनुमते नमः","accent":"#FF8A3D","body":"#D95738","robe":"#E23E2C","trim":"#F2C14E","crown":"plain","mace":true,"offerings":["सिंदूर","बूंदी","चमेली तेल"],"order":4},
+  {"slug":"durga","name":"दुर्गा माँ","title":"माँ दुर्गा","mark":"ऐं","mantra":"ॐ दुं दुर्गायै नमः","accent":"#F06595","body":"#F0C39B","robe":"#C0392B","trim":"#F6C453","crown":"tall","offerings":["लाल चुनरी","नारियल","गुड़हल"],"order":5},
+  {"slug":"lakshmi","name":"लक्ष्मी माँ","title":"माँ लक्ष्मी","mark":"श्रीं","mantra":"ॐ श्रीं महालक्ष्म्यै नमः","accent":"#FFD166","body":"#F2C9A0","robe":"#E8467C","trim":"#C9366F","crown":"mukut","offerings":["कमल","खीर","कौड़ी"],"order":6},
+  {"slug":"krishna","name":"कृष्ण जी","title":"श्री कृष्ण","mark":"कृष्ण","mantra":"ॐ नमो भगवते वासुदेवाय","accent":"#7DD3C0","body":"#6B8FD4","robe":"#F6C453","trim":"#E8B04B","crown":"mukut","offerings":["माखन","तुलसी","मोरपंख"],"order":7},
 ];
 
 const TEMPLES = [
