@@ -12,7 +12,15 @@ import type { IconName } from '@/components/ui';
  * they keep working with no backend and no network — which matters at 4am.
  */
 
-export type ReminderId = 'mangala' | 'shringar' | 'sandhya' | 'shayan' | 'mantra';
+/**
+ * Any reminder's id. The five below are the bundled daily cycle; a devotee's
+ * own reminders get a generated `custom-*` id, so this cannot be a closed
+ * union any more.
+ */
+export type ReminderId = string;
+
+/** The ids of the bundled reminders, for telling them from a devotee's own. */
+export type BuiltInReminderId = 'mangala' | 'shringar' | 'sandhya' | 'shayan' | 'mantra';
 
 export type ReminderDef = {
   id: ReminderId;

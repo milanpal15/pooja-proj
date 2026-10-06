@@ -1,0 +1,68 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+  <!--
+    An alarm, not a notification. Each permission here is load-bearing:
+
+    USE_FULL_SCREEN_INTENT  — show the ringing screen over the lock screen.
+    FOREGROUND_SERVICE*     — keep ringing while the app is in the background.
+    RECEIVE_BOOT_COMPLETED  — alarms are lost on reboot unless re-registered.
+    WAKE_LOCK / VIBRATE     — wake the device and buzz while it rings.
+
+    Exact alarms need a permission, including via setAlarmClock() — which
+    throws SecurityException without one from Android 12 on.
+
+    USE_EXACT_ALARM (Android 13+) is granted at install with no prompt, and
+    is the permission intended for apps whose job is to ring at a stated
+    time. SCHEDULE_EXACT_ALARM covers Android 12, where it is granted by
+    default; above that it would need a Settings trip, so USE_EXACT_ALARM
+    supersedes it rather than both being requested.
+
+    Play reviews USE_EXACT_ALARM against whether alarms are a core feature.
+    If that is ever challenged, drop to SCHEDULE_EXACT_ALARM and send the
+    devotee to Settings — the scheduler already falls back when exact alarms
+    are refused, so nothing silently stops ringing either way.
+  -->
+  <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+  <uses-permission
+    android:name="android.permission.SCHEDULE_EXACT_ALARM"
+    android:maxSdkVersion="32" />
+  <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+  <uses-permission android:name="android.permission.WAKE_LOCK" />
+  <uses-permission android:name="android.permission.VIBRATE" />
+
+  <application>
+    <activity
+      android:name=".AlarmActivity"
+      android:exported="false"
+      android:launchMode="singleInstance"
+      android:excludeFromRecents="true"
+      android:showOnLockScreen="true"
+      android:turnScreenOn="true"
+      android:screenOrientation="portrait"
+      android:taskAffinity=".alarm"
+      android:theme="@style/Theme.PoojaAlarm" />
+
+    <service
+      android:name=".AlarmService"
+      android:exported="false"
+      android:foregroundServiceType="mediaPlayback" />
+
+    <receiver
+      android:name=".AlarmReceiver"
+      android:exported="false" />
+
+    <receiver
+      android:name=".BootReceiver"
+      android:exported="true">
+      <intent-filter>
+        <action android:name="android.intent.action.BOOT_COMPLETED" />
+        <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+        <action android:name="android.intent.action.TIME_SET" />
+        <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+      </intent-filter>
+    </receiver>
+  </application>
+</manifest>

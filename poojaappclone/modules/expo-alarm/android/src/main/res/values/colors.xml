@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- The app's sanctum palette, so the ringing screen is recognisably
+       part of the app and not a bare system dialog. -->
+  <color name="alarm_bg">#1A0E0B</color>
+  <color name="alarm_ink">#F7ECD9</color>
+  <color name="alarm_muted">#C2A98F</color>
+  <color name="alarm_gold">#E8B84B</color>
+  <color name="alarm_on_gold">#2A1403</color>
+</resources>

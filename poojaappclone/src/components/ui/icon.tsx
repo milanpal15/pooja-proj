@@ -42,6 +42,7 @@ export type IconName =
   | 'share'
   | 'plus'
   | 'minus'
+  | 'trash'
   | 'play'
   | 'pause'
   | 'globe'
@@ -265,6 +266,16 @@ function render(
           <Circle cx={12} cy={12} r={8.6} {...line} />
           <Path {...line} d="M3.4 12 h17.2" />
           <Path {...line} d="M12 3.4 a12.4 12.4 0 0 1 0 17.2 a12.4 12.4 0 0 1 0-17.2" />
+        </G>
+      );
+
+    case 'trash':
+      return (
+        <G>
+          <Path {...line} d="M4.5 6.8 h15" />
+          <Path {...line} d="M9.4 6.8 V5.2 a1.4 1.4 0 0 1 1.4-1.4 h2.4 a1.4 1.4 0 0 1 1.4 1.4 v1.6" />
+          <Path {...line} d="M6.4 6.8 l0.9 12.1 a1.8 1.8 0 0 0 1.8 1.7 h5.8 a1.8 1.8 0 0 0 1.8-1.7 l0.9-12.1" />
+          <Path {...line} d="M10.3 10.4 v6.6 M13.7 10.4 v6.6" />
         </G>
       );
 

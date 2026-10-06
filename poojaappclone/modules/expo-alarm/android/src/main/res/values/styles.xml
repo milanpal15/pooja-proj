@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- No action bar: the ringing screen is the whole screen. -->
+  <style name="Theme.PoojaAlarm" parent="Theme.AppCompat.NoActionBar">
+    <item name="android:windowBackground">@color/alarm_bg</item>
+    <item name="android:statusBarColor">@color/alarm_bg</item>
+    <item name="android:navigationBarColor">@color/alarm_bg</item>
+  </style>
+</resources>

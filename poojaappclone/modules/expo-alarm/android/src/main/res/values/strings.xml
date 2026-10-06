@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="alarm_dismiss">Dismiss</string>
+  <string name="alarm_snooze">Snooze 10 min</string>
+  <string name="alarm_channel_name">Aarti Alarm</string>
+</resources>

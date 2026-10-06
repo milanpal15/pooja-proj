@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+  android:layout_width="match_parent"
+  android:layout_height="match_parent"
+  android:orientation="vertical"
+  android:gravity="center"
+  android:background="@color/alarm_bg"
+  android:paddingLeft="28dp"
+  android:paddingRight="28dp">
+
+  <TextView
+    android:id="@+id/alarm_clock"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:textColor="@color/alarm_gold"
+    android:textSize="64sp"
+    android:textStyle="bold"
+    android:text="" />
+
+  <TextView
+    android:id="@+id/alarm_title"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="12dp"
+    android:textColor="@color/alarm_ink"
+    android:textSize="24sp"
+    android:gravity="center"
+    android:text="" />
+
+  <TextView
+    android:id="@+id/alarm_body"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="6dp"
+    android:textColor="@color/alarm_muted"
+    android:textSize="15sp"
+    android:gravity="center"
+    android:text="" />
+
+  <Button
+    android:id="@+id/alarm_dismiss"
+    android:layout_width="match_parent"
+    android:layout_height="56dp"
+    android:layout_marginTop="56dp"
+    android:background="@drawable/alarm_btn_gold"
+    android:textColor="@color/alarm_on_gold"
+    android:textAllCaps="false"
+    android:textSize="17sp"
+    android:textStyle="bold"
+    android:stateListAnimator="@null"
+    android:text="@string/alarm_dismiss" />
+
+  <Button
+    android:id="@+id/alarm_snooze"
+    android:layout_width="match_parent"
+    android:layout_height="52dp"
+    android:layout_marginTop="12dp"
+    android:background="@drawable/alarm_btn_outline"
+    android:textColor="@color/alarm_muted"
+    android:textAllCaps="false"
+    android:textSize="16sp"
+    android:stateListAnimator="@null"
+    android:text="@string/alarm_snooze" />
+</LinearLayout>

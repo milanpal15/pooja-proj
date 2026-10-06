@@ -329,6 +329,18 @@ anyone in. See `docs/FIREBASE_SETUP.md`.
 - **Node ≥ 20.19.4 is required** (nvm default here is v20.1.0, too old).
   Reading `poojaappclone/.env` needs `util.parseEnv`, so an old Node makes
   prebuild die with `parseEnv is not a function`. Use `/opt/homebrew/bin`.
+- **Reminders are a list the devotee owns, not a fixed five.** The bundled
+  daily cycle lives in `constants/reminders.ts`, but `useReminders()` returns
+  `reminders` — the bundle minus a `removed[]` tombstone list, plus the
+  devotee's own `custom[]`, each with its time override already applied.
+  Render and schedule from THAT, never from `REMINDERS`: `sync` reading the
+  constant directly would keep firing a deleted reminder. Deleting a bundled
+  one is a tombstone because it lives in code and would otherwise return on
+  next launch, which is why "Restore the daily cycle" exists.
+- **A stepper's granularity is the app's.** The alarm minute stepper moved by
+  five and there was no other way in, so 4:33 was simply unreachable. It
+  steps by one now and the hour/minute are typed into real fields with an
+  AM/PM toggle. Reach for a text field before a finer stepper.
 - **Android may auto-verify an OTP** (SMS Retriever) — the login screen can
   unmount mid-countdown without anyone typing. That is not a bug.
 - **Never trust identity from a request body.** `uid`, phone and email come

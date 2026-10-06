@@ -4,7 +4,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Platform } from 'react-native';
 
 
-import { REMINDERS, type ReminderId, type ToneId, TONES } from '@/constants/reminders';
+import * as Alarm from '../../modules/expo-alarm';
+import {
+  REMINDERS,
+  type ReminderDef,
+  type ReminderId,
+  type ToneId,
+  TONES,
+} from '@/constants/reminders';
 
 /**
  * Expo Go on Android cannot host these native modules, and the failure is not
@@ -71,17 +78,82 @@ async function loadNotifications(): Promise<NotificationsModule | null> {
   return cached;
 }
 
+/** A reminder the devotee added themselves. */
+export type CustomReminder = {
+  id: string;
+  title: string;
+  hour: number;
+  minute: number;
+};
+
 export type ReminderState = {
   /** Which reminders are on. */
   enabled: Record<string, boolean>;
   /** Per-reminder time override, "HH:MM"; absent means the traditional time. */
   times: Record<string, string>;
+  /** Reminders the devotee added. */
+  custom: CustomReminder[];
+  /**
+   * Bundled reminders the devotee deleted.
+   *
+   * Recorded as a tombstone rather than by rewriting the list, because the
+   * bundled five live in the app's code: a deletion that only removed them
+   * from an array would come back on the next launch.
+   */
+  removed: string[];
   tone: ToneId;
+};
+
+/** A reminder as the screen needs it: merged, with its effective time. */
+export type ResolvedReminder = {
+  id: string;
+  title: string;
+  titleHi: string;
+  body: string;
+  bodyHi: string;
+  hour: number;
+  minute: number;
+  icon: ReminderDef['icon'];
+  /** True for a devotee's own reminder, which can be renamed and deleted. */
+  custom: boolean;
 };
 
 const KEY = 'pooja.reminders';
 
-const EMPTY: ReminderState = { enabled: {}, times: {}, tone: 'bell' };
+const EMPTY: ReminderState = { enabled: {}, times: {}, custom: [], removed: [], tone: 'bell' };
+
+/**
+ * Merge the bundled cycle with the devotee's own, applying time overrides.
+ *
+ * Shared by the screen and by `sync`, so what is scheduled can never drift
+ * from what is shown — the previous version read `REMINDERS` directly in
+ * `sync`, which would have silently kept scheduling a deleted reminder.
+ */
+function resolveReminders(state: ReminderState): ResolvedReminder[] {
+  const builtIn = REMINDERS.filter((d) => !state.removed.includes(d.id)).map((d) => {
+    const override = state.times[d.id];
+    const { hour, minute } = override ? parseTime(override) : { hour: d.hour, minute: d.minute };
+    return { ...d, hour, minute, custom: false };
+  });
+
+  const own = (state.custom ?? []).map((r) => {
+    const override = state.times[r.id];
+    const { hour, minute } = override ? parseTime(override) : { hour: r.hour, minute: r.minute };
+    return {
+      id: r.id,
+      title: r.title,
+      titleHi: r.title,
+      body: 'Your reminder.',
+      bodyHi: 'आपका रिमाइंडर।',
+      hour,
+      minute,
+      icon: 'bell' as ReminderDef['icon'],
+      custom: true,
+    };
+  });
+
+  return [...builtIn, ...own];
+}
 
 export function parseTime(hhmm: string): { hour: number; minute: number } {
   const [h, m] = hhmm.split(':').map((n) => parseInt(n, 10));
@@ -127,17 +199,66 @@ function channelFor(toneId: string) {
   return `reminders-${toneId}`;
 }
 
+/**
+ * Register this state's enabled reminders as real alarms, and report when
+ * each will next ring.
+ *
+ * Module scope rather than a hook callback so the mount effect can call it
+ * with the state it has just read from disk, without that state becoming an
+ * effect dependency that re-arms on every change.
+ */
+async function armAlarms(next: ReminderState): Promise<Record<string, number>> {
+  const tone = TONES.find((t) => t.id === next.tone);
+  const silent = next.tone === 'silent';
+  const due = resolveReminders(next).filter((r) => next.enabled[r.id]);
+
+  const at = await Alarm.setAlarms(
+    due.map((def) => ({
+      id: def.id,
+      title: def.title,
+      body: def.body,
+      hour: def.hour,
+      minute: def.minute,
+      // The native side wants a raw resource NAME; `bell.wav` is the
+      // filename expo-notifications wants. Empty string means silence,
+      // null means the device's own alarm sound.
+      sound: silent ? '' : (tone?.sound?.replace(/\.[^.]+$/, '') ?? null),
+      vibrate: !silent,
+    })),
+  );
+  return Object.fromEntries(at);
+}
+
 export function useReminders() {
   const [state, setState] = useState<ReminderState>(EMPTY);
   const [loaded, setLoaded] = useState(false);
   const [permission, setPermission] = useState<'unknown' | 'granted' | 'denied'>('unknown');
   /** Whether this build can schedule notifications at all. */
   const [supported, setSupported] = useState<'unknown' | 'yes' | 'no'>('unknown');
+  /**
+   * When each enabled reminder next goes off, epoch millis.
+   *
+   * The screen used to say nothing at all about this, so turning on a 6am
+   * reminder at midday looked exactly like a reminder that did not work.
+   */
+  const [nextAt, setNextAt] = useState<Record<string, number>>({});
 
   useEffect(() => {
     AsyncStorage.getItem(KEY)
-      .then((raw) => {
-        if (raw) setState({ ...EMPTY, ...JSON.parse(raw) });
+      .then(async (raw) => {
+        const initial: ReminderState = raw ? { ...EMPTY, ...JSON.parse(raw) } : EMPTY;
+        setState(initial);
+        /*
+         * Re-arm with the OS on every launch.
+         *
+         * Three things need this. A devotee updating from the version that
+         * scheduled notifications has reminders switched on that nothing has
+         * yet registered as alarms. Android loses alarms to reboots and to
+         * some OEM cleanups. And `nextAt` — "rings in 11h 48m" — can only be
+         * known by asking the scheduler, so without it the screen says
+         * nothing about when anything will happen until a setting changes.
+         */
+        if (Alarm.isAvailable()) setNextAt(await armAlarms(initial));
       })
       .catch(() => {})
       .finally(() => setLoaded(true));
@@ -176,15 +297,33 @@ export function useReminders() {
     return asked.granted;
   }, []);
 
+  const syncAlarms = useCallback(async (next: ReminderState) => {
+    setNextAt(await armAlarms(next));
+  }, []);
+
   /**
-   * Rebuild every scheduled notification from state.
+   * Rebuild every scheduled reminder from state.
    *
-   * Cancel-all then re-add, rather than diffing: five reminders is nothing to
-   * reschedule, and a diff has to stay correct against an OS list that other
-   * code paths also touch. Idempotent beats clever here.
+   * Two completely different mechanisms, and the choice matters:
+   *
+   *  - **Android with the alarm module** — real alarms via
+   *    `AlarmManager.setAlarmClock`, ringing on the alarm stream through a
+   *    foreground service. Exact, audible on a silenced phone, loops until
+   *    dismissed.
+   *  - **Everything else** — `expo-notifications`, which posts once at
+   *    notification volume and is scheduled inexactly. That is a reminder,
+   *    not an alarm, and is the fallback precisely because it is weaker.
+   *
+   * Never both: two systems firing for one reminder means it goes off twice.
    */
+
   const sync = useCallback(
     async (next: ReminderState) => {
+      if (Alarm.isAvailable()) {
+        await syncAlarms(next);
+        return;
+      }
+
       const N = await loadNotifications();
       // Settings still save without the module; they take effect on a build
       // that has it.
@@ -196,12 +335,9 @@ export function useReminders() {
       const tone = TONES.find((t) => t.id === next.tone);
       const silent = next.tone === 'silent';
 
-      for (const def of REMINDERS) {
+      for (const def of resolveReminders(next)) {
         if (!next.enabled[def.id]) continue;
-        const override = next.times[def.id];
-        const { hour, minute } = override
-          ? parseTime(override)
-          : { hour: def.hour, minute: def.minute };
+        const { hour, minute } = def;
 
         await N.scheduleNotificationAsync({
           content: {
@@ -221,7 +357,7 @@ export function useReminders() {
         });
       }
     },
-    [],
+    [syncAlarms],
   );
 
   const toggle = useCallback(
@@ -254,6 +390,68 @@ export function useReminders() {
     [state, persist, sync],
   );
 
+  /**
+   * Add a reminder of the devotee's own.
+   *
+   * It starts ON: adding one is already the statement of intent, and an
+   * alarm that has to be switched on after being created reads as broken.
+   * Permission is asked for here for the same reason it is asked on toggle.
+   */
+  const addReminder = useCallback(
+    async (title: string, hour: number, minute: number) => {
+      const clean = title.trim();
+      if (!clean) return false;
+      if (supported === 'yes' && !(await ensurePermission())) return false;
+
+      const id = `custom-${Date.now().toString(36)}`;
+      const next: ReminderState = {
+        ...state,
+        custom: [...(state.custom ?? []), { id, title: clean, hour, minute }],
+        enabled: { ...state.enabled, [id]: true },
+      };
+      persist(next);
+      await sync(next);
+      return true;
+    },
+    [state, supported, ensurePermission, persist, sync],
+  );
+
+  /**
+   * Delete a reminder.
+   *
+   * A devotee's own is dropped outright; a bundled one is tombstoned, since
+   * it lives in the app's code and would otherwise return on next launch.
+   * Either way its enabled flag and time override go with it, so re-adding
+   * or restoring starts clean rather than inheriting a stale time.
+   */
+  const removeReminder = useCallback(
+    async (id: ReminderId) => {
+      const enabled = { ...state.enabled };
+      const times = { ...state.times };
+      delete enabled[id];
+      delete times[id];
+
+      const isCustom = (state.custom ?? []).some((r) => r.id === id);
+      const next: ReminderState = {
+        ...state,
+        enabled,
+        times,
+        custom: isCustom ? state.custom.filter((r) => r.id !== id) : state.custom,
+        removed: isCustom ? state.removed : [...new Set([...state.removed, id])],
+      };
+      persist(next);
+      await sync(next);
+    },
+    [state, persist, sync],
+  );
+
+  /** Bring back the bundled cycle, so deleting them is not a one-way door. */
+  const restoreDefaults = useCallback(async () => {
+    const next: ReminderState = { ...state, removed: [] };
+    persist(next);
+    await sync(next);
+  }, [state, persist, sync]);
+
   const setTone = useCallback(
     async (tone: ToneId) => {
       const next = { ...state, tone };
@@ -265,31 +463,53 @@ export function useReminders() {
     [state, persist, sync],
   );
 
+  /** The list the screen renders: bundled minus deleted, plus the devotee's. */
+  const reminders = useMemo(() => resolveReminders(state), [state]);
+
   const activeCount = useMemo(
-    () => REMINDERS.filter((r) => state.enabled[r.id]).length,
-    [state.enabled],
+    () => reminders.filter((r) => state.enabled[r.id]).length,
+    [reminders, state.enabled],
   );
 
-  /** Resolve a reminder's effective time, override or traditional. */
-  const timeFor = useCallback(
-    (id: ReminderId) => {
-      const def = REMINDERS.find((r) => r.id === id)!;
-      const override = state.times[id];
-      return override ? parseTime(override) : { hour: def.hour, minute: def.minute };
-    },
-    [state.times],
-  );
+  /** Whether any bundled reminder has been deleted — gates "Restore". */
+  const hasRemovedDefaults = state.removed.length > 0;
+
+  /** Ring one now, so the devotee can hear it before 4:30am does. */
+  const previewAlarm = useCallback(async (id: ReminderId) => {
+    if (!Alarm.isAvailable()) return false;
+    if (supported === 'yes' && !(await ensurePermission())) return false;
+    // It has to exist natively before it can be previewed, and it only does
+    // once it is enabled — so arm the current state first.
+    await syncAlarms({ ...state, enabled: { ...state.enabled, [id]: true } });
+    await Alarm.preview(id);
+    return true;
+  }, [state, supported, ensurePermission, syncAlarms]);
 
   return {
     state,
     loaded,
     permission,
     supported,
+    /** True when reminders ring as real alarms rather than notifications. */
+    isRealAlarm: Alarm.isAvailable(),
+    /** False when Android 14+ has withheld the full-screen ring screen. */
+    canFullScreen: Alarm.canUseFullScreen(),
+    openFullScreenSettings: Alarm.openFullScreenSettings,
+    /** False when alarms will ring late rather than to the minute. */
+    canScheduleExact: Alarm.canScheduleExact(),
+    openExactAlarmSettings: Alarm.openExactAlarmSettings,
+    nextAt,
+    previewAlarm,
+    stopAlarm: Alarm.stop,
+    reminders,
     activeCount,
+    hasRemovedDefaults,
     toggle,
     setTime,
     setTone,
-    timeFor,
+    addReminder,
+    removeReminder,
+    restoreDefaults,
     ensurePermission,
     /** Android needs a channel before anything is shown; harmless elsewhere. */
     prepareChannel: useCallback(async () => {
