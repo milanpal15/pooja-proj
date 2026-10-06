@@ -59,7 +59,16 @@ export const api = {
 
   /* ------------------------------------------------------------ session -- */
   session: () => req('/admin/session'),
-  login: (password) => req('/admin/login', { method: 'POST', body: JSON.stringify({ password }) }),
+  login: (username, password) =>
+    req('/admin/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
+
+  /* ---------------------------------------------------------- operators -- */
+  operators: {
+    list: () => req('/admin/operators'),
+    create: (body) => req('/admin/operators', { method: 'POST', body: JSON.stringify(body) }),
+    update: (id, body) => req(`/admin/operators/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+    remove: (id) => req(`/admin/operators/${id}`, { method: 'DELETE' }),
+  },
   logout: () => req('/admin/logout', { method: 'POST' }),
 
   // Resolve a stored asset path (host-relative like `/uploads/x.png`, or an

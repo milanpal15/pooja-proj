@@ -20,6 +20,7 @@
 
 const BASE = (process.env.BASE || 'http://127.0.0.1:4000').replace(/\/$/, '');
 const PASSWORD = process.env.ADMIN_PASSWORD || '';
+const USERNAME = process.env.ADMIN_USERNAME || 'admin';
 
 let failed = 0;
 const pass = (name, extra = '') => console.log(`  PASS  ${name}${extra ? `  — ${extra}` : ''}`);
@@ -90,16 +91,24 @@ await expect('PUT /api/horoscope/day/:date', '/api/horoscope/day/2026-01-01', 40
   body: { readings: [] },
 });
 await expect('POST /api/content/upload', '/api/content/upload', 401, { method: 'POST' });
+await expect('GET /api/admin/operators', '/api/admin/operators', 401);
 
 /* The sign-in round trip, when a password is available. */
 if (PASSWORD) {
   console.log('\nSign-in:');
   await expect('wrong password rejected', '/api/admin/login', 401, {
     method: 'POST',
-    body: { password: `${PASSWORD}-wrong` },
+    body: { username: USERNAME, password: `${PASSWORD}-wrong` },
+  });
+  await expect('unknown username rejected', '/api/admin/login', 401, {
+    method: 'POST',
+    body: { username: 'nobody-here', password: PASSWORD },
   });
 
-  const { res } = await status('/api/admin/login', { method: 'POST', body: { password: PASSWORD } });
+  const { res } = await status('/api/admin/login', {
+    method: 'POST',
+    body: { username: USERNAME, password: PASSWORD },
+  });
   if (res.status !== 200) {
     fail('correct password accepted', `got ${res.status}`);
   } else {
@@ -119,6 +128,7 @@ if (PASSWORD) {
 
     await expect('session opens /api/users', '/api/users', 200, { cookie });
     await expect('session opens content CRUD', '/api/content/deities', 200, { cookie });
+    await expect('session opens the operator list', '/api/admin/operators', 200, { cookie });
 
     await status('/api/admin/logout', { method: 'POST', cookie });
     // The cookie string is now stale server-side only if it were a stored

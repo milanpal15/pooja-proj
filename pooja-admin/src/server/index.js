@@ -7,18 +7,17 @@ import 'dotenv/config';
 import express from 'express';
 import morgan from 'morgan';
 
-import { assertAdminAuthReady, mountAdminAuth, requireAdmin } from './admin.js';
+import { ensureFirstOperator, mountAdminAuth, requireAdmin } from './admin.js';
 import { announcements, policies } from './broadcast.js';
 import { auth } from './auth.js';
 import { content, horoscope, panchang, publicContent, UPLOAD_DIR, users } from './content.js';
 import { connectDb } from './db.js';
+import { operators } from './operators.js';
 import { router } from './routes.js';
 
 const PORT = process.env.PORT || 4000;
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/pooja_admin';
 const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
-
-assertAdminAuthReady();
 
 const app = express();
 // `credentials` so the admin session cookie survives a cross-origin
@@ -66,6 +65,7 @@ app.use('/api', horoscope); // GET /api/horoscope?date=YYYY-MM-DD
 app.use('/api', panchang); // GET /api/panchang?date=YYYY-MM-DD
 app.use('/api/content', content); // deities/temples/aartis CRUD + upload
 app.use('/api/users', users);
+app.use('/api', operators);
 app.use('/api', policies);
 app.use('/api', announcements);
 
@@ -101,6 +101,9 @@ if (existsSync(CLIENT_DIST)) {
 }
 
 connectDb(MONGODB_URI)
+  // Operators live in the database now, so the first one can only be
+  // created once there is a connection — not at import time.
+  .then(ensureFirstOperator)
   .then(() => {
     app.listen(PORT, () =>
       console.log(

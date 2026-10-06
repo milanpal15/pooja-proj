@@ -371,6 +371,37 @@ const heroSlideSchema = new Schema(
  * value rather than a list. Stored as strings so the dashboard needs no
  * per-key schema; callers coerce.
  */
+/**
+ * Someone who signs in to the dashboard. NOT a devotee.
+ *
+ * `User` in this file is a devotee of the app, keyed by Firebase uid. This
+ * is the operator: the person writing horoscopes or managing temples. The
+ * two were never the same thing, and conflating them would mean a devotee
+ * account could be escalated into dashboard access.
+ *
+ * Replaces the single shared ADMIN_PASSWORD. A shared password cannot carry
+ * a role and cannot say who changed what.
+ */
+const operatorSchema = new Schema(
+  {
+    username: { type: String, required: true, unique: true, index: true, lowercase: true, trim: true },
+    /** scrypt, as `scrypt$<salt-hex>$<hash-hex>`. Never the password itself. */
+    passwordHash: { type: String, required: true },
+    /**
+     * `admin` may do anything, including managing operators, devotees,
+     * feature flags and payments. `editor` may write content — deities,
+     * temples, horoscope, festivals, announcements — and nothing else.
+     * The split that matters: whoever writes the daily reading has no
+     * business being able to delete a devotee's account.
+     */
+    role: { type: String, enum: ['admin', 'editor'], default: 'editor', index: true },
+    /** Suspends sign-in without deleting the record or its history. */
+    active: { type: Boolean, default: true },
+    lastLogin: Date,
+  },
+  { timestamps: true },
+);
+
 const settingSchema = new Schema(
   {
     key: { type: String, required: true, unique: true, index: true },
@@ -466,6 +497,7 @@ export const Knowledge = model('Knowledge', knowledgeSchema);
 export const Faq = model('Faq', faqSchema);
 export const HeroSlide = model('HeroSlide', heroSlideSchema);
 export const Setting = model('Setting', settingSchema);
+export const Operator = model('Operator', operatorSchema);
 export const Policy = model('Policy', policySchema);
 export const Announcement = model('Announcement', announcementSchema);
 

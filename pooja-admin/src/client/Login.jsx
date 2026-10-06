@@ -5,27 +5,32 @@ import { api } from './api.js';
 /**
  * The dashboard's front door.
  *
- * One shared password, checked server-side, exchanged for an HttpOnly
- * session cookie. Deliberately not a user system: there is one operator
- * here, and the devotee accounts in the Users tab are a different thing
- * entirely — they belong to the app, not to this.
+ * Per-operator username and password, checked server-side, exchanged for an
+ * HttpOnly session cookie carrying the operator's role.
+ *
+ * The devotee accounts in the Users tab are a different thing entirely —
+ * they belong to the app and sign in with Firebase. An operator is whoever
+ * edits the temple's content.
  */
 export function Login({ onAuthed }) {
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
   const submit = async (e) => {
     e.preventDefault();
-    if (!password || busy) return;
+    if (!username || !password || busy) return;
     setBusy(true);
     setError('');
     try {
-      await api.login(password);
+      await api.login(username, password);
       onAuthed();
     } catch (err) {
       // 401 is the ordinary case — a wrong password, not a broken server.
-      setError(err.name === 'Unauthorized' ? 'That password is not right.' : err.message);
+      // Deliberately does not say which half was wrong: naming the
+      // username would let anyone enumerate who has access.
+      setError(err.name === 'Unauthorized' ? 'Wrong username or password.' : err.message);
       setPassword('');
     } finally {
       setBusy(false);
@@ -40,17 +45,25 @@ export function Login({ onAuthed }) {
         <p className="muted">Admin Portal</p>
 
         <input
+          value={username}
+          autoFocus
+          placeholder="Username"
+          autoComplete="username"
+          autoCapitalize="none"
+          onChange={(e) => setUsername(e.target.value)}
+        />
+
+        <input
           type="password"
           value={password}
-          autoFocus
-          placeholder="Admin password"
+          placeholder="Password"
           autoComplete="current-password"
           onChange={(e) => setPassword(e.target.value)}
         />
 
         {!!error && <p className="login-error">{error}</p>}
 
-        <button className="btn" type="submit" disabled={busy || !password}>
+        <button className="btn" type="submit" disabled={busy || !username || !password}>
           {busy ? 'Checking…' : 'Sign in'}
         </button>
       </form>

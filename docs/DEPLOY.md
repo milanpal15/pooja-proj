@@ -81,7 +81,7 @@ You will be prompted for the three secrets marked `sync: false`:
 | Variable | Value |
 |---|---|
 | `MONGODB_URI` | the string from step 1 — **its own database** |
-| `ADMIN_PASSWORD` | the dashboard password you choose — see below |
+| `ADMIN_PASSWORD` | bootstraps the first admin account — see Operators and roles |
 | `FIREBASE_SERVICE_ACCOUNT` | the **entire** service-account JSON, on one line |
 
 For the Firebase one, flatten the file first:
@@ -177,23 +177,62 @@ there.
 
 ---
 
-## The dashboard password
+## Operators and roles
 
-`ADMIN_PASSWORD` is the whole of the dashboard's security. Everything under
+Each person who uses the dashboard gets their own username, password and
+role. `ADMIN_PASSWORD` (with optional `ADMIN_USERNAME`, default `admin`) now
+only **bootstraps the first admin** on an empty database — after that,
+accounts are managed in the **Operators** tab.
+
+| Role | May do |
+|---|---|
+| **admin** | Everything: content, plus Operators, devotee Users, Feature Flags, Payments, Visitors, Rules |
+| **editor** | Content only — deities, temples, aartis, festivals, sevas, knowledge, FAQs, home slides, horoscope, panchang, announcements, settings |
+
+The split that matters: whoever writes the daily horoscope cannot delete a
+devotee's account — and deleting a devotee here deletes their Firebase
+account too.
+
+Enforcement is server-side, in `ADMIN_ONLY` in
+[`src/server/admin.js`](../pooja-admin/src/server/admin.js). The sidebar
+hides tabs an editor cannot use, but that is only cosmetic: an editor who
+calls `/api/users` directly gets 403.
+
+A few deliberate refusals, all of which exist to prevent a lockout:
+
+- you cannot demote, suspend or delete **yourself**;
+- you cannot remove the **last active admin**;
+- a suspended operator cannot sign in, and a demotion takes effect on their
+  very next request rather than when their session happens to expire.
+
+Passwords are stored as salted scrypt hashes and never leave the server —
+the operator list does not include them. Sessions are a signed HttpOnly
+`SameSite=Strict` cookie, good for 12 hours.
+
+**Forgot the admin password?** There is no reset link. Connect to the
+database and delete the operator record, then restart with `ADMIN_PASSWORD`
+set — an empty operator collection bootstraps a fresh admin.
+
+## The bootstrap password
+
+`ADMIN_PASSWORD` creates that first admin. Everything under
 `/api` that is not on the phone app's allowlist — all content CRUD, uploads,
 feature flags, analytics, and the Users tab that can **delete devotees and
 their Firebase accounts** — requires it.
 
-- **Production refuses to start without it.** That is deliberate: there is no
-  degraded mode where the admin API is open, because an open admin API is the
-  entire problem.
+- **Production refuses to start with no operators and no `ADMIN_PASSWORD`.**
+  That is deliberate: there is no degraded mode where the admin API is open,
+  because an open admin API is the entire problem.
 - The allowlist of public endpoints lives in
   [`src/server/admin.js`](../pooja-admin/src/server/admin.js) and is
   **fail-closed** — a route added later is private unless it is listed. When
   you add an endpoint the app needs, add it there too or the app will get 401.
 - Sessions are a signed HttpOnly `SameSite=Strict` cookie, good for 12 hours.
-- To change the password: edit the env var and redeploy. Existing sessions
-  survive, because `ADMIN_SESSION_SECRET` is independent of the password.
+- To change a password: use **Operators → Set password**. Changing
+  `ADMIN_PASSWORD` after the first boot does nothing — it only ever seeds
+  the first account.
+- **Set `ADMIN_SESSION_SECRET`.** Without one a random key is generated per
+  boot, which is safe but signs everyone out on every restart.
 
 Locally, leave `ADMIN_PASSWORD` unset and the dashboard stays open with a
 warning on boot — a password on localhost is friction with nothing behind it.

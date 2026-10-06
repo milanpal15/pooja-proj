@@ -115,12 +115,19 @@ origin — `api.js` has no absolute base URL any more.
 - `models.js` — `Flag, Visitor, Event, Payment, Deity, Temple, Aarti,
   Festival, Seva, Knowledge, Faq, HeroSlide, Setting, User, Policy,
   Announcement` + `DEFAULT_FLAGS`.
-- `admin.js` — **the gate**. `requireAdmin` is mounted at `/api` before every
+- `admin.js` — **the gate**, and the role policy. `requireAdmin` is mounted at `/api` before every
   router, with a **fail-closed allowlist** of the endpoints the phone app
   needs; everything else wants an admin session. Also `POST /admin/login`,
   `/admin/logout`, `GET /admin/session`. Sessions are a signed HttpOnly
-  `SameSite=Strict` cookie. **Production refuses to start without
-  `ADMIN_PASSWORD`**; locally it stays open with a warning.
+  `SameSite=Strict` cookie carrying the operator's id and role.
+  `ADMIN_ONLY` is the second list: paths an **editor** may not touch
+  (devotees, flags, payments, analytics, operators, policies). Written as a
+  denylist on purpose — a new *content* route is editable by default, a new
+  *administrative* one has to be named. **Production refuses to start with
+  no operators and no `ADMIN_PASSWORD`.**
+- `operators.js` — who may sign in. Admin-only CRUD over the `Operator`
+  model, with refusals that prevent a lockout: no self-demotion, no
+  self-suspension, no self-delete, and never the last active admin.
 - `db.js` — Mongo connect; seeds flags and default content only when empty.
 - `routes.js` — flags, analytics, ingest, payments, visitors.
 - `content.js` — generic CRUD for `/deities /temples /aartis /festivals
@@ -142,9 +149,12 @@ origin — `api.js` has no absolute base URL any more.
 - `HoroscopeCopyDay.jsx` — the Horoscope tab's day bar. Picks the day the
   table below is scoped to, counts how much of it is published, and seeds it
   from the day before. It does **not** edit readings; see §5.
-- `Login.jsx` — the password gate. `App` asks `/api/admin/session` and
+- `Login.jsx` — username + password. `App` asks `/api/admin/session` and
   renders this or the dashboard; any 401 anywhere drops back to it.
-- `Users.jsx` — user list with block/unblock/delete.
+- `Operators.jsx` — **dashboard** accounts (admin-only tab). Distinct from
+  `Users.jsx`, which is **devotees** — they sign in to the app with Firebase
+  and have no access here. Keeping the words apart is deliberate.
+- `Users.jsx` — devotee list with block/unblock/delete.
 - `api.js` — API client. **Same-origin by default**; `api.asset(url)` resolves
   relative upload paths. Sends `credentials: 'include'` (the session is an
   HttpOnly cookie) and raises `Unauthorized` on 401.
@@ -404,6 +414,16 @@ anyone in. See `docs/FIREBASE_SETUP.md`.
 - **Don't invent social proof.** Ratings, review counts and the like are real
   data or they are hidden — `templeRating()` returns undefined rather than a
   default, and the row disappears.
+- **Two roles: `admin` and `editor`.** An editor writes content and nothing
+  else — no devotees, flags, payments, analytics or operators. The sidebar
+  hides those tabs, but that is cosmetic; `ADMIN_ONLY` in `admin.js` is what
+  enforces it, and an editor calling `/api/users` directly gets 403. Verified
+  in `scratchpad/e2e/rbac.mjs`.
+- **`ADMIN_PASSWORD` only bootstraps the first admin** on an empty operator
+  collection. Changing it later does nothing; passwords are changed in the
+  Operators tab. Locked out? Delete the operator rows and restart.
+- **Operator ≠ User.** `Operator` is a dashboard login (scrypt hash, role).
+  `User` is a devotee keyed by Firebase uid. Never let one become the other.
 - **The admin API is fail-closed.** A new `/api` route is private unless you
   add it to `PUBLIC` in `src/server/admin.js`. If the app starts getting 401s
   after you add an endpoint, that is why — and it is the safe direction to

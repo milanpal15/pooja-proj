@@ -3,9 +3,20 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, setUnauthorizedHandler } from './api.js';
 import { ContentManager } from './ContentManager.jsx';
 import { Login } from './Login.jsx';
+import { Operators } from './Operators.jsx';
 import { HoroscopeCopyDay } from './HoroscopeCopyDay.jsx';
 import { Policies } from './Policies.jsx';
 import { Users } from './Users.jsx';
+
+/**
+ * Tabs an editor must not see.
+ *
+ * Cosmetic only — the server enforces the same list in ADMIN_ONLY, and will
+ * 403 an editor who reaches the endpoint by other means. Hiding them keeps
+ * the dashboard honest about what this account can actually do, rather than
+ * offering controls that fail.
+ */
+const ADMIN_TABS = new Set(['Overview', 'Feature Flags', 'Rules', 'Operators', 'Users', 'Payments', 'Visitors']);
 
 const TABS = [
   'Overview',
@@ -23,6 +34,7 @@ const TABS = [
   'Horoscope',
   'Panchang',
   'Settings',
+  'Operators',
   'Users',
   'Payments',
   'Visitors',
@@ -282,11 +294,16 @@ const SETTING_FIELDS = [
  */
 export function App() {
   const [authed, setAuthed] = useState(null); // null = not yet known
+  /** Who is signed in, and as what. Drives which tabs exist. */
+  const [me, setMe] = useState(null);
 
   const check = useCallback(() => {
     api
       .session()
-      .then((s) => setAuthed(!s.required || s.authed))
+      .then((s) => {
+        setAuthed(!s.required || s.authed);
+        setMe(s.authed ? { username: s.username ?? 'admin', role: s.role ?? 'admin' } : null);
+      })
       .catch(() => setAuthed(false));
   }, []);
 
@@ -298,11 +315,21 @@ export function App() {
   }, [check]);
 
   if (authed === null) return null;
-  if (!authed) return <Login onAuthed={() => setAuthed(true)} />;
-  return <Dashboard onSignOut={() => api.logout().finally(() => setAuthed(false))} />;
+  if (!authed) return <Login onAuthed={check} />;
+  return (
+    <Dashboard
+      me={me}
+      onSignOut={() =>
+        api.logout().finally(() => {
+          setAuthed(false);
+          setMe(null);
+        })
+      }
+    />
+  );
 }
 
-function Dashboard({ onSignOut }) {
+function Dashboard({ me, onSignOut }) {
   const [tab, setTabState] = useState(() => decodeURIComponent(location.hash.slice(1)) || 'Overview');
   const [online, setOnline] = useState(true);
   // The Horoscope tab is scoped to one day: the bar and the table below it
@@ -325,6 +352,12 @@ function Dashboard({ onSignOut }) {
     location.hash = encodeURIComponent(t);
   };
 
+  const isAdmin = me?.role !== 'editor';
+  const visibleTabs = TABS.filter((t) => isAdmin || !ADMIN_TABS.has(t));
+  // An editor landing on #Users — a stale bookmark, or a link from before
+  // they were demoted — gets the first tab they can actually use.
+  const current = visibleTabs.includes(tab) ? tab : visibleTabs[0];
+
   return (
     <div className="app">
       <aside className="sidebar">
@@ -336,8 +369,11 @@ function Dashboard({ onSignOut }) {
           </div>
         </div>
         <nav>
-          {TABS.map((t) => (
-            <button key={t} className={t === tab ? 'nav active' : 'nav'} onClick={() => setTab(t)}>
+          {visibleTabs.map((t) => (
+            <button
+              key={t}
+              className={t === current ? 'nav active' : 'nav'}
+              onClick={() => setTab(t)}>
               {t}
             </button>
           ))}
@@ -346,16 +382,21 @@ function Dashboard({ onSignOut }) {
           <span className="dot" /> {online ? 'API connected' : 'API offline'}
           <div className="api-base">{api.base}</div>
         </div>
+        {me && (
+          <div className="whoami">
+            {me.username} · {me.role}
+          </div>
+        )}
         <button className="nav sign-out" onClick={onSignOut}>
           Sign out
         </button>
       </aside>
 
       <main className="content">
-        <h1>{tab}</h1>
-        {tab === 'Overview' && <Overview setOnline={setOnline} />}
-        {tab === 'Feature Flags' && <Flags />}
-        {tab === 'Announcements' && (
+        <h1>{current}</h1>
+        {current === 'Overview' && <Overview setOnline={setOnline} />}
+        {current === 'Feature Flags' && <Flags />}
+        {current === 'Announcements' && (
           <ContentManager
             title="Announcement"
             resource={api.announcements}
@@ -369,17 +410,17 @@ function Dashboard({ onSignOut }) {
             }}
           />
         )}
-        {tab === 'Rules' && <Policies />}
-        {tab === 'Deities' && (
+        {current === 'Rules' && <Policies />}
+        {current === 'Deities' && (
           <ContentManager title="Deity" resource={api.deities} fields={DEITY_FIELDS} previewKey="name" />
         )}
-        {tab === 'Temples' && (
+        {current === 'Temples' && (
           <ContentManager title="Temple" resource={api.temples} fields={TEMPLE_FIELDS} previewKey="name" />
         )}
-        {tab === 'Sevas' && (
+        {current === 'Sevas' && (
           <ContentManager title="Seva" resource={api.sevas} fields={SEVA_FIELDS} previewKey="name" />
         )}
-        {tab === 'Knowledge' && (
+        {current === 'Knowledge' && (
           <ContentManager
             title="Knowledge"
             resource={api.knowledge}
@@ -387,15 +428,15 @@ function Dashboard({ onSignOut }) {
             previewKey="deitySlug"
           />
         )}
-        {tab === 'FAQs' && (
+        {current === 'FAQs' && (
           <ContentManager title="FAQ" resource={api.faqs} fields={FAQ_FIELDS} previewKey="question" />
         )}
-        {tab === 'Home Slides' && (
+        {current === 'Home Slides' && (
           <ContentManager title="Slide" resource={api.hero} fields={HERO_FIELDS} previewKey="title" />
         )}
         {/* Readings are written one at a time in the table's modal; the bar
             above only picks the day and seeds it from the one before. */}
-        {tab === 'Horoscope' && (
+        {current === 'Horoscope' && (
           <HoroscopeCopyDay
             date={horoDate}
             onDateChange={setHoroDate}
@@ -408,7 +449,7 @@ function Dashboard({ onSignOut }) {
             }}
           />
         )}
-        {tab === 'Horoscope' && (
+        {current === 'Horoscope' && (
           <ContentManager
             key={horoReload}
             title="Reading"
@@ -420,7 +461,7 @@ function Dashboard({ onSignOut }) {
             onChange={() => setHoroTick((v) => v + 1)}
           />
         )}
-        {tab === 'Panchang' && (
+        {current === 'Panchang' && (
           <ContentManager
             title="Panchang"
             resource={api.panchangs}
@@ -428,7 +469,7 @@ function Dashboard({ onSignOut }) {
             previewKey="date"
           />
         )}
-        {tab === 'Settings' && (
+        {current === 'Settings' && (
           <ContentManager
             title="Setting"
             resource={api.settings}
@@ -436,7 +477,7 @@ function Dashboard({ onSignOut }) {
             previewKey="label"
           />
         )}
-        {tab === 'Festivals' && (
+        {current === 'Festivals' && (
           <ContentManager
             title="Festival"
             resource={api.festivals}
@@ -444,12 +485,13 @@ function Dashboard({ onSignOut }) {
             previewKey="name"
           />
         )}
-        {tab === 'Aartis' && (
+        {current === 'Aartis' && (
           <ContentManager title="Aarti" resource={api.aartis} fields={AARTI_FIELDS} previewKey="title" />
         )}
-        {tab === 'Users' && <Users />}
-        {tab === 'Payments' && <Payments />}
-        {tab === 'Visitors' && <Visitors />}
+        {current === 'Operators' && <Operators me={me} />}
+        {current === 'Users' && <Users />}
+        {current === 'Payments' && <Payments />}
+        {current === 'Visitors' && <Visitors />}
       </main>
     </div>
   );

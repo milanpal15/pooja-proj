@@ -647,3 +647,11 @@ code {
 .nav.sign-out:hover {
   color: var(--primary);
 }
+
+/* Who is signed in, above the sign-out button. */
+.whoami {
+  margin-top: 14px;
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: capitalize;
+}
