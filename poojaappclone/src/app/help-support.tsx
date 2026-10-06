@@ -9,7 +9,7 @@ import {
 
 import { Button, Card, Chip, Field, Icon, Screen, Type, useScrollPadding, useToast } from '@/components/ui';
 import { AppBar } from '@/components/ui/surface';
-import { FAQS, FAQItem } from '@/constants/faqs';
+import { FAQItem } from '@/constants/faqs';
 import {
   SUPPORT_EMAIL,
   SUPPORT_HOURS_EN,
@@ -26,7 +26,7 @@ export default function HelpSupportScreen() {
   const { c } = useTheme();
   const { t, lang } = useLanguage();
   const toast = useToast();
-  const { demo, faqs: remoteFaqs, settingText } = useContent();
+  const { faqs: remoteFaqs, settingText } = useContent();
 
   /*
    * Dashboard first, then the env fallback from `constants/support.ts`.
@@ -56,10 +56,8 @@ export default function HelpSupportScreen() {
             answerEn: f.answer,
             answerHi: f.answerHi ?? f.answer,
           }))
-        : demo
-          ? FAQS
-          : [],
-    [remoteFaqs, demo],
+        : [],
+    [remoteFaqs],
   );
   const scrollPad = useScrollPadding();
 

@@ -5,13 +5,9 @@ import { Platform } from 'react-native';
 
 
 import * as Alarm from '../../modules/expo-alarm';
-import {
-  REMINDERS,
-  type ReminderDef,
-  type ReminderId,
-  type ToneId,
-  TONES,
-} from '@/constants/reminders';
+import type { IconName } from '@/components/ui';
+import { type ReminderId, type ToneId } from '@/constants/reminders';
+import { type RemoteReminder, type RemoteTone, useContent } from '@/context/content';
 
 /**
  * Expo Go on Android cannot host these native modules, and the failure is not
@@ -113,7 +109,7 @@ export type ResolvedReminder = {
   bodyHi: string;
   hour: number;
   minute: number;
-  icon: ReminderDef['icon'];
+  icon: IconName;
   /** True for a devotee's own reminder, which can be renamed and deleted. */
   custom: boolean;
 };
@@ -129,12 +125,24 @@ const EMPTY: ReminderState = { enabled: {}, times: {}, custom: [], removed: [], 
  * from what is shown — the previous version read `REMINDERS` directly in
  * `sync`, which would have silently kept scheduling a deleted reminder.
  */
-function resolveReminders(state: ReminderState): ResolvedReminder[] {
-  const builtIn = REMINDERS.filter((d) => !state.removed.includes(d.id)).map((d) => {
-    const override = state.times[d.id];
-    const { hour, minute } = override ? parseTime(override) : { hour: d.hour, minute: d.minute };
-    return { ...d, hour, minute, custom: false };
-  });
+function resolveReminders(state: ReminderState, cycle: RemoteReminder[]): ResolvedReminder[] {
+  const builtIn = cycle
+    .filter((d) => !state.removed.includes(d.slug))
+    .map((d) => {
+      const override = state.times[d.slug];
+      const { hour, minute } = override ? parseTime(override) : { hour: d.hour, minute: d.minute };
+      return {
+        id: d.slug,
+        title: d.title,
+        titleHi: d.titleHi ?? d.title,
+        body: d.body ?? '',
+        bodyHi: d.bodyHi ?? d.body ?? '',
+        hour,
+        minute,
+        icon: (d.icon ?? 'bell') as ResolvedReminder['icon'],
+        custom: false,
+      };
+    });
 
   const own = (state.custom ?? []).map((r) => {
     const override = state.times[r.id];
@@ -147,7 +155,7 @@ function resolveReminders(state: ReminderState): ResolvedReminder[] {
       bodyHi: 'आपका रिमाइंडर।',
       hour,
       minute,
-      icon: 'bell' as ReminderDef['icon'],
+      icon: 'bell' as ResolvedReminder['icon'],
       custom: true,
     };
   });
@@ -182,14 +190,24 @@ export function formatTime(hour: number, minute: number, hi = false): string {
  * `Custom sound 'default' not found` error on every launch. Omitting `sound`
  * is how you ask for the system default.
  */
-async function ensureToneChannels(N: NotificationsModule) {
-  for (const tone of TONES) {
-    const silent = tone.id === 'silent';
-    await N.setNotificationChannelAsync(channelFor(tone.id), {
+async function ensureToneChannels(N: NotificationsModule, tones: RemoteTone[]) {
+  for (const tone of tones) {
+    const silent = tone.slug === 'silent';
+    await N.setNotificationChannelAsync(channelFor(tone.slug), {
       name: `Aarti Reminders · ${tone.title}`,
       importance: silent ? N.AndroidImportance.LOW : N.AndroidImportance.HIGH,
       // Omitted entirely for the system default; `null` for silence.
-      ...(silent ? { sound: null } : tone.sound ? { sound: tone.sound } : {}),
+      /*
+       * An Android channel sound must be a file bundled with the app, so a
+       * tone configured as a URL cannot be one. It still rings — the native
+       * alarm streams it — but on this fallback path it uses the device
+       * default rather than silently playing nothing.
+       */
+      ...(silent
+        ? { sound: null }
+        : tone.sound && !/^https?:\/\//.test(tone.sound)
+          ? { sound: `${tone.sound}.wav` }
+          : {}),
     });
   }
 }
@@ -207,10 +225,14 @@ function channelFor(toneId: string) {
  * with the state it has just read from disk, without that state becoming an
  * effect dependency that re-arms on every change.
  */
-async function armAlarms(next: ReminderState): Promise<Record<string, number>> {
-  const tone = TONES.find((t) => t.id === next.tone);
+async function armAlarms(
+  next: ReminderState,
+  cycle: RemoteReminder[],
+  tones: RemoteTone[],
+): Promise<Record<string, number>> {
+  const tone = tones.find((t) => t.slug === next.tone);
   const silent = next.tone === 'silent';
-  const due = resolveReminders(next).filter((r) => next.enabled[r.id]);
+  const due = resolveReminders(next, cycle).filter((r) => next.enabled[r.id]);
 
   const at = await Alarm.setAlarms(
     due.map((def) => ({
@@ -230,6 +252,14 @@ async function armAlarms(next: ReminderState): Promise<Record<string, number>> {
 }
 
 export function useReminders() {
+  /*
+   * The temple's suggested cycle and its alert tones come from the
+   * dashboard. They used to be literals in `constants/reminders.ts`, so a
+   * temple whose Mangala Aarti is at 4:00 rather than 4:30 could not say so
+   * without shipping a new build.
+   */
+  const { reminders: cycle, tones } = useContent();
+
   const [state, setState] = useState<ReminderState>(EMPTY);
   const [loaded, setLoaded] = useState(false);
   const [permission, setPermission] = useState<'unknown' | 'granted' | 'denied'>('unknown');
@@ -258,7 +288,7 @@ export function useReminders() {
          * known by asking the scheduler, so without it the screen says
          * nothing about when anything will happen until a setting changes.
          */
-        if (Alarm.isAvailable()) setNextAt(await armAlarms(initial));
+        if (Alarm.isAvailable()) setNextAt(await armAlarms(initial, cycle, tones));
       })
       .catch(() => {})
       .finally(() => setLoaded(true));
@@ -276,7 +306,10 @@ export function useReminders() {
         setPermission('denied');
       }
     });
-  }, []);
+    // `cycle` and `tones` arrive from the network a moment after mount, so
+    // the first pass arms nothing and the second arms the real thing. Both
+    // are idempotent — setAlarms replaces the whole set every time.
+  }, [cycle, tones]);
 
   const persist = useCallback((next: ReminderState) => {
     setState(next);
@@ -297,9 +330,12 @@ export function useReminders() {
     return asked.granted;
   }, []);
 
-  const syncAlarms = useCallback(async (next: ReminderState) => {
-    setNextAt(await armAlarms(next));
-  }, []);
+  const syncAlarms = useCallback(
+    async (next: ReminderState) => {
+      setNextAt(await armAlarms(next, cycle, tones));
+    },
+    [cycle, tones],
+  );
 
   /**
    * Rebuild every scheduled reminder from state.
@@ -329,13 +365,13 @@ export function useReminders() {
       // that has it.
       if (!N) return;
       // Channels must exist before anything is scheduled into them.
-      if (Platform.OS === 'android') await ensureToneChannels(N);
+      if (Platform.OS === 'android') await ensureToneChannels(N, tones);
       await N.cancelAllScheduledNotificationsAsync();
 
-      const tone = TONES.find((t) => t.id === next.tone);
+      const tone = tones.find((t) => t.slug === next.tone);
       const silent = next.tone === 'silent';
 
-      for (const def of resolveReminders(next)) {
+      for (const def of resolveReminders(next, cycle)) {
         if (!next.enabled[def.id]) continue;
         const { hour, minute } = def;
 
@@ -357,7 +393,7 @@ export function useReminders() {
         });
       }
     },
-    [syncAlarms],
+    [syncAlarms, cycle, tones],
   );
 
   const toggle = useCallback(
@@ -464,7 +500,7 @@ export function useReminders() {
   );
 
   /** The list the screen renders: bundled minus deleted, plus the devotee's. */
-  const reminders = useMemo(() => resolveReminders(state), [state]);
+  const reminders = useMemo(() => resolveReminders(state, cycle), [state, cycle]);
 
   const activeCount = useMemo(
     () => reminders.filter((r) => state.enabled[r.id]).length,
@@ -516,7 +552,7 @@ export function useReminders() {
       if (Platform.OS !== 'android') return;
       const N = await loadNotifications();
       if (!N) return;
-      await ensureToneChannels(N);
-    }, []),
+      await ensureToneChannels(N, tones);
+    }, [tones]),
   };
 }

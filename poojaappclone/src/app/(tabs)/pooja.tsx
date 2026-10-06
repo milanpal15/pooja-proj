@@ -1,6 +1,6 @@
 import { setAudioModeAsync, useAudioPlayer } from 'expo-audio';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -24,13 +24,14 @@ import { Marigold, MarigoldRain } from '@/components/mandir/marigold';
 import { HangingBell, TempleBackdrop, Toran } from '@/components/mandir/temple-scene';
 import { Thali } from '@/components/mandir/thali';
 import { Flame } from '@/components/pooja/flame';
-import { AARTI_CIRCLES, PANCHANG_LINE, type Deity } from '@/constants/deities';
+import { AARTI_CIRCLES, type Deity } from '@/constants/deities';
 import { SOUNDS } from '@/constants/sounds';
 import { BottomTabInset, TopTabInset } from '@/constants/theme';
 import { useAuth } from '@/context/auth';
 import { useLanguage } from '@/context/language';
 import { useContent } from '@/context/content';
 import { NoContent } from '@/components/ui';
+import { computePanchang, DEFAULT_PLACE } from '@/lib/panchang';
 
 const TWO_PI = Math.PI * 2;
 /** Resting spot: bottom of the circle, in screen coords where +y points down. */
@@ -51,6 +52,24 @@ export default function MandirScreen() {
   // published there is no murti to perform an aarti to, and the screen says
   // so rather than inventing one.
   const { deityById, deityList } = useContent();
+
+  /*
+   * The real panchang for today.
+   *
+   * This banner printed a fixed string — '॥ सोमवार, आषाढ़, त्रयोदशी ॥' —
+   * under the murti on every screen, every day, regardless of the date. It
+   * is computed on device from the same library the Panchang screen uses,
+   * so the two can no longer disagree.
+   */
+  const panchangLine = useMemo(() => {
+    try {
+      const p = computePanchang(new Date(), DEFAULT_PLACE.lat, DEFAULT_PLACE.lng);
+      return `॥ ${p.varaHi}, ${p.masaHi}, ${p.tithiHi} ॥`;
+    } catch {
+      // An ephemeris failure must not take the sanctum down; drop the line.
+      return '';
+    }
+  }, []);
   // A deity id passed from the Temples tab ("Perform Pooja") preselects the murti.
   // `ts` is a per-navigation nonce so the same deity still restarts the aarti.
   const { deity: deityParam, ts } = useLocalSearchParams<{ deity?: string; ts?: string }>();
@@ -452,7 +471,7 @@ export default function MandirScreen() {
 
             {/* Panchang banner */}
             <View style={[styles.banner, { top: cy + rRest * 0.52 }]}>
-              <Text style={styles.bannerText}>{PANCHANG_LINE}</Text>
+              <Text style={styles.bannerText}>{panchangLine}</Text>
             </View>
           </View>
         </GestureDetector>

@@ -33,6 +33,9 @@ const TABS = [
   'Home Slides',
   'Horoscope',
   'Panchang',
+  'Reminders',
+  'Alert Tones',
+  'Wallpapers',
   'Settings',
   'Operators',
   'Users',
@@ -211,6 +214,47 @@ const HERO_FIELDS = [
   { key: 'subtitleHi', label: 'Subtitle (HI)', type: 'text' },
   { key: 'deitySlug', label: 'Deity slug (artwork)', type: 'text', col: true },
   { key: 'href', label: 'Opens route (e.g. /darshan)', type: 'text' },
+  { key: 'order', label: 'Order', type: 'number' },
+  { key: 'enabled', label: 'Visible', type: 'bool', col: true },
+];
+
+
+/** The temple's suggested daily cycle. A devotee's own alarms stay on their phone. */
+const REMINDER_FIELDS = [
+  { key: 'slug', label: 'Slug', type: 'text', col: true },
+  { key: 'title', label: 'Title (EN)', type: 'text', col: true },
+  { key: 'titleHi', label: 'Title (HI)', type: 'text' },
+  { key: 'body', label: 'Notification text (EN)', type: 'text' },
+  { key: 'bodyHi', label: 'Notification text (HI)', type: 'text' },
+  { key: 'hour', label: 'Hour (0–23)', type: 'number', col: true },
+  { key: 'minute', label: 'Minute', type: 'number', col: true },
+  { key: 'icon', label: 'Icon', type: 'text' },
+  { key: 'order', label: 'Order', type: 'number' },
+  { key: 'enabled', label: 'Visible', type: 'bool', col: true },
+];
+
+/**
+ * Alert tones. `sound` is a name bundled with the app (`bell`, `aarti`),
+ * an absolute URL to an audio file, or blank for silent. A URL streams
+ * through the real alarm; on the notification fallback it rings with the
+ * device default, because an Android channel sound must be a bundled file.
+ */
+const TONE_FIELDS = [
+  { key: 'slug', label: 'Slug', type: 'text', col: true },
+  { key: 'title', label: 'Title (EN)', type: 'text', col: true },
+  { key: 'titleHi', label: 'Title (HI)', type: 'text' },
+  { key: 'desc', label: 'Description (EN)', type: 'text', col: true },
+  { key: 'descHi', label: 'Description (HI)', type: 'text' },
+  { key: 'sound', label: 'Sound — bundled name, URL, or blank for silent', type: 'text' },
+  { key: 'icon', label: 'Icon', type: 'text' },
+  { key: 'order', label: 'Order', type: 'number' },
+  { key: 'enabled', label: 'Visible', type: 'bool', col: true },
+];
+
+const WALLPAPER_STYLE_FIELDS = [
+  { key: 'slug', label: 'Slug', type: 'text', col: true },
+  { key: 'title', label: 'Title (EN)', type: 'text', col: true },
+  { key: 'titleHi', label: 'Title (HI)', type: 'text', col: true },
   { key: 'order', label: 'Order', type: 'number' },
   { key: 'enabled', label: 'Visible', type: 'bool', col: true },
 ];
@@ -498,6 +542,25 @@ function Dashboard({ me, onSignOut }) {
         )}
         {current === 'Aartis' && (
           <ContentManager title="Aarti" resource={api.aartis} fields={AARTI_FIELDS} previewKey="title" />
+        )}
+        {current === 'Reminders' && (
+          <ContentManager
+            title="Reminder"
+            resource={api.reminders}
+            fields={REMINDER_FIELDS}
+            previewKey="title"
+          />
+        )}
+        {current === 'Alert Tones' && (
+          <ContentManager title="Tone" resource={api.tones} fields={TONE_FIELDS} previewKey="title" />
+        )}
+        {current === 'Wallpapers' && (
+          <ContentManager
+            title="Wallpaper style"
+            resource={api.wallpaperStyles}
+            fields={WALLPAPER_STYLE_FIELDS}
+            previewKey="title"
+          />
         )}
         {current === 'Operators' && <Operators me={me} />}
         {current === 'Users' && <Users />}

@@ -416,6 +416,66 @@ const operatorSchema = new Schema(
   { timestamps: true },
 );
 
+/**
+ * The daily aarti cycle the app can remind a devotee of.
+ *
+ * Was a literal in the app bundle, so a temple whose Mangala Aarti is at
+ * 4:00 rather than 4:30 could not say so without a store release. The
+ * devotee's own additions stay on their device — this is the temple's
+ * suggested cycle, not their alarm list.
+ */
+const reminderSchema = new Schema(
+  {
+    slug: { type: String, required: true, unique: true, index: true },
+    title: String,
+    titleHi: String,
+    body: String,
+    bodyHi: String,
+    hour: { type: Number, default: 6 }, // 24-hour
+    minute: { type: Number, default: 0 },
+    icon: { type: String, default: 'bell' }, // an IconName the app knows
+    order: { type: Number, default: 0 },
+    enabled: { type: Boolean, default: true },
+  },
+  { timestamps: true },
+);
+
+/**
+ * Alert tones offered for those reminders.
+ *
+ * `sound` is either the name of a sound bundled with the app (`bell`,
+ * `aarti`) or an absolute URL to an audio file. A URL plays fine through
+ * the native alarm, which streams it; it cannot be used as an Android
+ * notification-channel sound, so on the notification fallback path a URL
+ * tone rings with the device default. Empty means silent.
+ */
+const toneSchema = new Schema(
+  {
+    slug: { type: String, required: true, unique: true, index: true },
+    title: String,
+    titleHi: String,
+    desc: String,
+    descHi: String,
+    sound: String, // bundled name, absolute URL, or '' for silent
+    icon: { type: String, default: 'bell' },
+    order: { type: Number, default: 0 },
+    enabled: { type: Boolean, default: true },
+  },
+  { timestamps: true },
+);
+
+/** Wallpaper looks the app can compose. Presentation, but the temple's choice. */
+const wallpaperStyleSchema = new Schema(
+  {
+    slug: { type: String, required: true, unique: true, index: true },
+    title: String,
+    titleHi: String,
+    order: { type: Number, default: 0 },
+    enabled: { type: Boolean, default: true },
+  },
+  { timestamps: true },
+);
+
 const settingSchema = new Schema(
   {
     key: { type: String, required: true, unique: true, index: true },
@@ -512,6 +572,9 @@ export const Faq = model('Faq', faqSchema);
 export const HeroSlide = model('HeroSlide', heroSlideSchema);
 export const Setting = model('Setting', settingSchema);
 export const Operator = model('Operator', operatorSchema);
+export const Reminder = model('Reminder', reminderSchema);
+export const Tone = model('Tone', toneSchema);
+export const WallpaperStyle = model('WallpaperStyle', wallpaperStyleSchema);
 export const Policy = model('Policy', policySchema);
 export const Announcement = model('Announcement', announcementSchema);
 
@@ -534,16 +597,4 @@ export const DEFAULT_FLAGS = [
    * day billing is enabled; no app release needed.
    */
   { key: 'phoneAuth', label: 'Mobile OTP Sign-in', desc: 'Needs Firebase Blaze billing', enabled: false },
-  /**
-   * Whether the app may fall back to the catalogue compiled into its bundle
-   * when this dashboard has nothing to show.
-   *
-   * **Off by default**, like `phoneAuth`, and for a comparable reason: on,
-   * an empty or unreachable backend renders invented deities and temples
-   * that no operator can edit — the dashboard looks broken while the app
-   * looks fine. Off, the app shows exactly what this returns, empty states
-   * included. Turn it on to demo the app, or to keep something on screen
-   * while a fresh deployment is still being filled.
-   */
-  { key: 'demoContent', label: 'Demo Content', desc: 'Use the app\'s bundled data when this dashboard is empty', enabled: false },
 ];

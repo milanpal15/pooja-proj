@@ -3,12 +3,11 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { ImageSourcePropType } from 'react-native';
 
 import { ADMIN_API } from '@/constants/config';
-import { type CrownKind, type Deity, DEITIES as BUNDLED_DEITIES } from '@/constants/deities';
+import { type CrownKind, type Deity } from '@/constants/deities';
 import { DEITY_IMAGES } from '@/constants/deity-images';
 import { type Festival, FESTIVALS } from '@/constants/home';
-import { SEVAS as BUNDLED_SEVAS, type Seva } from '@/constants/poojas';
-import { type Temple, TEMPLES as BUNDLED_TEMPLES } from '@/constants/temples';
-import { useAdmin } from '@/context/admin';
+import { type Seva } from '@/constants/poojas';
+import { type Temple } from '@/constants/temples';
 
 /** Shapes returned by the admin backend's public `/api/content` endpoint. */
 export type RemoteDeity = {
@@ -117,6 +116,37 @@ export type RemoteKnowledge = {
   festivalsHi?: string[];
 };
 
+export type RemoteReminder = {
+  slug: string;
+  title: string;
+  titleHi?: string;
+  body?: string;
+  bodyHi?: string;
+  hour: number;
+  minute: number;
+  icon?: string;
+};
+
+/**
+ * An alert tone. `sound` is a bundled resource name, an absolute URL, or
+ * '' for silent; null means the device's own default.
+ */
+export type RemoteTone = {
+  slug: string;
+  title: string;
+  titleHi?: string;
+  desc?: string;
+  descHi?: string;
+  sound?: string | null;
+  icon?: string;
+};
+
+export type RemoteWallpaperStyle = {
+  slug: string;
+  title: string;
+  titleHi?: string;
+};
+
 export type RemoteFaq = {
   _id: string;
   slug: string;
@@ -151,6 +181,9 @@ type Content = {
   knowledge: RemoteKnowledge[];
   faqs: RemoteFaq[];
   hero: RemoteHeroSlide[];
+  reminders: RemoteReminder[];
+  tones: RemoteTone[];
+  wallpaperStyles: RemoteWallpaperStyle[];
   /** Flat key/value map: prasadDelivery, supportEmail, supportPhone… */
   settings: Record<string, string>;
   announcement: RemoteAnnouncement | null;
@@ -178,22 +211,20 @@ type ContentContextValue = Content & {
    * in above are the dashboard's rows, kept for the few places that need a
    * field the app shape does not carry (darshan reads `liveUrl`).
    *
-   * Empty is a real answer: with `demoContent` off and nothing published,
-   * screens show their empty state rather than the bundled catalogue.
+   * Empty is a real answer. Nothing is compiled into the app any more, so
+   * an unpublished dashboard means empty states — which is how an unfilled
+   * dashboard is supposed to look.
    */
   deityList: Deity[];
   templeList: Temple[];
-  /** Whether bundled demo content is standing in for an empty dashboard. */
-  demo: boolean;
   /** A deity's display name for a slug; the slug itself if unknown. */
   deityName: (slug: string) => string;
   /**
    * Look one up by slug, falling back to the first in the list.
    *
    * Returns undefined when there is nothing at all — an unfilled dashboard
-   * with `demoContent` off — so callers must handle an empty sanctum rather
-   * than assuming a deity always exists, which the bundled catalogue used
-   * to guarantee.
+   * — so callers must handle an empty sanctum rather than assuming a deity
+   * always exists, which the bundled catalogue used to guarantee.
    */
   deityById: (id?: string | string[]) => Deity | undefined;
   templeById: (id?: string | string[]) => Temple | undefined;
@@ -256,6 +287,9 @@ const EMPTY: Content = {
   knowledge: [],
   faqs: [],
   hero: [],
+  reminders: [],
+  tones: [],
+  wallpaperStyles: [],
   settings: {},
   announcement: null,
 };
@@ -289,10 +323,9 @@ const ContentContext = createContext<ContentContextValue>({
   ...EMPTY,
   loading: true,
   // Outside a provider nothing has been fetched, so there is nothing to
-  // show — the same answer the provider gives with demoContent off.
+  // show — the same answer the provider gives before anything loads.
   deityList: [],
   templeList: [],
-  demo: false,
   deityName: (slug) => slug,
   deityById: () => undefined,
   templeById: () => undefined,
@@ -300,12 +333,12 @@ const ContentContext = createContext<ContentContextValue>({
   // Outside a provider there is no dashboard, so the bundled murti is it.
   deityArt: (id) => DEITY_IMAGES[id],
   bookingEnabled: () => true,
-  // Outside a provider the bundled calendar is all there is.
-  upcomingFestivals: (limit = 4) => filterUpcoming(FESTIVALS, limit),
+  // Outside a provider nothing has been fetched, so there is nothing.
+  upcomingFestivals: () => [],
   templeRating: () => undefined,
   setting: (_k, fallback) => fallback,
   settingText: () => '',
-  sevasFor: () => BUNDLED_SEVAS,
+  sevasFor: () => [],
 });
 
 /*
@@ -393,6 +426,9 @@ const normalise = (data: Partial<Content> | null): Content => ({
   knowledge: data?.knowledge ?? [],
   faqs: data?.faqs ?? [],
   hero: data?.hero ?? [],
+  reminders: data?.reminders ?? [],
+  tones: data?.tones ?? [],
+  wallpaperStyles: data?.wallpaperStyles ?? [],
   settings: data?.settings ?? {},
   announcement: data?.announcement ?? null,
 });
@@ -400,14 +436,6 @@ const normalise = (data: Partial<Content> | null): Content => ({
 export function ContentProvider({ children }: { children: React.ReactNode }) {
   const [content, setContent] = useState<Content>(EMPTY);
   const [loading, setLoading] = useState(true);
-  /*
-   * `demoContent` decides whether an empty dashboard may be papered over
-   * with the catalogue compiled into this bundle. Off by default — see the
-   * note on DEFAULT_FLAGS. ContentProvider sits inside AdminProvider, so the
-   * flag is available here.
-   */
-  const { flags } = useAdmin();
-  const demo = flags.demoContent;
 
   /*
    * Cache first, then network.
@@ -473,38 +501,28 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
     /*
      * What the screens draw.
      *
-     * The dashboard is the source. Only when it has nothing at all — a fresh
-     * deployment, or a device that has never reached the backend — does the
-     * bundled catalogue stand in, and only with `demoContent` on. Off, an
-     * empty dashboard renders empty states, which is the honest answer and
-     * the one that makes the dashboard's own emptiness visible.
+     * The dashboard is the only source. Nothing is compiled into the app,
+     * so an empty dashboard renders empty states — which is the honest
+     * answer, and the one that makes the dashboard's emptiness visible
+     * instead of hiding it behind a catalogue nobody can edit.
      */
-    const deityList: Deity[] = content.deities.length
-      ? content.deities.map((d) => toDeity(d, artFor(d.slug)))
-      : demo
-        ? BUNDLED_DEITIES
-        : [];
+    const deityList: Deity[] = content.deities.map((d) => toDeity(d, artFor(d.slug)));
 
     const deityBySlug = new Map(deityList.map((d) => [d.id, d]));
 
-    const templeList: Temple[] = content.temples.length
-      ? content.temples.map((t) =>
-          toTemple(
-            t,
-            // A temple needs a deity to borrow its colours and mark from.
-            (t.deitySlug && deityBySlug.get(t.deitySlug)) ||
-              deityList[0] ||
-              toDeity({ slug: t.deitySlug ?? '', name: '' }),
-          ),
-        )
-      : demo
-        ? BUNDLED_TEMPLES
-        : [];
+    const templeList: Temple[] = content.temples.map((t) =>
+      toTemple(
+        t,
+        // A temple needs a deity to borrow its colours and mark from.
+        (t.deitySlug && deityBySlug.get(t.deitySlug)) ||
+          deityList[0] ||
+          toDeity({ slug: t.deitySlug ?? '', name: '' }),
+      ),
+    );
 
     return {
       ...content,
       loading,
-      demo,
       deityList,
       templeList,
       deityName: (slug) => deityBySlug.get(slug)?.name ?? slug,
@@ -537,7 +555,7 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
             price: s.price,
             duration: s.duration || '',
           }));
-        return remote.length ? remote : BUNDLED_SEVAS;
+        return remote;
       },
       setting: (key, fallback) => {
         const n = Number(content.settings[key]);
@@ -561,7 +579,7 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
         return fromRemote.length ? fromRemote : filterUpcoming(FESTIVALS, limit);
       },
     };
-  }, [content, loading, demo]);
+  }, [content, loading]);
 
   return <ContentContext.Provider value={value}>{children}</ContentContext.Provider>;
 }

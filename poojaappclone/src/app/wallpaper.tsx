@@ -12,7 +12,6 @@ import {
 import { Button, Card, Chip, Icon, Mandala, Screen, Type, useToast } from '@/components/ui';
 import { AppBar } from '@/components/ui/surface';
 import { DEITY_IMAGES } from '@/constants/deity-images';
-import { WALLPAPER_STYLES } from '@/constants/reminders';
 import { useContent } from '@/context/content';
 import { useLanguage } from '@/context/language';
 import * as Wallpaper from '../../modules/expo-wallpaper';
@@ -78,7 +77,7 @@ const DEITY_IDS = Object.keys(DEITY_IMAGES);
 export default function WallpaperScreen() {
   const { c } = useTheme();
   const { lang } = useLanguage();
-  const { deityArt, deityList } = useContent();
+  const { deityArt, deityList, wallpaperStyles } = useContent();
   const toast = useToast();
   const hi = lang === 'hi';
 
@@ -196,12 +195,12 @@ export default function WallpaperScreen() {
         </ScrollView>
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-          {WALLPAPER_STYLES.map((s) => (
+          {wallpaperStyles.map((s) => (
             <Chip
-              key={s.id}
-              label={hi ? s.titleHi : s.title}
-              selected={s.id === style}
-              onPress={() => setStyle(s.id)}
+              key={s.slug}
+              label={hi ? (s.titleHi ?? s.title) : s.title}
+              selected={s.slug === style}
+              onPress={() => setStyle(s.slug)}
             />
           ))}
         </ScrollView>

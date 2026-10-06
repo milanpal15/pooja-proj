@@ -32,56 +32,5 @@ export type Seva = {
   deities?: DeitySlug[];
 };
 
-export const SEVAS: Seva[] = [
-  {
-    id: 'archana',
-    name: 'Archana',
-    nameHi: 'अर्चना',
-    description: 'Your name and gotra offered with 108 recitations.',
-    price: 251,
-    duration: '~20 min',
-  },
-  {
-    id: 'abhishek',
-    name: 'Rudrabhishek',
-    nameHi: 'रुद्राभिषेक',
-    description: 'Ritual bathing of the lingam with milk, honey and Ganga jal.',
-    price: 1100,
-    duration: '~45 min',
-    deities: ['Shiva'],
-  },
-  {
-    id: 'sahasranama',
-    name: 'Sahasranama Archana',
-    nameHi: 'सहस्रनाम अर्चना',
-    description: 'The thousand names recited in your name.',
-    price: 751,
-    duration: '~40 min',
-    deities: ['Vishnu', 'Devi'],
-  },
-  {
-    id: 'modak',
-    name: 'Modak Naivedya',
-    nameHi: 'मोदक नैवेद्य',
-    description: 'Twenty-one modaks offered, then couriered to you as prasad.',
-    price: 501,
-    duration: '~25 min',
-    deities: ['Ganesha'],
-  },
-  {
-    id: 'deep',
-    name: 'Deep Daan',
-    nameHi: 'दीप दान',
-    description: 'A ghee lamp lit in your name at the evening aarti.',
-    price: 151,
-    duration: '~10 min',
-  },
-];
-
-/** Sevas appropriate for a temple's presiding deity. */
-export function sevasFor(deity: DeitySlug): Seva[] {
-  return SEVAS.filter((s) => !s.deities || s.deities.includes(deity));
-}
-
 /** Prasad courier, added at checkout. */
 export const PRASAD_DELIVERY = 99;

@@ -8,6 +8,9 @@ import { fileURLToPath } from 'url';
 import {
   Aarti,
   Deity,
+  Reminder,
+  Tone,
+  WallpaperStyle,
   DEFAULT_FLAGS,
   Faq,
   Festival,
@@ -41,6 +44,32 @@ const BUNDLED = JSON.parse(
  * filled gets the bundled value. Running this on every boot is safe because
  * the second run finds nothing to do.
  */
+/**
+ * The temple's suggested daily cycle, its alert tones and the wallpaper
+ * looks — all three used to be literals in the app bundle, so a temple
+ * whose Mangala Aarti is at 4:00 could not say so without a store release.
+ */
+const REMINDERS_SEED = [
+  { slug: 'mangala', title: 'Mangala Aarti', titleHi: 'मंगला आरती', body: 'The first aarti of the day is being offered.', bodyHi: 'दिन की पहली आरती का समय है।', hour: 4, minute: 30, icon: 'diya', order: 0 },
+  { slug: 'shringar', title: 'Shringar Aarti', titleHi: 'श्रृंगार आरती', body: 'The deity is adorned. Take darshan.', bodyHi: 'श्रृंगार दर्शन का समय है।', hour: 8, minute: 0, icon: 'marigold', order: 1 },
+  { slug: 'sandhya', title: 'Sandhya Aarti', titleHi: 'संध्या आरती', body: 'Evening aarti. Light a diya.', bodyHi: 'संध्या आरती — दीप जलाएँ।', hour: 18, minute: 30, icon: 'diya', order: 2 },
+  { slug: 'shayan', title: 'Shayan Aarti', titleHi: 'शयन आरती', body: 'The last aarti before the sanctum closes.', bodyHi: 'शयन आरती — पट बंद होने से पहले।', hour: 21, minute: 0, icon: 'lotus', order: 3 },
+  { slug: 'mantra', title: 'Daily Mantra', titleHi: 'दैनिक मंत्र', body: 'A few minutes of japa.', bodyHi: 'कुछ क्षण जप के लिए।', hour: 7, minute: 0, icon: 'sparkle', order: 4 },
+];
+
+const TONES_SEED = [
+  { slug: 'bell', title: 'Temple Bell', titleHi: 'मंदिर की घंटी', desc: 'A single ghanta strike', descHi: 'एक घंटा नाद', sound: 'bell', icon: 'bell', order: 0 },
+  { slug: 'aarti', title: 'Aarti Ambience', titleHi: 'आरती ध्वनि', desc: 'Drone and bells', descHi: 'ध्वनि एवं घंटियाँ', sound: 'aarti', icon: 'music', order: 1 },
+  { slug: 'default', title: 'Phone Default', titleHi: 'फ़ोन का डिफ़ॉल्ट', desc: 'Whatever your phone uses', descHi: 'जो आपके फ़ोन में सेट है', sound: null, icon: 'settings', order: 2 },
+  { slug: 'silent', title: 'Silent', titleHi: 'मौन', desc: 'Show it, but stay quiet', descHi: 'सूचना दिखे, ध्वनि नहीं', sound: '', icon: 'close', order: 3 },
+];
+
+const WALLPAPER_STYLES_SEED = [
+  { slug: 'sanctum', title: 'Sanctum', titleHi: 'गर्भगृह', order: 0 },
+  { slug: 'dawn', title: 'Dawn', titleHi: 'उषा', order: 1 },
+  { slug: 'night', title: 'Night', titleHi: 'रात्रि', order: 2 },
+];
+
 /** Give already-seeded aartis the category the Bhajan shelves need. */
 async function backfillAartis() {
   let touched = 0;
@@ -199,6 +228,10 @@ async function seedContent() {
   if ((await Aarti.countDocuments()) > 0) await backfillAartis();
   if ((await Temple.countDocuments()) === 0) await Temple.insertMany(TEMPLES);
   if ((await Aarti.countDocuments()) === 0) await Aarti.insertMany(AARTIS);
+  if ((await Reminder.countDocuments()) === 0) await Reminder.insertMany(REMINDERS_SEED);
+  if ((await Tone.countDocuments()) === 0) await Tone.insertMany(TONES_SEED);
+  if ((await WallpaperStyle.countDocuments()) === 0)
+    await WallpaperStyle.insertMany(WALLPAPER_STYLES_SEED);
   if ((await Festival.countDocuments()) === 0) await Festival.insertMany(FESTIVALS);
   if ((await Seva.countDocuments()) === 0) await Seva.insertMany(BUNDLED.sevas);
   if ((await Faq.countDocuments()) === 0) await Faq.insertMany(BUNDLED.faqs);

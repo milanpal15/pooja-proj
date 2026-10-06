@@ -99,7 +99,11 @@ export const REMINDERS: ReminderDef[] = [
  * development build. Choosing what this app plays is real, works today, and
  * is what most devotees actually mean by the setting.
  */
-export type ToneId = 'bell' | 'aarti' | 'default' | 'silent';
+/**
+ * A tone's slug. Open, not a union: tones are rows in the dashboard now, so
+ * the app cannot know their names at compile time.
+ */
+export type ToneId = string;
 
 export type ToneDef = {
   id: ToneId;

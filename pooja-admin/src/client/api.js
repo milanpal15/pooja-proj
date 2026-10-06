@@ -106,6 +106,9 @@ export const api = {
   settings: resource('settings'),
   horoscopes: resource('horoscopes'),
   panchangs: resource('panchangs'),
+  reminders: resource('reminders'),
+  tones: resource('tones'),
+  wallpaperStyles: resource('wallpaper-styles'),
 
   /** A whole day's readings, read and written in one call. */
   horoscopeDay: (date) => req(`/horoscope/day/${date}`),

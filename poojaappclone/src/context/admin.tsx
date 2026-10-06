@@ -37,14 +37,13 @@ export type FeatureKey =
   | 'liveDarshan'
   | 'payments'
   | 'announcements'
-  | 'phoneAuth'
-  | 'demoContent';
+  | 'phoneAuth';
 
 export type Flags = Record<FeatureKey, boolean>;
 
 /*
  * Every flag defaults ON so an unreachable backend hides nothing — except
- * `phoneAuth` and `demoContent`, which default OFF.
+ * `phoneAuth`, which defaults OFF.
  *
  * The usual fail-open reasoning inverts here. Firebase stopped sending
  * verification SMS on the free Spark plan in September 2024; it now needs a
@@ -62,20 +61,6 @@ const DEFAULT_FLAGS: Flags = {
   payments: true,
   announcements: true,
   phoneAuth: false,
-  /*
-   * `demoContent` is the other inversion, for the opposite reason.
-   *
-   * It decides whether the app may fall back to the catalogue compiled into
-   * the bundle when the dashboard has nothing to show. Defaulting it ON
-   * would mean an empty or unreachable backend silently renders invented
-   * deities and temples that no operator can edit — the dashboard looks
-   * broken and the app looks fine, which is the worst way round.
-   *
-   * Off, the app shows exactly what the backend returned, empty states and
-   * all. Turn it on to demo the app, or to keep something on screen while
-   * a fresh deployment is still being filled.
-   */
-  demoContent: false,
 };
 
 export const FEATURE_META: { key: FeatureKey; label: string; desc: string }[] = [
@@ -87,7 +72,6 @@ export const FEATURE_META: { key: FeatureKey; label: string; desc: string }[] = 
   { key: 'payments', label: 'Payments', desc: 'Razorpay checkout' },
   { key: 'announcements', label: 'Announcements', desc: 'Temple banners' },
   { key: 'phoneAuth', label: 'Mobile OTP Sign-in', desc: 'Needs Firebase Blaze billing' },
-  { key: 'demoContent', label: 'Demo Content', desc: 'Use bundled data when the dashboard is empty' },
 ];
 
 export type PaymentLog = {

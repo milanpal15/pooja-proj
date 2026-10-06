@@ -21,6 +21,9 @@ import {
   Setting,
   Temple,
   User,
+  Reminder,
+  Tone,
+  WallpaperStyle,
 } from './models.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -75,6 +78,9 @@ content.use('/sevas', crud('Seva', Seva));
 content.use('/knowledge', crud('Knowledge', Knowledge));
 content.use('/faqs', crud('Faq', Faq));
 content.use('/hero', crud('HeroSlide', HeroSlide));
+content.use('/reminders', crud('Reminder', Reminder));
+content.use('/tones', crud('Tone', Tone));
+content.use('/wallpaper-styles', crud('WallpaperStyle', WallpaperStyle));
 content.use('/settings', crud('Setting', Setting, { key: 1 }));
 content.use('/horoscopes', crud('Horoscope', Horoscope, { date: -1, rashi: 1 }));
 content.use('/panchangs', crud('Panchang', Panchang, { date: -1 }));
@@ -283,8 +289,21 @@ panchang.get('/panchang', async (req, res) => {
 // The app fetches all enabled content in one call.
 export const publicContent = Router();
 publicContent.get('/content', async (_req, res) => {
-  const [deities, temples, aartis, festivals, sevas, knowledge, faqs, hero, settingRows, announcement] =
-    await Promise.all([
+  const [
+    deities,
+    temples,
+    aartis,
+    festivals,
+    sevas,
+    knowledge,
+    faqs,
+    hero,
+    reminders,
+    tones,
+    wallpaperStyles,
+    settingRows,
+    announcement,
+  ] = await Promise.all([
       Deity.find({ enabled: true }).sort({ order: 1 }).lean(),
       Temple.find({ enabled: true }).sort({ order: 1 }).lean(),
       Aarti.find({ enabled: true }).sort({ order: 1 }).lean(),
@@ -293,6 +312,9 @@ publicContent.get('/content', async (_req, res) => {
       Knowledge.find({ enabled: true }).sort({ order: 1 }).lean(),
       Faq.find({ enabled: true }).sort({ order: 1 }).lean(),
       HeroSlide.find({ enabled: true }).sort({ order: 1 }).lean(),
+      Reminder.find({ enabled: true }).sort({ order: 1 }).lean(),
+      Tone.find({ enabled: true }).sort({ order: 1 }).lean(),
+      WallpaperStyle.find({ enabled: true }).sort({ order: 1 }).lean(),
       Setting.find().lean(),
       // The newest live modal announcement doubles as the darshan banner,
       // which used to be one hardcoded i18n string on every temple.
@@ -311,6 +333,9 @@ publicContent.get('/content', async (_req, res) => {
     knowledge,
     faqs,
     hero,
+    reminders,
+    tones,
+    wallpaperStyles,
     settings,
     announcement: announcement
       ? { title: announcement.title, body: announcement.bodyMd, severity: announcement.severity }

@@ -6,7 +6,7 @@ import { Card, Icon, Screen, SectionBand, Type } from '@/components/ui';
 import { AppBar } from '@/components/ui/surface';
 import { ADMIN_API } from '@/constants/config';
 import { useLanguage } from '@/context/language';
-import { clock, computePanchang, periodText } from '@/lib/panchang';
+import { clock, computePanchang, DEFAULT_PLACE, periodText } from '@/lib/panchang';
 import { Radius, Space, useTheme } from '@/theme';
 import { useContent } from '@/context/content';
 
@@ -35,16 +35,6 @@ function dayKey(d: Date) {
   return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`;
 }
 
-/**
- * Varanasi, when nothing better is available.
- *
- * Not content standing in for content: a panchang is *computed* from a
- * latitude and longitude, so there has to be one, and refusing to show
- * sunrise because the dashboard has no temple yet would be absurd. The
- * dashboard's first temple is preferred, and the device's own location
- * beats both.
- */
-const DEFAULT_PLACE = { lat: 25.3109, lng: 83.0107, label: 'Varanasi, Uttar Pradesh' };
 
 export default function PanchangScreen() {
   const { c } = useTheme();

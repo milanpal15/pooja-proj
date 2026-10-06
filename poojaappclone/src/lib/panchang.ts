@@ -24,6 +24,16 @@ import * as SunCalc from 'suncalc';
 
 export type Period = { start: Date; end: Date };
 
+/**
+ * Varanasi, when nothing better is available.
+ *
+ * Not content standing in for content: a panchang is computed from a
+ * latitude and longitude, so there has to be a pair. The dashboard's first
+ * temple is preferred where a screen has one, and the device's own location
+ * beats both.
+ */
+export const DEFAULT_PLACE = { lat: 25.3109, lng: 83.0107, label: 'Varanasi, Uttar Pradesh' };
+
 export type Panchang = {
   date: Date;
   /** Weekday in the Hindu reckoning. */

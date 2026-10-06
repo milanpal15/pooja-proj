@@ -7,13 +7,22 @@ import {
   View,
 } from 'react-native';
 
-import { Card, Icon, Screen, SectionBand, Type, useToast } from '@/components/ui';
+import {
+  Card,
+  Icon,
+  Screen,
+  SectionBand,
+  Type,
+  type IconName,
+  useToast,
+} from '@/components/ui';
 import { AppBar } from '@/components/ui/surface';
-import { TONES, type ToneId } from '@/constants/reminders';
 import { SOUNDS } from '@/constants/sounds';
 import { useLanguage } from '@/context/language';
 import { useReminders } from '@/hooks/use-reminders';
 import { Radius, Space, useTheme } from '@/theme';
+import { type ToneId } from '@/constants/reminders';
+import { useContent } from '@/context/content';
 
 /**
  * Alert tone — the "Ringtone" tile.
@@ -29,6 +38,7 @@ import { Radius, Space, useTheme } from '@/theme';
  * and is what most devotees actually want from this.
  */
 export default function RingtoneScreen() {
+  const { tones } = useContent();
   const { c } = useTheme();
   const { lang } = useLanguage();
   const toast = useToast();
@@ -149,16 +159,18 @@ export default function RingtoneScreen() {
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <SectionBand title={hi ? 'ध्वनि चुनें' : 'Choose a tone'} tone="gold">
-          {TONES.map((tone, i) => {
-            const on = state.tone === tone.id;
+          {tones.map((tone, i) => {
+            const on = state.tone === tone.slug;
             return (
-              <View key={tone.id}>
+              <View key={tone.slug}>
                 <Pressable
                   accessibilityRole="radio"
                   accessibilityState={{ selected: on }}
                   onPress={() => {
-                    setTone(tone.id);
-                    preview(tone.id, tone.preview);
+                    setTone(tone.slug);
+                    // Only the two bundled tones can be previewed in-app;
+                    // a URL tone has nothing loaded to play here.
+                    preview(tone.slug, tone.sound === 'bell' || tone.sound === 'aarti' ? tone.sound : null);
                   }}
                   style={({ pressed }) => [styles.tone, pressed && { opacity: 0.8 }]}>
                   <View
@@ -167,7 +179,7 @@ export default function RingtoneScreen() {
                       { backgroundColor: on ? c.primaryContainer : c.containerLow },
                     ]}>
                     <Icon
-                      name={playing === tone.id ? 'pause' : tone.icon}
+                      name={playing === tone.slug ? 'pause' : ((tone.icon ?? 'bell') as IconName)}
                       size={20}
                       color={on ? c.primary : c.onSurfaceFaint}
                     />
@@ -189,7 +201,7 @@ export default function RingtoneScreen() {
                   </View>
                 </Pressable>
 
-                {i < TONES.length - 1 && (
+                {i < tones.length - 1 && (
                   <View style={[styles.rule, { backgroundColor: c.outlineVariant }]} />
                 )}
               </View>
