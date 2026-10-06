@@ -1,4 +1,4 @@
-import type { Deity } from './temples';
+import type { DeitySlug } from './temples';
 
 /**
  * Seva catalogue for **real** pooja booking — a priest performs the ritual at
@@ -29,7 +29,7 @@ export type Seva = {
   /** Roughly how long the rite takes, for expectation-setting. */
   duration: string;
   /** Deities this seva is appropriate for; omitted means universal. */
-  deities?: Deity[];
+  deities?: DeitySlug[];
 };
 
 export const SEVAS: Seva[] = [
@@ -79,7 +79,7 @@ export const SEVAS: Seva[] = [
 ];
 
 /** Sevas appropriate for a temple's presiding deity. */
-export function sevasFor(deity: Deity): Seva[] {
+export function sevasFor(deity: DeitySlug): Seva[] {
   return SEVAS.filter((s) => !s.deities || s.deities.includes(deity));
 }
 

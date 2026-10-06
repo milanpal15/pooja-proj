@@ -45,7 +45,7 @@ export default function BookingScreen() {
    * used to need a store release.
    */
   const sevas = useMemo(
-    () => sevasFor({ templeSlug: temple.id, deitySlug: temple.deity.toLowerCase() }),
+    () => sevasFor({ templeSlug: temple.id, deitySlug: temple.deity }),
     [sevasFor, temple.id, temple.deity],
   );
   /** Courier fee, also admin-set; the bundled constant is the fallback. */

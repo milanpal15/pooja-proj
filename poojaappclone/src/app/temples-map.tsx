@@ -17,23 +17,19 @@ import { TempleGlyph } from '@/components/pooja/temple-glyph';
 import { mixHex } from '@/constants/color';
 import { MAP_H, MAP_W, TEMPLES, type Temple } from '@/constants/temples';
 import { BottomTabInset } from '@/constants/theme';
+import { useContent } from '@/context/content';
 import { useLanguage } from '@/context/language';
 
 const SPRING = { damping: 20, stiffness: 120, mass: 0.9 } as const;
 const MAX_SCALE = 2.4;
 const FOCUS_SCALE = 1.4;
 
-/** Each temple's presiding deity → the matching murti id on the mandir screen. */
-const DEITY_ROUTE: Record<Temple['deity'], string> = {
-  Shiva: 'shiva',
-  Ganesha: 'ganesh',
-  Devi: 'durga',
-  Vishnu: 'vishnu',
-};
-
 export default function TemplesScreen() {
   const router = useRouter();
   const { t } = useLanguage();
+  // Temples now carry their deity's slug; the display name comes from the
+  // dashboard so an admin-added deity reads correctly here too.
+  const { deityName } = useContent();
   const [selected, setSelected] = useState<Temple | null>(null);
 
   // Camera over the map canvas: one shared transform, not per-marker motion.
@@ -179,7 +175,7 @@ export default function TemplesScreen() {
                 <View style={styles.cardText}>
                   <Text style={styles.cardName}>{selected.name}</Text>
                   <Text style={[styles.cardDeity, { color: selected.accent }]}>
-                    {selected.deity}
+                    {deityName(selected.deity)}
                   </Text>
                   <Text style={styles.cardAarti}>{selected.aarti}</Text>
                   <View style={styles.chips}>
@@ -197,7 +193,7 @@ export default function TemplesScreen() {
                     pathname: '/pooja',
                     // `ts` is a nonce so re-selecting the same deity still restarts
                     // the aarti (identical params would otherwise skip the reset).
-                    params: { deity: DEITY_ROUTE[selected.deity], ts: String(Date.now()) },
+                    params: { deity: selected.deity, ts: String(Date.now()) },
                   })
                 }
                 style={[styles.cta, { backgroundColor: selected.accent }]}>

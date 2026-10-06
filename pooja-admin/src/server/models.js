@@ -488,4 +488,16 @@ export const DEFAULT_FLAGS = [
    * day billing is enabled; no app release needed.
    */
   { key: 'phoneAuth', label: 'Mobile OTP Sign-in', desc: 'Needs Firebase Blaze billing', enabled: false },
+  /**
+   * Whether the app may fall back to the catalogue compiled into its bundle
+   * when this dashboard has nothing to show.
+   *
+   * **Off by default**, like `phoneAuth`, and for a comparable reason: on,
+   * an empty or unreachable backend renders invented deities and temples
+   * that no operator can edit — the dashboard looks broken while the app
+   * looks fine. Off, the app shows exactly what this returns, empty states
+   * included. Turn it on to demo the app, or to keep something on screen
+   * while a fresh deployment is still being filled.
+   */
+  { key: 'demoContent', label: 'Demo Content', desc: 'Use the app\'s bundled data when this dashboard is empty', enabled: false },
 ];

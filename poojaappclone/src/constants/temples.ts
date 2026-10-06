@@ -5,12 +5,21 @@
  * user swipes between them.
  */
 
-export type Deity = 'Shiva' | 'Ganesha' | 'Devi' | 'Vishnu';
+/**
+ * Which deity a temple is dedicated to, as the deity's slug.
+ *
+ * This was a display label ('Shiva' | 'Ganesha' | 'Devi' | 'Vishnu'), which
+ * made it a lossy encoding of the slug every consumer actually wanted:
+ * `booking.tsx` recovered one with `.toLowerCase()`, and 'Ganesha' lowercases
+ * to `ganesha`, which matches no deity — so its seva lookup silently found
+ * nothing. The slug is the real value; screens look the display name up.
+ */
+export type DeitySlug = string;
 
 export type Temple = {
   id: string;
   name: string;
-  deity: Deity;
+  deity: DeitySlug;
   /** Short devanagari mark drawn on the idol's halo. */
   mark: string;
   location: string;
@@ -38,7 +47,7 @@ export const TEMPLES: Temple[] = [
   {
     id: 'kashi',
     name: 'Kashi Vishwanath',
-    deity: 'Shiva',
+    deity: 'shiva',
     mark: 'ॐ',
     location: 'Varanasi, Uttar Pradesh',
     aarti: 'Mangala Aarti · 3:00 AM',
@@ -53,7 +62,7 @@ export const TEMPLES: Temple[] = [
   {
     id: 'siddhivinayak',
     name: 'Shree Siddhivinayak',
-    deity: 'Ganesha',
+    deity: 'ganesh',
     mark: 'श्री',
     location: 'Prabhadevi, Mumbai',
     aarti: 'Kakad Aarti · 5:30 AM',
@@ -68,7 +77,7 @@ export const TEMPLES: Temple[] = [
   {
     id: 'meenakshi',
     name: 'Meenakshi Amman',
-    deity: 'Devi',
+    deity: 'durga',
     mark: 'ऐं',
     location: 'Madurai, Tamil Nadu',
     aarti: 'Palliyarai Pooja · 9:30 PM',
@@ -83,7 +92,7 @@ export const TEMPLES: Temple[] = [
   {
     id: 'jagannath',
     name: 'Jagannath Dham',
-    deity: 'Vishnu',
+    deity: 'vishnu',
     mark: 'हरि',
     location: 'Puri, Odisha',
     aarti: 'Sandhya Aarti · 7:00 PM',
@@ -98,7 +107,7 @@ export const TEMPLES: Temple[] = [
   {
     id: 'tirupati',
     name: 'Tirumala Balaji',
-    deity: 'Vishnu',
+    deity: 'vishnu',
     mark: 'ॐ',
     location: 'Tirumala, Andhra Pradesh',
     aarti: 'Suprabhata Seva · 4:30 AM',

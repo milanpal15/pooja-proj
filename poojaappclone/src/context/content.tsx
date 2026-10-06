@@ -3,9 +3,12 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { ImageSourcePropType } from 'react-native';
 
 import { ADMIN_API } from '@/constants/config';
+import { type CrownKind, type Deity, DEITIES as BUNDLED_DEITIES } from '@/constants/deities';
 import { DEITY_IMAGES } from '@/constants/deity-images';
 import { type Festival, FESTIVALS } from '@/constants/home';
 import { SEVAS as BUNDLED_SEVAS, type Seva } from '@/constants/poojas';
+import { type Temple, TEMPLES as BUNDLED_TEMPLES } from '@/constants/temples';
+import { useAdmin } from '@/context/admin';
 
 /** Shapes returned by the admin backend's public `/api/content` endpoint. */
 export type RemoteDeity = {
@@ -47,6 +50,24 @@ export type RemoteTemple = {
   /** 0–5. Absent when nobody has entered one — do not invent a default. */
   rating?: number;
   reviews?: number;
+  /** A YouTube or direct stream URL. Empty means this temple is not live. */
+  liveUrl?: string;
+  /**
+   * Presentation, as the sanctum re-themes itself per temple, plus where the
+   * pilgrimage map puts the pin and where the temple actually is. All used
+   * to live only in `constants/temples.ts`, so a temple added from the
+   * dashboard had no colours and no pin.
+   */
+  mark?: string;
+  backdropFrom?: string;
+  backdropTo?: string;
+  accent?: string;
+  trim?: string;
+  idol?: string;
+  mapX?: number;
+  mapY?: number;
+  lat?: number;
+  lng?: number;
 };
 export type RemoteAarti = {
   _id: string;
@@ -149,6 +170,22 @@ type ContentContextValue = Content & {
    */
   deityArt: (id: string) => ImageSourcePropType | undefined;
   /**
+   * The deities and temples the screens render, in the app's own shape.
+   *
+   * These are the lists to use. The raw `deities` / `temples` arrays spread
+   * in above are the dashboard's rows, kept for the few places that need a
+   * field the app shape does not carry (darshan reads `liveUrl`).
+   *
+   * Empty is a real answer: with `demoContent` off and nothing published,
+   * screens show their empty state rather than the bundled catalogue.
+   */
+  deityList: Deity[];
+  templeList: Temple[];
+  /** Whether bundled demo content is standing in for an empty dashboard. */
+  demo: boolean;
+  /** A deity's display name for a slug; the slug itself if unknown. */
+  deityName: (slug: string) => string;
+  /**
    * Whether a temple accepts real pooja bookings, per the admin dashboard.
    *
    * Only an explicit `false` disables. An unknown temple — backend
@@ -239,6 +276,12 @@ export function assetUrl(url?: string): string | undefined {
 const ContentContext = createContext<ContentContextValue>({
   ...EMPTY,
   loading: true,
+  // Outside a provider nothing has been fetched, so there is nothing to
+  // show — the same answer the provider gives with demoContent off.
+  deityList: [],
+  templeList: [],
+  demo: false,
+  deityName: (slug) => slug,
   deityImage: () => undefined,
   // Outside a provider there is no dashboard, so the bundled murti is it.
   deityArt: (id) => DEITY_IMAGES[id],
@@ -250,6 +293,79 @@ const ContentContext = createContext<ContentContextValue>({
   settingText: () => '',
   sevasFor: () => BUNDLED_SEVAS,
 });
+
+/*
+ * Turning dashboard rows into what the screens draw.
+ *
+ * The app's `Deity` and `Temple` carry rendering parameters the dashboard
+ * may leave blank — a deity created there has a name long before anyone
+ * picks its robe colour. These defaults are NOT content: they are how the
+ * sanctum draws an unstyled record, and they apply whether or not demo
+ * content is enabled. Falling back to a whole bundled *catalogue* is a
+ * different thing, and that is what the flag controls.
+ */
+const DRAWN = {
+  body: '#D9C7A7',
+  robe: '#C8862F',
+  accent: '#FFC13D',
+  trim: '#E4572E',
+  crown: 'plain' as CrownKind,
+};
+
+const TEMPLE_DRAWN = {
+  backdrop: ['#2A1206', '#120703'] as [string, string],
+  accent: '#FFC13D',
+  trim: '#E4572E',
+  idol: '#D9C7A7',
+};
+
+const CROWNS: CrownKind[] = ['jata', 'mukut', 'tall', 'plain'];
+const asCrown = (v?: string): CrownKind =>
+  CROWNS.includes(v as CrownKind) ? (v as CrownKind) : DRAWN.crown;
+
+function toDeity(r: RemoteDeity, art?: ImageSourcePropType): Deity {
+  return {
+    id: r.slug,
+    name: r.name,
+    title: r.title ?? r.name,
+    body: r.body || DRAWN.body,
+    robe: r.robe || DRAWN.robe,
+    accent: r.accent || DRAWN.accent,
+    trim: r.trim || DRAWN.trim,
+    crown: asCrown(r.crown),
+    crescent: r.crescent,
+    serpent: r.serpent,
+    elephant: r.elephant,
+    mace: r.mace,
+    image: art,
+    mark: r.mark ?? '',
+    mantra: r.mantra ?? '',
+    offerings: r.offerings ?? [],
+  };
+}
+
+function toTemple(r: RemoteTemple, deity: Deity): Temple {
+  return {
+    id: r.slug,
+    name: r.name,
+    // The slug, not the deity object: `Temple.deity` is a reference, and
+    // every consumer wanted the slug back out of it.
+    deity: deity.id,
+    mark: r.mark || deity.mark,
+    location: r.location ?? '',
+    aarti: r.aartiTime ?? '',
+    offerings: r.offerings ?? [],
+    backdrop: [
+      r.backdropFrom || TEMPLE_DRAWN.backdrop[0],
+      r.backdropTo || TEMPLE_DRAWN.backdrop[1],
+    ],
+    accent: r.accent || deity.accent || TEMPLE_DRAWN.accent,
+    trim: r.trim || TEMPLE_DRAWN.trim,
+    idol: r.idol || TEMPLE_DRAWN.idol,
+    map: { x: r.mapX ?? 0, y: r.mapY ?? 0 },
+    coords: { lat: r.lat ?? 0, lng: r.lng ?? 0 },
+  };
+}
 
 /** Where the last good /api/content response is kept. */
 const CACHE_KEY = 'pooja.content.v1';
@@ -270,6 +386,14 @@ const normalise = (data: Partial<Content> | null): Content => ({
 export function ContentProvider({ children }: { children: React.ReactNode }) {
   const [content, setContent] = useState<Content>(EMPTY);
   const [loading, setLoading] = useState(true);
+  /*
+   * `demoContent` decides whether an empty dashboard may be papered over
+   * with the catalogue compiled into this bundle. Off by default — see the
+   * note on DEFAULT_FLAGS. ContentProvider sits inside AdminProvider, so the
+   * flag is available here.
+   */
+  const { flags } = useAdmin();
+  const demo = flags.demoContent;
 
   /*
    * Cache first, then network.
@@ -327,9 +451,49 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
     );
     const templeBySlug = new Map(content.temples.map((tpl) => [tpl.slug, tpl]));
 
+    const artFor = (slug: string): ImageSourcePropType | undefined => {
+      const url = assetUrl(imageBySlug.get(slug));
+      return url ? { uri: url } : DEITY_IMAGES[slug];
+    };
+
+    /*
+     * What the screens draw.
+     *
+     * The dashboard is the source. Only when it has nothing at all — a fresh
+     * deployment, or a device that has never reached the backend — does the
+     * bundled catalogue stand in, and only with `demoContent` on. Off, an
+     * empty dashboard renders empty states, which is the honest answer and
+     * the one that makes the dashboard's own emptiness visible.
+     */
+    const deityList: Deity[] = content.deities.length
+      ? content.deities.map((d) => toDeity(d, artFor(d.slug)))
+      : demo
+        ? BUNDLED_DEITIES
+        : [];
+
+    const deityBySlug = new Map(deityList.map((d) => [d.id, d]));
+
+    const templeList: Temple[] = content.temples.length
+      ? content.temples.map((t) =>
+          toTemple(
+            t,
+            // A temple needs a deity to borrow its colours and mark from.
+            (t.deitySlug && deityBySlug.get(t.deitySlug)) ||
+              deityList[0] ||
+              toDeity({ slug: t.deitySlug ?? '', name: '' }),
+          ),
+        )
+      : demo
+        ? BUNDLED_TEMPLES
+        : [];
+
     return {
       ...content,
       loading,
+      demo,
+      deityList,
+      templeList,
+      deityName: (slug) => deityBySlug.get(slug)?.name ?? slug,
       deityImage: (id) => {
         const url = assetUrl(imageBySlug.get(id));
         return url ? { uri: url } : undefined;
@@ -375,7 +539,7 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
         return fromRemote.length ? fromRemote : filterUpcoming(FESTIVALS, limit);
       },
     };
-  }, [content, loading]);
+  }, [content, loading, demo]);
 
   return <ContentContext.Provider value={value}>{children}</ContentContext.Provider>;
 }
