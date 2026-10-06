@@ -1,0 +1,28 @@
+# Netlify hosts the dashboard: a static bundle, no server.
+#
+# The API is NOT here — it is a long-running Express process with a live
+# MongoDB connection, which Netlify has no runtime for. It runs on Render;
+# see render.yaml at the repo root.
+#
+# Set in the Netlify UI (Site settings → Environment variables), not here,
+# because it differs per deploy context and is not worth committing:
+#
+#   VITE_API_BASE = https://pooja-api.onrender.com
+#
+# It is read at BUILD time and baked into the bundle, so changing it needs
+# a redeploy, not a restart.
+
+[build]
+  base    = "pooja-admin"
+  command = "npm ci && npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20.19.4"
+
+# A single-page app: any path that is not a real file is a client route.
+# Must come last — Netlify applies the first matching rule.
+[[redirects]]
+  from   = "/*"
+  to     = "/index.html"
+  status = 200
