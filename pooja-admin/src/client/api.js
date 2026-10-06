@@ -8,11 +8,37 @@
  */
 const BASE = import.meta.env.VITE_API_BASE || '';
 
+/**
+ * Raised when the server says the admin session is missing or expired.
+ *
+ * A distinct type so the shell can swap in the login screen instead of
+ * rendering "Can't reach API" over what is really just a timed-out session.
+ */
+export class Unauthorized extends Error {
+  constructor() {
+    super('Admin sign-in required');
+    this.name = 'Unauthorized';
+  }
+}
+
+/** Notified on any 401, so the app can show the login screen immediately. */
+let onUnauthorized = () => {};
+export const setUnauthorizedHandler = (fn) => {
+  onUnauthorized = fn;
+};
+
 async function req(path, options) {
   const res = await fetch(`${BASE}/api${path}`, {
     headers: { 'Content-Type': 'application/json' },
+    // The admin session is an HttpOnly cookie; without this it is not sent
+    // when the dashboard and API are on different origins.
+    credentials: 'include',
     ...options,
   });
+  if (res.status === 401) {
+    onUnauthorized();
+    throw new Unauthorized();
+  }
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
   return res.json();
 }
@@ -30,6 +56,12 @@ function resource(name) {
 
 export const api = {
   base: BASE,
+
+  /* ------------------------------------------------------------ session -- */
+  session: () => req('/admin/session'),
+  login: (password) => req('/admin/login', { method: 'POST', body: JSON.stringify({ password }) }),
+  logout: () => req('/admin/logout', { method: 'POST' }),
+
   // Resolve a stored asset path (host-relative like `/uploads/x.png`, or an
   // older absolute URL) into a loadable URL for the dashboard.
   asset: (url) => (!url ? '' : /^https?:\/\//.test(url) ? url : `${BASE}${url}`),
@@ -81,7 +113,18 @@ export const api = {
   async upload(file) {
     const fd = new FormData();
     fd.append('file', file);
-    const res = await fetch(`${BASE}/api/content/upload`, { method: 'POST', body: fd });
+    // Not through `req`: multipart must not carry a JSON Content-Type, so
+    // this sets none and lets the browser write the boundary. It still needs
+    // the session cookie and the same 401 handling.
+    const res = await fetch(`${BASE}/api/content/upload`, {
+      method: 'POST',
+      body: fd,
+      credentials: 'include',
+    });
+    if (res.status === 401) {
+      onUnauthorized();
+      throw new Unauthorized();
+    }
     if (!res.ok) throw new Error('upload failed');
     return res.json();
   },

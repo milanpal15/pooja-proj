@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { api } from './api.js';
+import { api, setUnauthorizedHandler } from './api.js';
 import { ContentManager } from './ContentManager.jsx';
+import { Login } from './Login.jsx';
 import { HoroscopeCopyDay } from './HoroscopeCopyDay.jsx';
 import { Policies } from './Policies.jsx';
 import { Users } from './Users.jsx';
@@ -243,7 +244,37 @@ const SETTING_FIELDS = [
   { key: 'desc', label: 'Description', type: 'text' },
 ];
 
+/**
+ * The gate around the dashboard.
+ *
+ * Asks the server whether a password is configured and whether this browser
+ * already holds a session. Three outcomes: still asking (blank), no session
+ * (login), authed — or no password configured at all, which only happens in
+ * local development because production refuses to start that way.
+ */
 export function App() {
+  const [authed, setAuthed] = useState(null); // null = not yet known
+
+  const check = useCallback(() => {
+    api
+      .session()
+      .then((s) => setAuthed(!s.required || s.authed))
+      .catch(() => setAuthed(false));
+  }, []);
+
+  useEffect(() => {
+    check();
+    // Any 401 from anywhere in the app drops straight back to the login
+    // screen, so an expired session does not look like a broken dashboard.
+    setUnauthorizedHandler(() => setAuthed(false));
+  }, [check]);
+
+  if (authed === null) return null;
+  if (!authed) return <Login onAuthed={() => setAuthed(true)} />;
+  return <Dashboard onSignOut={() => api.logout().finally(() => setAuthed(false))} />;
+}
+
+function Dashboard({ onSignOut }) {
   const [tab, setTabState] = useState(() => decodeURIComponent(location.hash.slice(1)) || 'Overview');
   const [online, setOnline] = useState(true);
   // The Horoscope tab is scoped to one day: the bar and the table below it
@@ -287,6 +318,9 @@ export function App() {
           <span className="dot" /> {online ? 'API connected' : 'API offline'}
           <div className="api-base">{api.base}</div>
         </div>
+        <button className="nav sign-out" onClick={onSignOut}>
+          Sign out
+        </button>
       </aside>
 
       <main className="content">

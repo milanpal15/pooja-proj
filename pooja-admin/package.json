@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Admin dashboard for the Divine Temple Portal — Express API and React UI in one app.",
+  "description": "Admin dashboard for the Divine Temple Portal \u2014 Express API and React UI in one app.",
   "main": "src/server/index.js",
   "scripts": {
     "dev": "concurrently -n api,ui -c magenta,cyan \"npm:dev:api\" \"npm:dev:ui\"",
@@ -12,7 +12,8 @@
     "build": "vite build",
     "start": "npm run build && node src/server/index.js",
     "serve": "node src/server/index.js",
-    "seed": "node src/server/seed.js"
+    "seed": "node src/server/seed.js",
+    "smoke": "node scripts/smoke.mjs"
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -29,5 +30,8 @@
     "@vitejs/plugin-react": "^4.3.1",
     "concurrently": "^9.1.0",
     "vite": "^5.4.0"
+  },
+  "engines": {
+    "node": ">=20.19.4"
   }
 }

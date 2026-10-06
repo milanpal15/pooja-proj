@@ -7,6 +7,7 @@ import 'dotenv/config';
 import express from 'express';
 import morgan from 'morgan';
 
+import { assertAdminAuthReady, mountAdminAuth, requireAdmin } from './admin.js';
 import { announcements, policies } from './broadcast.js';
 import { auth } from './auth.js';
 import { content, horoscope, panchang, publicContent, UPLOAD_DIR, users } from './content.js';
@@ -17,17 +18,48 @@ const PORT = process.env.PORT || 4000;
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/pooja_admin';
 const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
 
+assertAdminAuthReady();
+
 const app = express();
-app.use(cors({ origin: CORS_ORIGIN === '*' ? true : CORS_ORIGIN.split(',') }));
+// `credentials` so the admin session cookie survives a cross-origin
+// dashboard; harmless when the UI is served from this same process.
+app.use(
+  cors({
+    origin: CORS_ORIGIN === '*' ? true : CORS_ORIGIN.split(','),
+    credentials: true,
+  }),
+);
 app.use(express.json());
 app.use(morgan('dev'));
 
 // NOTE: no `GET /` handler. It used to answer with an API banner, which
 // shadowed the dashboard once the UI started being served from here.
 // `/api/health` is the liveness check.
-app.get('/api/health', (_req, res) => res.json({ ok: true, uptime: process.uptime() }));
+/**
+ * Liveness, and which build is answering.
+ *
+ * `commit` is what lets CI tell a finished deploy from the old container
+ * still serving traffic — polling for "is it up" would pass instantly
+ * against the version being replaced. Render sets RENDER_GIT_COMMIT itself.
+ */
+app.get('/api/health', (_req, res) =>
+  res.json({
+    ok: true,
+    uptime: process.uptime(),
+    commit: process.env.RENDER_GIT_COMMIT || process.env.GIT_COMMIT || null,
+  }),
+);
 app.use('/uploads', express.static(UPLOAD_DIR));
+
+// Before the guard: these verify a Firebase ID token, which is a stronger
+// check than the admin password and belongs to the devotee, not the operator.
 app.use('/api/auth', auth); // Firebase-verified sign-in sync + profile
+
+// The gate. Everything registered after this needs an admin session unless
+// it is on the allowlist in admin.js — so a new route is private by default.
+mountAdminAuth(app);
+app.use('/api', requireAdmin);
+
 app.use('/api', router);
 app.use('/api', publicContent); // GET /api/content for the app
 app.use('/api', horoscope); // GET /api/horoscope?date=YYYY-MM-DD

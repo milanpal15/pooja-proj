@@ -115,6 +115,12 @@ origin — `api.js` has no absolute base URL any more.
 - `models.js` — `Flag, Visitor, Event, Payment, Deity, Temple, Aarti,
   Festival, Seva, Knowledge, Faq, HeroSlide, Setting, User, Policy,
   Announcement` + `DEFAULT_FLAGS`.
+- `admin.js` — **the gate**. `requireAdmin` is mounted at `/api` before every
+  router, with a **fail-closed allowlist** of the endpoints the phone app
+  needs; everything else wants an admin session. Also `POST /admin/login`,
+  `/admin/logout`, `GET /admin/session`. Sessions are a signed HttpOnly
+  `SameSite=Strict` cookie. **Production refuses to start without
+  `ADMIN_PASSWORD`**; locally it stays open with a warning.
 - `db.js` — Mongo connect; seeds flags and default content only when empty.
 - `routes.js` — flags, analytics, ingest, payments, visitors.
 - `content.js` — generic CRUD for `/deities /temples /aartis /festivals
@@ -136,9 +142,12 @@ origin — `api.js` has no absolute base URL any more.
 - `HoroscopeCopyDay.jsx` — the Horoscope tab's day bar. Picks the day the
   table below is scoped to, counts how much of it is published, and seeds it
   from the day before. It does **not** edit readings; see §5.
+- `Login.jsx` — the password gate. `App` asks `/api/admin/session` and
+  renders this or the dashboard; any 401 anywhere drops back to it.
 - `Users.jsx` — user list with block/unblock/delete.
 - `api.js` — API client. **Same-origin by default**; `api.asset(url)` resolves
-  relative upload paths.
+  relative upload paths. Sends `credentials: 'include'` (the session is an
+  HttpOnly cookie) and raises `Unauthorized` on 401.
 
 ## 3. How the two connect (READ THIS before debugging "flags/content don't apply")
 
@@ -395,6 +404,30 @@ anyone in. See `docs/FIREBASE_SETUP.md`.
 - **Don't invent social proof.** Ratings, review counts and the like are real
   data or they are hidden — `templeRating()` returns undefined rather than a
   default, and the row disappears.
+- **The admin API is fail-closed.** A new `/api` route is private unless you
+  add it to `PUBLIC` in `src/server/admin.js`. If the app starts getting 401s
+  after you add an endpoint, that is why — and it is the safe direction to
+  fail, because the alternative once exposed `DELETE /api/users/:id` (which
+  deletes the Firebase account too) to the open internet.
+- **CI deploys, Render does not.** `.github/workflows/ci.yml` runs the
+  dashboard build + a real boot against a Mongo service container +
+  `pooja-admin/scripts/smoke.mjs`, and the app's typecheck/lint; only a green
+  `main` triggers the Render deploy hook. `autoDeploy: false` in
+  `render.yaml` is what makes that the only path to production.
+- **`scripts/smoke.mjs` is the gate's regression test.** It asserts the
+  public endpoints answer 200 and every admin route answers 401, and it runs
+  twice — against localhost in CI, then against the deployed URL. Run it by
+  hand with `BASE=… ADMIN_PASSWORD=… npm run smoke`. Verified it fails (exit
+  1, 12 findings) against a server booted with the gate off.
+- **`/api/health` reports `commit`** (from `RENDER_GIT_COMMIT`). The deploy
+  job polls for the pushed SHA rather than for a 200, because the old
+  container keeps serving during a release and a plain health check passes
+  against the version being replaced.
+- **Deployment lives in `docs/DEPLOY.md`** — Render + Mongo Atlas, via
+  `pooja-admin/render.yaml`. Two things bite: uploads need a mounted disk
+  (`UPLOAD_DIR`) or they are wiped on every release, and
+  `EXPO_PUBLIC_ADMIN_API` is baked into the app bundle at build time, so
+  pointing the app at the deployed API needs a rebuild, not a reload.
 - **Feature flags default to ON when offline** — never assume a hidden feature
   means the flag is off; confirm the backend is reachable first.
 

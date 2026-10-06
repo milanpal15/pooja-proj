@@ -1,0 +1,255 @@
+# Deploying the admin dashboard
+
+Written for: whoever is putting `pooja-admin` on the internet for the first
+time. Takes about 30 minutes, most of it waiting.
+
+The dashboard is one Node service — Express serves both the API and the built
+React UI — plus a MongoDB database and a disk for uploaded images. Target
+here is **Render's free web service**, pointed at whatever MongoDB you
+already run.
+
+---
+
+## Before you start
+
+You need:
+
+- the GitHub repo (`milanpal15/pooja-proj`) up to date,
+- a [Render](https://render.com) account,
+- a MongoDB connection string **for a database of this app's own** — see
+  below, this is the step that goes wrong,
+- the Firebase service-account JSON for project `pooja-app-aa462`
+  (Firebase console → Project settings → Service accounts → Generate new
+  private key). **This is a secret.** It never goes in the repo.
+
+---
+
+## 1. The database
+
+### Give this app its own database
+
+This matters more than it looks. The app's models write to collections named
+`users`, `settings`, `events`, `visitors`, `payments`, `deities` and so on —
+all unprefixed. Point it at a database another system already uses and the
+two will share `users` and `settings` and quietly corrupt each other, and the
+dashboard's "delete devotee" will delete the other system's rows.
+
+The database name is the last path segment of the URI:
+
+```
+mongodb://USER:PASS@host:27019/pooja_admin
+                               ^^^^^^^^^^^ its own, not shared
+```
+
+A separate database on a server you already run is fine — it costs nothing
+and isolates the collections. Just make sure the user can create it, and that
+the name is not already in use. Verify before deploying:
+
+```bash
+# Lists what is already in there. Expect an empty list.
+mongosh "$MONGODB_URI" --eval 'db.getCollectionNames()'
+```
+
+If that prints another application's collections, **change the database
+name** and run it again.
+
+### Or use Atlas
+
+If you do not already run MongoDB: [Atlas](https://cloud.mongodb.com) M0 is
+free. Create a cluster near your devotees (Mumbai or Singapore), add a
+database user under **Database Access**, and allow `0.0.0.0/0` under
+**Network Access** — Render has no fixed egress IP on the lower plans, so
+the password is what protects it; use a long one. Then **Connect → Drivers**
+and append `/pooja_admin` to the string.
+
+### A note on `mongodb://` vs `mongodb+srv://`
+
+A plain `mongodb://` URI to a public IP is **unencrypted** — the password and
+every document cross the internet in clear text. Atlas (`mongodb+srv://`)
+forces TLS. If you are using your own server, either put it behind a VPN or
+enable TLS on mongod and add `?tls=true`.
+
+## 2. The service
+
+Render → **New → Blueprint** → pick this repo. It reads
+[`pooja-admin/render.yaml`](../pooja-admin/render.yaml), which already sets
+the build and start commands, the health check, and the non-secret
+environment.
+
+You will be prompted for the three secrets marked `sync: false`:
+
+| Variable | Value |
+|---|---|
+| `MONGODB_URI` | the string from step 1 — **its own database** |
+| `ADMIN_PASSWORD` | the dashboard password you choose — see below |
+| `FIREBASE_SERVICE_ACCOUNT` | the **entire** service-account JSON, on one line |
+
+For the Firebase one, flatten the file first:
+
+```bash
+jq -c . firebase-service-account.json | pbcopy
+```
+
+Paste that as the value. `ADMIN_SESSION_SECRET` is generated for you.
+
+First deploy takes a few minutes. When it is up you get a URL like
+`https://pooja-admin.onrender.com`.
+
+> **The free plan sleeps after 15 minutes idle** and takes ~30–50s to wake.
+> Fine for a dashboard you open a few times a day. Less fine for the phone
+> app, which calls `/api/content` on launch — it falls back to the bundled
+> catalogue while it waits, so nothing breaks, but a content change may not
+> show on the first launch after a quiet spell. Upgrading to Starter removes
+> the sleep and allows a disk; see Uploads.
+
+## 3. Turn on the pipeline
+
+[`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs on every push
+and pull request, and deploys from a green `main`. `render.yaml` sets
+`autoDeploy: false` precisely so that Render does not release anything this
+has not checked.
+
+What runs:
+
+| Job | What it proves |
+|---|---|
+| **dashboard** | `npm ci`, UI builds, the server actually **boots** against a real MongoDB 7 service container, and `scripts/smoke.mjs` passes — public endpoints open, every admin route 401, sign-in works |
+| **app** | `tsc --noEmit` and `expo lint` (needs no secrets — verified both pass without `.env`) |
+| **deploy** | only on `main`, only if both passed: hits the deploy hook, waits for **this commit** to be live, then runs the same smoke test against the real URL |
+
+Add these in **Settings → Secrets and variables → Actions**:
+
+| | Name | Value |
+|---|---|---|
+| Secret | `RENDER_DEPLOY_HOOK_URL` | Render → the service → Settings → Deploy Hook |
+| Variable | `DEPLOY_URL` | `https://pooja-admin.onrender.com` (no trailing slash) |
+| Secret *(optional)* | `SMOKE_ADMIN_PASSWORD` | same as `ADMIN_PASSWORD`; makes the post-deploy check exercise sign-in too |
+
+The deploy job waits for `/api/health` to report `github.sha`, not merely to
+answer. Polling for "is it up" would pass instantly against the old container
+still serving traffic during a release — Render sets `RENDER_GIT_COMMIT`, and
+health reports it.
+
+Two things this is designed to catch that a build cannot:
+
+- **a route added above `requireAdmin`** in `index.js` — looks harmless in
+  review, publishes `DELETE /api/users/:id` to the internet;
+- **an environment variable set wrong in Render** — the build is perfect and
+  the release still ships with no `ADMIN_PASSWORD`. The post-deploy smoke
+  test is the only thing that looks.
+
+Run the same check by hand any time:
+
+```bash
+cd pooja-admin
+BASE=https://pooja-admin.onrender.com ADMIN_PASSWORD=… npm run smoke
+```
+
+If you want a human to approve releases, add required reviewers to the
+`production` environment in repo settings — the deploy job already declares
+it, so it will start waiting with no change here.
+
+## 4. Point the app at it
+
+In `poojaappclone/.env`:
+
+```
+EXPO_PUBLIC_ADMIN_API=https://pooja-admin.onrender.com
+```
+
+Then rebuild the app (`npx expo run:android`). This value is baked into the
+JS bundle at build time, so changing it needs a new build, not a reload.
+
+Check it reached the right place:
+
+```bash
+curl https://pooja-admin.onrender.com/api/health
+curl https://pooja-admin.onrender.com/api/content | head -c 200
+```
+
+## 5. Seed the content
+
+Nothing to do: a fresh database seeds itself with the bundled catalogue on
+first boot (`db.js` seeds only what is empty). Verified on a cold, empty
+database — 8 deities, 5 temples, 6 aartis, 16 festivals, 5 sevas, 9 FAQs and
+the settings table all appear. Sign in to the dashboard and adjust from
+there.
+
+---
+
+## The dashboard password
+
+`ADMIN_PASSWORD` is the whole of the dashboard's security. Everything under
+`/api` that is not on the phone app's allowlist — all content CRUD, uploads,
+feature flags, analytics, and the Users tab that can **delete devotees and
+their Firebase accounts** — requires it.
+
+- **Production refuses to start without it.** That is deliberate: there is no
+  degraded mode where the admin API is open, because an open admin API is the
+  entire problem.
+- The allowlist of public endpoints lives in
+  [`src/server/admin.js`](../pooja-admin/src/server/admin.js) and is
+  **fail-closed** — a route added later is private unless it is listed. When
+  you add an endpoint the app needs, add it there too or the app will get 401.
+- Sessions are a signed HttpOnly `SameSite=Strict` cookie, good for 12 hours.
+- To change the password: edit the env var and redeploy. Existing sessions
+  survive, because `ADMIN_SESSION_SECRET` is independent of the password.
+
+Locally, leave `ADMIN_PASSWORD` unset and the dashboard stays open with a
+warning on boot — a password on localhost is friction with nothing behind it.
+
+## Uploads
+
+**On the free plan, uploaded images are deleted on every deploy.** The
+container filesystem is rebuilt each release and the free plan cannot mount a
+disk, so artwork uploaded through the dashboard disappears — silently, with
+nothing in the logs to say why. Three ways out, in order of effort:
+
+1. **Paste URLs instead of uploading.** Every image field accepts an absolute
+   URL as well as an upload. Host the artwork anywhere stable.
+2. **Upgrade to Starter** and give it a disk. Add this back to
+   `render.yaml`, alongside `plan: starter`:
+
+   ```yaml
+       disk:
+         name: uploads
+         mountPath: /var/data
+         sizeGB: 1
+   ```
+
+   and the env var that points multer at it:
+
+   ```yaml
+         - key: UPLOAD_DIR
+           value: /var/data/uploads
+   ```
+
+3. **Move to object storage.** Swap the multer disk storage in
+   `src/server/content.js` for an S3 or Cloudinary client. Nothing else
+   changes — the stored value is just a URL, and both clients already resolve
+   absolute URLs.
+
+## Operating it
+
+- **Logs**: Render → the service → Logs.
+- **Health**: `GET /api/health`, which is also what Render polls.
+- **Backups**: nothing is automatic. `mongodump` against the `MONGODB_URI`
+  on a schedule if the content matters.
+- **Redeploy**: push to `main`. CI checks it and deploys if green; Render's
+  own auto-deploy is off on purpose. To re-release without a commit, run the
+  workflow manually (Actions → CI → Run workflow).
+- **A deploy that fails the post-deploy smoke test** leaves the new version
+  running — the pipeline reports, it does not roll back. Use Render's
+  "Rollback" button, then fix forward.
+
+## Known gaps
+
+- **No HTTPS redirect or HSTS** is configured in the app; Render terminates
+  TLS and does not serve the service over plain HTTP, so this has not
+  mattered. It would behind your own proxy.
+- **No rate limiting** on `/api/admin/login`. The password is checked in
+  constant time, but nothing slows a determined guesser down — use a long
+  password, or put Cloudflare in front.
+- **`CORS_ORIGIN` is `*`.** Fine while the only browser client is the
+  same-origin dashboard; narrow it if you ever host the UI separately.
+- **Uploads are ephemeral on the free plan** — see Uploads above.

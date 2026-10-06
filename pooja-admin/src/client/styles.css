@@ -575,3 +575,75 @@ code {
   outline: none;
   border-color: var(--saffron);
 }
+
+/* ------------------------------------------------------------- sign-in -- */
+
+.login-wrap {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  padding: 24px;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 360px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 32px 28px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 8px 32px rgba(29, 28, 19, 0.08);
+}
+
+.login-mark {
+  font-size: 40px;
+  line-height: 1;
+  color: var(--saffron);
+}
+
+.login-card h1 {
+  margin: 4px 0 0;
+  font-size: 22px;
+}
+
+.login-card p.muted {
+  margin: 0 0 8px;
+}
+
+.login-card input {
+  width: 100%;
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 15px;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+.login-card input:focus {
+  outline: 2px solid var(--gold);
+  outline-offset: 1px;
+}
+
+.login-error {
+  margin: 0;
+  color: var(--primary);
+  font-size: 13px;
+}
+
+/* Pushed away from the nav list so signing out is never a misclick. */
+.nav.sign-out {
+  margin-top: 10px;
+  text-align: left;
+  color: var(--muted);
+}
+
+.nav.sign-out:hover {
+  color: var(--primary);
+}

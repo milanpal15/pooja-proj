@@ -1,0 +1,175 @@
+#
+# Checks on every push and pull request; deploy only from a green `main`.
+#
+# The deploy job is what makes this worth having. Render can auto-deploy on
+# push by itself, but it does so without knowing whether anything passed —
+# so `autoDeploy: false` in render.yaml hands that decision to this file.
+# Nothing reaches production without the admin gate having been proven shut,
+# before the release and again against the live URL.
+#
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch: # lets you re-run a deploy without an empty commit
+
+# One run per branch. A second push supersedes the first rather than racing
+# it to the same environment.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20.19.4' # matches render.yaml; below 20.19 `expo` dies on util.parseEnv
+
+jobs:
+  # ───────────────────────────────────────────────────────── dashboard ──
+  dashboard:
+    name: Dashboard — build, boot, prove the gate
+    runs-on: ubuntu-latest
+
+    services:
+      mongo:
+        image: mongo:7
+        ports: ['27017:27017']
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ping:1}).ok'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: pooja-admin/package-lock.json
+
+      - name: Install
+        working-directory: pooja-admin
+        run: npm ci
+
+      - name: Build the dashboard UI
+        working-directory: pooja-admin
+        run: npm run build
+
+      # Boots the real server against a real Mongo. A build that compiles but
+      # cannot start is not a passing build.
+      - name: Boot
+        working-directory: pooja-admin
+        env:
+          PORT: '4000'
+          MONGODB_URI: mongodb://127.0.0.1:27017/pooja_ci
+          ADMIN_PASSWORD: ci-only-password
+        run: |
+          node src/server/index.js > /tmp/server.log 2>&1 &
+          echo $! > /tmp/server.pid
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:4000/api/health >/dev/null 2>&1 && exit 0
+            sleep 1
+          done
+          echo "::error::server did not become healthy"
+          cat /tmp/server.log
+          exit 1
+
+      - name: Smoke test — public open, admin shut
+        working-directory: pooja-admin
+        env:
+          BASE: http://127.0.0.1:4000
+          ADMIN_PASSWORD: ci-only-password
+        run: npm run smoke
+
+      - name: Server log
+        if: always()
+        run: cat /tmp/server.log || true
+
+  # ─────────────────────────────────────────────────────────────── app ──
+  app:
+    name: App — typecheck and lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: poojaappclone/package-lock.json
+
+      - name: Install
+        working-directory: poojaappclone
+        run: npm ci
+
+      # No .env and no google-services.json here, deliberately: both are
+      # secrets, and both are only needed to BUILD the native app, not to
+      # typecheck or lint it. Verified these pass without them.
+      - name: Typecheck
+        working-directory: poojaappclone
+        run: npx tsc --noEmit
+
+      - name: Lint
+        working-directory: poojaappclone
+        run: npm run lint
+
+  # ──────────────────────────────────────────────────────────── deploy ──
+  deploy:
+    name: Deploy to Render
+    needs: [dashboard, app]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    # Add required reviewers to this environment in repo settings if you ever
+    # want a human to approve releases.
+    environment:
+      name: production
+      url: ${{ vars.DEPLOY_URL }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check it is configured
+        run: |
+          test -n "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" || {
+            echo "::error::RENDER_DEPLOY_HOOK_URL secret is not set. See docs/DEPLOY.md."
+            exit 1
+          }
+          test -n "${{ vars.DEPLOY_URL }}" || {
+            echo "::error::DEPLOY_URL variable is not set. See docs/DEPLOY.md."
+            exit 1
+          }
+
+      - name: Trigger the deploy
+        run: curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" -o /dev/null
+
+      # Polls for THIS commit rather than for "is it up": the old container
+      # keeps serving during a deploy, so a plain health check passes
+      # immediately against the version being replaced.
+      - name: Wait for this commit to be live
+        env:
+          DEPLOY_URL: ${{ vars.DEPLOY_URL }}
+          WANT: ${{ github.sha }}
+        run: |
+          echo "waiting for $WANT at $DEPLOY_URL"
+          for i in $(seq 1 90); do   # 90 × 10s = 15 min; free-tier builds are slow
+            GOT=$(curl -fsS --max-time 20 "$DEPLOY_URL/api/health" 2>/dev/null \
+                  | sed -n 's/.*"commit":"\([^"]*\)".*/\1/p')
+            if [ "$GOT" = "$WANT" ]; then echo "live after $((i*10))s"; exit 0; fi
+            echo "  [$i] serving ${GOT:-unknown}"
+            sleep 10
+          done
+          echo "::error::$WANT did not go live within 15 minutes"
+          exit 1
+
+      # The same assertions as pre-deploy, now against the real thing. This
+      # is the one that would catch an env var set wrong in Render — a build
+      # can be perfect and still ship with ADMIN_PASSWORD missing.
+      - name: Smoke test the deployment
+        working-directory: pooja-admin
+        env:
+          BASE: ${{ vars.DEPLOY_URL }}
+          # Optional. Set it to also exercise sign-in against production.
+          ADMIN_PASSWORD: ${{ secrets.SMOKE_ADMIN_PASSWORD }}
+        run: node scripts/smoke.mjs

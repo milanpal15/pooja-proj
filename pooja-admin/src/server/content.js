@@ -24,8 +24,15 @@ import {
 } from './models.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-// Project root, not src/ — this file lives at src/server/ now.
-export const UPLOAD_DIR = join(__dirname, '..', '..', 'uploads');
+/**
+ * Where uploaded artwork is written.
+ *
+ * Defaults to the project root (not src/ — this file lives at src/server/).
+ * UPLOAD_DIR overrides it, which is what a hosted deploy needs: the
+ * container filesystem is wiped on every release, so this has to point at a
+ * mounted disk or the images disappear with nothing in the logs to say why.
+ */
+export const UPLOAD_DIR = process.env.UPLOAD_DIR || join(__dirname, '..', '..', 'uploads');
 if (!existsSync(UPLOAD_DIR)) mkdirSync(UPLOAD_DIR, { recursive: true });
 
 const storage = multer.diskStorage({
