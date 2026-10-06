@@ -59,7 +59,7 @@ export default function SavedTemplesScreen() {
                 icon="temple"
                 size="md"
                 onPress={() => router.push('/temples')}
-                style={{ marginTop: Space.md }}
+                style={styles.emptyCta}
               />
             </View>
           ) : null
@@ -193,6 +193,18 @@ const styles = StyleSheet.create({
   },
   action: {
     flex: 1,
+  },
+  /*
+   * `alignSelf` is the point of this, not the margin.
+   *
+   * A Button that is not `block` sets `alignSelf: 'flex-start'` so it does
+   * not stretch to fill a column — which also overrides the centred
+   * container around it, leaving the call to action hard against the left
+   * edge under centred text.
+   */
+  emptyCta: {
+    marginTop: Space.md,
+    alignSelf: 'center',
   },
   emptyContainer: {
     paddingVertical: 60,
