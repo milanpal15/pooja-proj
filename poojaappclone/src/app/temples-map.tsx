@@ -15,7 +15,7 @@ import { MapTerrain } from '@/components/mandir/map-terrain';
 import { Glow } from '@/components/pooja/flame';
 import { TempleGlyph } from '@/components/pooja/temple-glyph';
 import { mixHex } from '@/constants/color';
-import { MAP_H, MAP_W, TEMPLES, type Temple } from '@/constants/temples';
+import { MAP_H, MAP_W, type Temple } from '@/constants/temples';
 import { BottomTabInset } from '@/constants/theme';
 import { useContent } from '@/context/content';
 import { useLanguage } from '@/context/language';
@@ -29,7 +29,7 @@ export default function TemplesScreen() {
   const { t } = useLanguage();
   // Temples now carry their deity's slug; the display name comes from the
   // dashboard so an admin-added deity reads correctly here too.
-  const { deityName } = useContent();
+  const { deityName, templeList } = useContent();
   const [selected, setSelected] = useState<Temple | null>(null);
 
   // Camera over the map canvas: one shared transform, not per-marker motion.
@@ -122,7 +122,7 @@ export default function TemplesScreen() {
     transform: [{ translateX: tx.value }, { translateY: ty.value }, { scale: scale.value }],
   }));
 
-  const theme = selected ?? TEMPLES[0];
+  const theme = selected ?? templeList[0];
 
   return (
     <View style={[styles.root, { backgroundColor: theme.backdrop[1] }]}>
@@ -131,7 +131,7 @@ export default function TemplesScreen() {
           <Text style={styles.eyebrow}>{t('pilgrimage_map')}</Text>
           <Text style={styles.title}>{selected ? selected.name : t('choose_temple')}</Text>
           <Text style={[styles.location, { color: theme.trim }]}>
-            {selected ? selected.location : `${TEMPLES.length} ${t('tap_marker')}`}
+            {selected ? selected.location : `${templeList.length} ${t('tap_marker')}`}
           </Text>
         </View>
 
@@ -143,11 +143,11 @@ export default function TemplesScreen() {
             <View style={styles.viewportInner}>
               <Animated.View style={[styles.canvas, cameraStyle]}>
                 <MapTerrain />
-                <Routes />
+                <Routes temples={templeList} />
                 {/* Clouds of varying density drift all across the map, above the
                     terrain but below the markers so pins stay visible/tappable. */}
                 <Clouds width={MAP_W} height={MAP_H} count={11} />
-                {TEMPLES.map((t) => (
+                {templeList.map((t) => (
                   <Marker
                     key={t.id}
                     temple={t}
@@ -210,11 +210,11 @@ export default function TemplesScreen() {
 }
 
 /** Dotted pilgrimage routes linking the temples in order. */
-function Routes() {
+function Routes({ temples }: { temples: Temple[] }) {
   const dots: { x: number; y: number; key: string }[] = [];
-  for (let i = 0; i < TEMPLES.length - 1; i++) {
-    const a = TEMPLES[i].map;
-    const b = TEMPLES[i + 1].map;
+  for (let i = 0; i < temples.length - 1; i++) {
+    const a = temples[i].map;
+    const b = temples[i + 1].map;
     const steps = Math.round(Math.hypot(b.x - a.x, b.y - a.y) / 22);
     for (let s = 1; s < steps; s++) {
       dots.push({

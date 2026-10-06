@@ -48,6 +48,7 @@ const STRINGS = {
     live: 'LIVE',
     // bhajan
     media_library: 'Premium Media Library',
+    bhajan_empty: 'No bhajans on this shelf yet. They appear once the temple adds them.',
     morning_mantras: 'Morning Mantras',
     evening_aarti: 'Evening Aarti',
     meditation_music: 'Meditation Music',
@@ -285,6 +286,7 @@ const STRINGS = {
     live: 'लाइव',
     // bhajan
     media_library: 'प्रीमियम मीडिया लाइब्रेरी',
+    bhajan_empty: 'इस श्रेणी में अभी कोई भजन नहीं। मंदिर द्वारा जोड़े जाते ही यहाँ दिखेंगे।',
     morning_mantras: 'प्रातः मंत्र',
     evening_aarti: 'संध्या आरती',
     meditation_music: 'ध्यान संगीत',

@@ -76,6 +76,8 @@ export type RemoteAarti = {
   deitySlug?: string;
   audioUrl?: string;
   duration?: string;
+  /** Which Bhajan shelf: morning | evening | meditation. */
+  category?: string;
 };
 
 export type RemoteFestival = {

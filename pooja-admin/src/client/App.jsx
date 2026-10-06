@@ -130,6 +130,17 @@ const AARTI_FIELDS = [
   { key: 'artist', label: 'Artist', type: 'text', col: true },
   { key: 'deitySlug', label: 'Deity slug', type: 'text' },
   { key: 'duration', label: 'Duration', type: 'text', col: true },
+  {
+    key: 'category',
+    label: 'Shelf',
+    type: 'select',
+    col: true,
+    options: [
+      { value: 'morning', label: 'Morning Mantras' },
+      { value: 'evening', label: 'Evening Aarti' },
+      { value: 'meditation', label: 'Meditation Music' },
+    ],
+  },
   { key: 'audioUrl', label: 'Audio', type: 'audio' },
   { key: 'order', label: 'Order', type: 'number' },
   { key: 'enabled', label: 'Visible', type: 'bool', col: true },

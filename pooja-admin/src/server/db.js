@@ -41,6 +41,19 @@ const BUNDLED = JSON.parse(
  * filled gets the bundled value. Running this on every boot is safe because
  * the second run finds nothing to do.
  */
+/** Give already-seeded aartis the category the Bhajan shelves need. */
+async function backfillAartis() {
+  let touched = 0;
+  for (const seed of AARTIS) {
+    const res = await Aarti.updateOne(
+      { title: seed.title, category: { $in: [null, undefined] } },
+      { $set: { category: seed.category } },
+    );
+    touched += res.modifiedCount ?? 0;
+  }
+  if (touched) console.log(`✓ Backfilled a category on ${touched} aartis`);
+}
+
 async function backfillDeities() {
   const fields = ['body', 'robe', 'trim', 'crown', 'offerings', 'accent', 'mark', 'mantra'];
   let touched = 0;
@@ -121,12 +134,12 @@ const TEMPLES = [
 ];
 
 const AARTIS = [
-  { title: 'Om Jai Jagdish Hare', artist: 'Anup Jalota', duration: '5:10', order: 0 },
-  { title: 'Hanuman Chalisa', artist: 'Hariharan', deitySlug: 'hanuman', duration: '7:30', order: 1 },
-  { title: 'Gayatri Mantra', artist: 'Suresh Wadkar', duration: '6:15', order: 2 },
-  { title: 'Shiv Tandav Stotram', artist: 'Shankar Mahadevan', deitySlug: 'shiva', duration: '8:02', order: 3 },
-  { title: 'Achyutam Keshavam', artist: 'Vivek Prakash', deitySlug: 'vishnu', duration: '5:45', order: 4 },
-  { title: 'Aigiri Nandini', artist: 'Rajalakshmee', deitySlug: 'durga', duration: '6:30', order: 5 },
+  { title: 'Om Jai Jagdish Hare', artist: 'Anup Jalota', duration: '5:10', category: 'evening', order: 0 },
+  { title: 'Hanuman Chalisa', artist: 'Hariharan', deitySlug: 'hanuman', duration: '7:30', category: 'morning', order: 1 },
+  { title: 'Gayatri Mantra', artist: 'Suresh Wadkar', duration: '6:15', category: 'morning', order: 2 },
+  { title: 'Shiv Tandav Stotram', artist: 'Shankar Mahadevan', deitySlug: 'shiva', duration: '8:02', category: 'evening', order: 3 },
+  { title: 'Achyutam Keshavam', artist: 'Vivek Prakash', deitySlug: 'vishnu', duration: '5:45', category: 'meditation', order: 4 },
+  { title: 'Aigiri Nandini', artist: 'Rajalakshmee', deitySlug: 'durga', duration: '6:30', category: 'meditation', order: 5 },
 ];
 
 /**
@@ -183,6 +196,7 @@ const HERO_SLIDES = [
 async function seedContent() {
   if ((await Deity.countDocuments()) === 0) await Deity.insertMany(DEITIES);
   else await backfillDeities();
+  if ((await Aarti.countDocuments()) > 0) await backfillAartis();
   if ((await Temple.countDocuments()) === 0) await Temple.insertMany(TEMPLES);
   if ((await Aarti.countDocuments()) === 0) await Aarti.insertMany(AARTIS);
   if ((await Festival.countDocuments()) === 0) await Festival.insertMany(FESTIVALS);

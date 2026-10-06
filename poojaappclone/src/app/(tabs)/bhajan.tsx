@@ -1,18 +1,20 @@
 import { useAudioPlayer } from 'expo-audio';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
   Card,
   Icon,
-  type IconName,
+  NoContent,
   Screen,
   Type,
+  type IconName,
   useScrollPadding,
 } from '@/components/ui';
 import { SOUNDS } from '@/constants/sounds';
 import { BottomTabInset } from '@/constants/theme';
+import { useContent } from '@/context/content';
 import { type StringKey, useLanguage } from '@/context/language';
 import { Radius, Space, useTheme } from '@/theme';
 
@@ -34,16 +36,14 @@ const CATEGORIES: { key: string; labelKey: StringKey; icon: IconName }[] = [
   { key: 'meditation', labelKey: 'meditation_music', icon: 'lotus' },
 ];
 
-const TRACKS = [
-  { id: 't1', title: 'Om Jai Jagdish Hare', artist: 'Anup Jalota', len: '5:10', category: 'evening' },
-  { id: 't2', title: 'Hanuman Chalisa', artist: 'Hariharan', len: '7:30', category: 'morning' },
-  { id: 't3', title: 'Gayatri Mantra', artist: 'Suresh Wadkar', len: '6:15', category: 'morning' },
-  { id: 't4', title: 'Shiv Tandav Stotram', artist: 'Shankar Mahadevan', len: '8:02', category: 'evening' },
-  { id: 't5', title: 'Achyutam Keshavam', artist: 'Vivek Prakash', len: '5:45', category: 'meditation' },
-  { id: 't6', title: 'Aigiri Nandini', artist: 'Rajalakshmee', len: '6:30', category: 'meditation' },
-];
-
-type Track = (typeof TRACKS)[number];
+/**
+ * A track, as the shelf renders it.
+ *
+ * The six tracks used to be a literal in this file while the dashboard
+ * managed six aartis of its own — two lists, neither visible to the other,
+ * and the one an operator could edit was the one nobody saw.
+ */
+type Track = { id: string; title: string; artist: string; len: string; category: string };
 
 export default function BhajanScreen() {
   return (
@@ -57,13 +57,25 @@ function BhajanBody() {
   const { c } = useTheme();
   const { t } = useLanguage();
   const scrollPad = useScrollPadding(96);
+  const { aartis } = useContent();
   const player = useAudioPlayer(SOUNDS.aarti);
   const [nowPlaying, setNowPlaying] = useState<Track | null>(null);
   const [playing, setPlaying] = useState(false);
   const [category, setCategory] = useState('morning');
 
-  // Filter tracks to the selected category.
-  const filteredTracks = TRACKS.filter((tr) => tr.category === category);
+  const tracks: Track[] = useMemo(
+    () =>
+      aartis.map((a) => ({
+        id: a._id,
+        title: a.title,
+        artist: a.artist ?? '',
+        len: a.duration ?? '',
+        category: a.category ?? 'morning',
+      })),
+    [aartis],
+  );
+
+  const filteredTracks = tracks.filter((tr) => tr.category === category);
 
   const play = useCallback(
     (track: Track) => {
@@ -128,6 +140,13 @@ function BhajanBody() {
         </View>
 
         <View style={styles.list}>
+          {filteredTracks.length === 0 && (
+            <NoContent
+              title={t('media_library')}
+              body={t('bhajan_empty')}
+            />
+          )}
+
           {filteredTracks.map((tr) => {
             const active = nowPlaying?.id === tr.id;
             return (

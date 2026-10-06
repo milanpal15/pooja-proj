@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import {
@@ -15,7 +15,6 @@ import {
   Type,
 } from '@/components/ui';
 import { AppBar } from '@/components/ui/surface';
-import { KNOWLEDGE_IDS, LORE } from '@/constants/knowledge';
 import { useAdmin } from '@/context/admin';
 import { useContent } from '@/context/content';
 import { useLanguage } from '@/context/language';
@@ -35,21 +34,52 @@ export default function KnowledgeScreen() {
   const router = useRouter();
   const { c } = useTheme();
   const { t, lang } = useLanguage();
-  const { deityArt, deityById, deityList } = useContent();
+  const { deityArt, deityById, deityList, knowledge } = useContent();
   const { flags } = useAdmin();
   const hi = lang === 'hi';
 
+  /*
+   * The lore is the dashboard's, keyed by deity slug. It used to be a 200
+   * line literal in constants/knowledge.ts, which the Knowledge tab could
+   * not touch — so the one copy an operator could edit was the one nobody
+   * ever read.
+   */
+  const loreBySlug = useMemo(
+    () => Object.fromEntries(knowledge.map((k) => [k.deitySlug, k])),
+    [knowledge],
+  );
+  // Only deities that actually have lore published get a chip.
+  const knowledgeIds = useMemo(
+    () => deityList.map((d) => d.id).filter((slug) => loreBySlug[slug]),
+    [deityList, loreBySlug],
+  );
+
   const { deity: param } = useLocalSearchParams<{ deity?: string }>();
   const [id, setId] = useState(() =>
-    KNOWLEDGE_IDS.includes(param as never) ? (param as string) : 'shiva',
+    knowledgeIds.includes(param as string) ? (param as string) : (knowledgeIds[0] ?? ''),
   );
 
   const deity = deityById(id);
-  const lore = LORE[id];
+  /*
+   * Dashboard rows may leave any section blank, which the bundled literal
+   * never did. Normalising here keeps each section below a plain map, and
+   * an empty array renders an empty band rather than crashing.
+   */
+  const entry = loreBySlug[id];
+  const lore = entry && {
+    ...entry,
+    facts: entry.facts ?? [],
+    texts: entry.texts ?? [],
+    textsHi: entry.textsHi ?? entry.texts ?? [],
+    festivals: entry.festivals ?? [],
+    festivalsHi: entry.festivalsHi ?? entry.festivals ?? [],
+  };
   const art = deityArt(id);
 
-  // Every hook has run; from here the dashboard may simply have no deities.
-  if (!deity) {
+  // Every hook has run. Two ways to have nothing: no deities at all, or a
+  // deity whose lore has not been written yet. The bundled literal made the
+  // second impossible, so nothing downstream expects it.
+  if (!deity || !lore) {
     return (
       <Screen tabBar={false}>
         <AppBar title={hi ? 'देवों का ज्ञान' : 'Knowledge of the Gods'} />
@@ -72,7 +102,7 @@ export default function KnowledgeScreen() {
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.chips}>
-          {KNOWLEDGE_IDS.map((k) => {
+          {knowledgeIds.map((k) => {
             const d = deityList.find((x) => x.id === k);
             return (
               <Chip
