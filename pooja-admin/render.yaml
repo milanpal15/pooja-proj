@@ -29,7 +29,10 @@ services:
     plan: free
     region: singapore # closest Render region to India
     rootDir: pooja-admin
-    buildCommand: npm ci && npm run build
+    # `--include=dev` is load-bearing: NODE_ENV=production below makes npm
+    # skip devDependencies, and vite — which builds the dashboard UI — is
+    # one. Without it the build dies with `sh: 1: vite: not found`.
+    buildCommand: npm ci --include=dev && npm run build
     # `serve`, not `start`: start would rebuild the UI on every boot.
     startCommand: npm run serve
     healthCheckPath: /api/health

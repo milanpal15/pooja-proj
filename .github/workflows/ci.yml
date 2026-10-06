@@ -49,9 +49,12 @@ jobs:
           cache: npm
           cache-dependency-path: pooja-admin/package-lock.json
 
+      # `--include=dev` mirrors render.yaml, where NODE_ENV=production
+      # otherwise drops vite and the build fails. Same command both places,
+      # so CI cannot pass on a build production will not reproduce.
       - name: Install
         working-directory: pooja-admin
-        run: npm ci
+        run: npm ci --include=dev
 
       - name: Build the dashboard UI
         working-directory: pooja-admin
