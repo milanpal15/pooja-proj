@@ -165,11 +165,20 @@ jobs:
 
           CODE=$(curl -sS -o /tmp/hook.out -w '%{http_code}' -X POST "$HOOK")
           echo "deploy hook responded $CODE"
-          if [ "$CODE" != "200" ] && [ "$CODE" != "201" ]; then
-            echo "::error::Deploy hook returned $CODE. A 404 means the service id or key in the URL is wrong — re-copy it from Render → Settings → Deploy Hook."
-            cat /tmp/hook.out
-            exit 1
+          if [ "$CODE" = "200" ] || [ "$CODE" = "201" ]; then
+            exit 0
           fi
+
+          # Each of these means something different, and the difference is
+          # the whole value of reading the log.
+          case "$CODE" in
+            404) echo "::error::404 — the service id or key in the hook URL is wrong. Re-copy it from Render → Settings → Deploy Hook." ;;
+            409) echo "::error::409 — Render is refusing to deploy this service. Usually it is suspended: free instance hours exhausted for the month, or suspended manually. Open the service in Render; the banner says which. The running instance keeps serving the OLD commit meanwhile." ;;
+            401|403) echo "::error::$CODE — the key in the hook URL is no longer valid. Regenerate the Deploy Hook in Render and re-set the secret." ;;
+            *) echo "::error::Deploy hook returned $CODE." ;;
+          esac
+          cat /tmp/hook.out
+          exit 1
 
       # Polls for THIS commit rather than for "is it up": the old container
       # keeps serving during a deploy, so a plain health check passes
