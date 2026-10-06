@@ -5,10 +5,10 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Card, Icon, Screen, SectionBand, Type } from '@/components/ui';
 import { AppBar } from '@/components/ui/surface';
 import { ADMIN_API } from '@/constants/config';
-import { TEMPLES } from '@/constants/temples';
 import { useLanguage } from '@/context/language';
 import { clock, computePanchang, periodText } from '@/lib/panchang';
 import { Radius, Space, useTheme } from '@/theme';
+import { useContent } from '@/context/content';
 
 /**
  * The daily panchang.
@@ -35,19 +35,30 @@ function dayKey(d: Date) {
   return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`;
 }
 
-/** Kashi Vishwanath — the fallback when location is unavailable. */
-const FALLBACK = TEMPLES[0];
+/**
+ * Varanasi, when nothing better is available.
+ *
+ * Not content standing in for content: a panchang is *computed* from a
+ * latitude and longitude, so there has to be one, and refusing to show
+ * sunrise because the dashboard has no temple yet would be absurd. The
+ * dashboard's first temple is preferred, and the device's own location
+ * beats both.
+ */
+const DEFAULT_PLACE = { lat: 25.3109, lng: 83.0107, label: 'Varanasi, Uttar Pradesh' };
 
 export default function PanchangScreen() {
   const { c } = useTheme();
   const { t, lang } = useLanguage();
   const hi = lang === 'hi';
 
+  const { templeList } = useContent();
+
   const [offset, setOffset] = useState(0);
-  const [place, setPlace] = useState<{ lat: number; lng: number; label: string }>({
-    lat: FALLBACK.coords.lat,
-    lng: FALLBACK.coords.lng,
-    label: FALLBACK.location,
+  const [place, setPlace] = useState<{ lat: number; lng: number; label: string }>(() => {
+    const first = templeList[0];
+    return first?.coords.lat
+      ? { lat: first.coords.lat, lng: first.coords.lng, label: first.location }
+      : DEFAULT_PLACE;
   });
 
   // Best-effort: a refused permission just leaves the fallback in place.

@@ -9,12 +9,24 @@ import {
 
 import { RazorpayCheckout } from '@/components/payment/razorpay-checkout';
 import { TempleGlyph } from '@/components/pooja/temple-glyph';
-import { Button, Card, Chip, Divider, Field, Icon, Screen, Type, type IconName, useToast } from '@/components/ui';
+import {
+  Button,
+  Card,
+  Chip,
+  Divider,
+  Field,
+  Icon,
+  NoContent,
+  Screen,
+  Type,
+  type IconName,
+  useToast,
+} from '@/components/ui';
 import { AppBar } from '@/components/ui/surface';
-import { TEMPLES } from '@/constants/temples';
 import { useAdmin } from '@/context/admin';
 import { type StringKey, useLanguage } from '@/context/language';
 import { Radius, Space, useTheme } from '@/theme';
+import { useContent } from '@/context/content';
 
 /**
  * E-Chadhava — offerings and checkout.
@@ -47,15 +59,14 @@ const OFFERINGS: {
 ];
 
 export default function ChadhavaScreen() {
+  const { templeById, templeList } = useContent();
   const { c } = useTheme();
   const { flags, logPayment } = useAdmin();
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const toast = useToast();
 
   const { temple: templeId } = useLocalSearchParams<{ temple?: string }>();
-  const [temple, setTemple] = useState(
-    () => TEMPLES.find((tpl) => tpl.id === templeId) ?? TEMPLES[0],
-  );
+  const [temple, setTemple] = useState(() => templeById(templeId));
   const [amount, setAmount] = useState('101');
   const [offering, setOffering] = useState('flowers');
   const [payOpen, setPayOpen] = useState(false);
@@ -70,6 +81,17 @@ export default function ChadhavaScreen() {
     }
     setPayOpen(true);
   };
+
+  // Offerings are made to a temple; with none published there is nothing
+  // to offer to, and inventing one would take real money for a fiction.
+  if (!temple) {
+    return (
+      <Screen tabBar={false}>
+        <AppBar title={t('echadhava_title')} />
+        <NoContent hi={lang === 'hi'} />
+      </Screen>
+    );
+  }
 
   return (
     <Screen tabBar={false}>
@@ -105,7 +127,7 @@ export default function ChadhavaScreen() {
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.chips}>
-            {TEMPLES.map((tpl) => (
+            {templeList.map((tpl) => (
               <Chip
                 key={tpl.id}
                 label={tpl.name}

@@ -12,7 +12,7 @@ import {
   useScrollPadding,
 } from '@/components/ui';
 import { AppBar } from '@/components/ui/surface';
-import { TEMPLES } from '@/constants/temples';
+
 import { useAdmin } from '@/context/admin';
 import { useContent } from '@/context/content';
 import { useLanguage } from '@/context/language';
@@ -23,15 +23,15 @@ export default function SavedTemplesScreen() {
   const router = useRouter();
   const { c } = useTheme();
   const { t } = useLanguage();
-  const { templeRating } = useContent();
+  const { templeList, templeRating } = useContent();
   const { flags } = useAdmin();
   const { bookingEnabled } = useContent();
   const scrollPad = useScrollPadding();
   const { savedIds, toggleSave, loading } = useSavedTemples();
 
   const savedTemples = useMemo(() => {
-    return TEMPLES.filter((tpl) => savedIds.includes(tpl.id));
-  }, [savedIds]);
+    return templeList.filter((tpl) => savedIds.includes(tpl.id));
+  }, [savedIds, templeList]);
 
   return (
     <Screen tabBar={false} watermark>

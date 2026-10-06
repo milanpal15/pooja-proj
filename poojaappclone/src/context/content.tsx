@@ -186,6 +186,16 @@ type ContentContextValue = Content & {
   /** A deity's display name for a slug; the slug itself if unknown. */
   deityName: (slug: string) => string;
   /**
+   * Look one up by slug, falling back to the first in the list.
+   *
+   * Returns undefined when there is nothing at all — an unfilled dashboard
+   * with `demoContent` off — so callers must handle an empty sanctum rather
+   * than assuming a deity always exists, which the bundled catalogue used
+   * to guarantee.
+   */
+  deityById: (id?: string | string[]) => Deity | undefined;
+  templeById: (id?: string | string[]) => Temple | undefined;
+  /**
    * Whether a temple accepts real pooja bookings, per the admin dashboard.
    *
    * Only an explicit `false` disables. An unknown temple — backend
@@ -282,6 +292,8 @@ const ContentContext = createContext<ContentContextValue>({
   templeList: [],
   demo: false,
   deityName: (slug) => slug,
+  deityById: () => undefined,
+  templeById: () => undefined,
   deityImage: () => undefined,
   // Outside a provider there is no dashboard, so the bundled murti is it.
   deityArt: (id) => DEITY_IMAGES[id],
@@ -494,6 +506,14 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
       deityList,
       templeList,
       deityName: (slug) => deityBySlug.get(slug)?.name ?? slug,
+      deityById: (id) => {
+        const key = Array.isArray(id) ? id[0] : id;
+        return (key ? deityBySlug.get(key) : undefined) ?? deityList[0];
+      },
+      templeById: (id) => {
+        const key = Array.isArray(id) ? id[0] : id;
+        return templeList.find((tpl) => tpl.id === key) ?? templeList[0];
+      },
       deityImage: (id) => {
         const url = assetUrl(imageBySlug.get(id));
         return url ? { uri: url } : undefined;

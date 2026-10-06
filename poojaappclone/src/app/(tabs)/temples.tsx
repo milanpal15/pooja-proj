@@ -14,7 +14,7 @@ import {
   Type,
   useScrollPadding,
 } from '@/components/ui';
-import { TEMPLES } from '@/constants/temples';
+
 import { useAdmin } from '@/context/admin';
 import { useContent } from '@/context/content';
 import { useLanguage } from '@/context/language';
@@ -47,7 +47,7 @@ export default function TemplesScreen() {
   const params = useLocalSearchParams<{ search?: string }>();
   const { c } = useTheme();
   const { t, lang } = useLanguage();
-  const { bookingEnabled, templeRating } = useContent();
+  const { bookingEnabled, templeList, templeRating } = useContent();
   const { flags } = useAdmin();
   const scrollPad = useScrollPadding();
   const { state: loc, request, clear } = useLocation();
@@ -68,7 +68,7 @@ export default function TemplesScreen() {
   // Ranked by distance only once we actually have a fix; otherwise the
   // catalogue keeps its curated order rather than silently reshuffling.
   const list = useMemo(() => {
-    let base = TEMPLES;
+    let base = templeList;
     if (onlySaved) {
       base = base.filter((tpl) => savedIds.includes(tpl.id));
     }
@@ -82,7 +82,7 @@ export default function TemplesScreen() {
       (tpl) =>
         tpl.name.toLowerCase().includes(q) || tpl.location.toLowerCase().includes(q),
     );
-  }, [nearMe, loc, q, onlySaved, savedIds]);
+  }, [nearMe, loc, q, onlySaved, savedIds, templeList]);
 
   const toggleNearMe = () => {
     if (nearMe) {

@@ -12,14 +12,12 @@ import {
 import { TempleGlyph } from '@/components/pooja/temple-glyph';
 import { ArchImage, Badge, Card, Icon, IconButton, Screen, SectionBand, SectionHeader, Type, type IconName, useScrollPadding, useToast } from '@/components/ui';
 import { AppBar } from '@/components/ui/surface';
-import { DEITIES } from '@/constants/deities';
 import {
   DAILY,
   DEITY_KNOWLEDGE,
   QUICK_TILES,
   SCRIPTURE,
 } from '@/constants/home';
-import { TEMPLES } from '@/constants/temples';
 import { type FeatureKey, useAdmin } from '@/context/admin';
 import { useAuth } from '@/context/auth';
 import { useContent } from '@/context/content';
@@ -58,7 +56,7 @@ export default function HomeScreen() {
   const { user } = useAuth();
   const { flags } = useAdmin();
   // Admin-managed calendar, falling back to the bundled one.
-  const { deityArt, upcomingFestivals } = useContent();
+  const { deityArt, deityList, templeList, upcomingFestivals } = useContent();
   const { t, lang } = useLanguage();
   const toast = useToast();
   const scrollPad = useScrollPadding();
@@ -220,7 +218,7 @@ export default function HomeScreen() {
         <View style={styles.section}>
           <SectionHeader title={t('popular_temples')} />
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hscroll}>
-            {TEMPLES.map((tpl) => (
+            {templeList.map((tpl) => (
               <Card
                 key={tpl.id}
                 style={styles.templeCard}
@@ -285,7 +283,7 @@ export default function HomeScreen() {
           onFooter={() => router.push('/knowledge')}>
           <View style={styles.knowRow}>
             {DEITY_KNOWLEDGE.map((id) => {
-              const d = DEITIES.find((x) => x.id === id);
+              const d = deityList.find((x) => x.id === id);
               const art = deityArt(id);
               return (
                 <Pressable

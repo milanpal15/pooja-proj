@@ -9,6 +9,7 @@ export { ArchImage, Badge, Card, type CardProps, Chip, Divider, ListRow, Section
 export { Field, type FieldProps } from './field';
 export { Icon, type IconName, type IconProps } from './icon';
 export { Mandala, type MandalaProps } from './mandala';
+export { NoContent, type NoContentProps } from './no-content';
 export { ProgressRing, type ProgressRingProps } from './progress-ring';
 export { type BandTone, SectionBand } from './section-band';
 export { Segmented, type SegmentedProps } from './segmented';

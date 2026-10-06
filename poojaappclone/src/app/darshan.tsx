@@ -14,7 +14,7 @@ import {
 import { AppBar } from '@/components/ui/surface';
 import { LivePlayer } from '@/components/darshan/live-player';
 import { DEITY_IMAGES } from '@/constants/deity-images';
-import { TEMPLES } from '@/constants/temples';
+
 import { useContent } from '@/context/content';
 import { useLanguage } from '@/context/language';
 import { Radius, Space, useTheme } from '@/theme';
@@ -31,7 +31,7 @@ export default function DarshanScreen() {
   const router = useRouter();
   const { c } = useTheme();
   const { t, lang } = useLanguage();
-  const { announcement, deityArt, temples } = useContent();
+  const { announcement, deityArt, templeList, temples } = useContent();
   const [liked, setLiked] = useState(false);
 
   /*
@@ -43,7 +43,7 @@ export default function DarshanScreen() {
    * unreachable.
    */
   const remote = temples[0];
-  const templeName = remote?.name ?? TEMPLES[0]?.name ?? '';
+  const templeName = remote?.name ?? templeList[0]?.name ?? '';
   const art = deityArt(remote?.deitySlug ?? 'shiva');
 
   /*

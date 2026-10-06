@@ -5,14 +5,16 @@ import { Alert, FlatList, RefreshControl, StyleSheet, View } from 'react-native'
 import { TempleGlyph } from '@/components/pooja/temple-glyph';
 import { Badge, Button, Card, Divider, Icon, Screen, Segmented, Type, useScrollPadding, useToast } from '@/components/ui';
 import { AppBar } from '@/components/ui/surface';
-import { TEMPLES } from '@/constants/temples';
+
 import { useLanguage } from '@/context/language';
 import { type BookedPooja, cancelBooking, getBookedPoojas } from '@/lib/bookings';
 import { Radius, Space, useTheme } from '@/theme';
+import { useContent } from '@/context/content';
 
 type FilterTab = 'all' | 'upcoming' | 'completed';
 
 export default function MyPoojasScreen() {
+  const { templeById } = useContent();
   const { c } = useTheme();
   const router = useRouter();
   const { t, lang } = useLanguage();
@@ -128,7 +130,7 @@ export default function MyPoojasScreen() {
           ) : null
         }
         renderItem={({ item }) => {
-          const temple = TEMPLES.find((tpl) => tpl.id === item.templeId) ?? TEMPLES[0];
+          const temple = templeById(item.templeId);
           const isUpcoming = item.status === 'upcoming';
 
           return (
@@ -136,9 +138,14 @@ export default function MyPoojasScreen() {
               {/* Header: Temple info & status */}
               <View style={styles.cardHeader}>
                 <View style={styles.templeSnippet}>
-                  <View style={styles.glyphBox}>
-                    <TempleGlyph temple={temple} size={48} />
-                  </View>
+                  {/* The booking carries its own temple name, so a temple
+                      the dashboard no longer lists still renders — just
+                      without its glyph, rather than not at all. */}
+                  {temple && (
+                    <View style={styles.glyphBox}>
+                      <TempleGlyph temple={temple} size={48} />
+                    </View>
+                  )}
                   <View style={{ flex: 1, gap: 2 }}>
                     <Type v="titleMd" tone="goldInk">
                       {item.templeName}

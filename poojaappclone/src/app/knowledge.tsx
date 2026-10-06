@@ -9,12 +9,12 @@ import {
   Chip,
   Divider,
   Icon,
+  NoContent,
   Screen,
   SectionBand,
   Type,
 } from '@/components/ui';
 import { AppBar } from '@/components/ui/surface';
-import { DEITIES, deityById } from '@/constants/deities';
 import { KNOWLEDGE_IDS, LORE } from '@/constants/knowledge';
 import { useAdmin } from '@/context/admin';
 import { useContent } from '@/context/content';
@@ -35,7 +35,7 @@ export default function KnowledgeScreen() {
   const router = useRouter();
   const { c } = useTheme();
   const { t, lang } = useLanguage();
-  const { deityArt } = useContent();
+  const { deityArt, deityById, deityList } = useContent();
   const { flags } = useAdmin();
   const hi = lang === 'hi';
 
@@ -47,6 +47,16 @@ export default function KnowledgeScreen() {
   const deity = deityById(id);
   const lore = LORE[id];
   const art = deityArt(id);
+
+  // Every hook has run; from here the dashboard may simply have no deities.
+  if (!deity) {
+    return (
+      <Screen tabBar={false}>
+        <AppBar title={hi ? 'देवों का ज्ञान' : 'Knowledge of the Gods'} />
+        <NoContent hi={hi} />
+      </Screen>
+    );
+  }
 
   return (
     <Screen tabBar={false}>
@@ -63,7 +73,7 @@ export default function KnowledgeScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.chips}>
           {KNOWLEDGE_IDS.map((k) => {
-            const d = DEITIES.find((x) => x.id === k);
+            const d = deityList.find((x) => x.id === k);
             return (
               <Chip
                 key={k}

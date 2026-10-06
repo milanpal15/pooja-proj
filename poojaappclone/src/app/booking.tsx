@@ -4,10 +4,21 @@ import { Alert, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-na
 
 import { RazorpayCheckout } from '@/components/payment/razorpay-checkout';
 import { TempleGlyph } from '@/components/pooja/temple-glyph';
-import { Button, Card, Chip, Divider, Field, Icon, Screen, Type, useToast } from '@/components/ui';
+import {
+  Button,
+  Card,
+  Chip,
+  Divider,
+  Field,
+  Icon,
+  NoContent,
+  Screen,
+  Type,
+  useToast,
+} from '@/components/ui';
 import { AppBar } from '@/components/ui/surface';
 import { PRASAD_DELIVERY, type Seva } from '@/constants/poojas';
-import { TEMPLES } from '@/constants/temples';
+
 import { useAdmin } from '@/context/admin';
 import { useAuth } from '@/context/auth';
 import { useContent } from '@/context/content';
@@ -34,10 +45,10 @@ export default function BookingScreen() {
   const toast = useToast();
   const { user } = useAuth();
   const { flags, logPayment } = useAdmin();
-  const { bookingEnabled, sevasFor, setting } = useContent();
+  const { bookingEnabled, setting, sevasFor, templeById } = useContent();
 
   const { temple: templeId } = useLocalSearchParams<{ temple?: string }>();
-  const temple = TEMPLES.find((tpl) => tpl.id === templeId) ?? TEMPLES[0];
+  const temple = templeById(templeId);
 
   /*
    * Rites and prices come from the dashboard, with the bundled catalogue as
@@ -45,23 +56,29 @@ export default function BookingScreen() {
    * used to need a store release.
    */
   const sevas = useMemo(
-    () => sevasFor({ templeSlug: temple.id, deitySlug: temple.deity }),
-    [sevasFor, temple.id, temple.deity],
+    () => sevasFor({ templeSlug: temple?.id, deitySlug: temple?.deity }),
+    [sevasFor, temple?.id, temple?.deity],
   );
   /** Courier fee, also admin-set; the bundled constant is the fallback. */
   const prasadFee = setting('prasadDelivery', PRASAD_DELIVERY);
   const dates = useMemo(() => nextDays(7), []);
 
-  const [seva, setSeva] = useState<Seva>(sevas[0]);
+  const [seva, setSeva] = useState<Seva | undefined>(sevas[0]);
   const [day, setDay] = useState(dates[0].iso);
   const [name, setName] = useState(user?.name ?? '');
   const [gotra, setGotra] = useState('');
   const [prasad, setPrasad] = useState(true);
   const [payOpen, setPayOpen] = useState(false);
 
-  const total = seva.price + (prasad ? prasadFee : 0);
-  const allowed = bookingEnabled(temple.id);
-  const canBook = allowed && !!name.trim();
+  /*
+   * Every hook above runs unconditionally; the guards start here. With the
+   * bundled catalogue gone there may be no temple at all — an unfilled
+   * dashboard — and a booking screen for a temple that does not exist is
+   * worse than saying so.
+   */
+  const total = (seva?.price ?? 0) + (prasad ? prasadFee : 0);
+  const allowed = !!temple && bookingEnabled(temple.id);
+  const canBook = allowed && !!seva && !!name.trim();
 
   const onPay = () => {
     if (!flags.payments) {
@@ -70,6 +87,17 @@ export default function BookingScreen() {
     }
     setPayOpen(true);
   };
+
+  // Also guarded on `seva`: a temple with no rites published cannot take a
+  // booking, and every control below assumes one is selected.
+  if (!temple || !seva) {
+    return (
+      <Screen tabBar={false}>
+        <AppBar title={t('book_pooja_title')} />
+        <NoContent hi={lang === 'hi'} />
+      </Screen>
+    );
+  }
 
   return (
     <Screen tabBar={false}>

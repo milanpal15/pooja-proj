@@ -24,11 +24,13 @@ import { Marigold, MarigoldRain } from '@/components/mandir/marigold';
 import { HangingBell, TempleBackdrop, Toran } from '@/components/mandir/temple-scene';
 import { Thali } from '@/components/mandir/thali';
 import { Flame } from '@/components/pooja/flame';
-import { AARTI_CIRCLES, DEITIES, deityById, PANCHANG_LINE, type Deity } from '@/constants/deities';
+import { AARTI_CIRCLES, PANCHANG_LINE, type Deity } from '@/constants/deities';
 import { SOUNDS } from '@/constants/sounds';
 import { BottomTabInset, TopTabInset } from '@/constants/theme';
 import { useAuth } from '@/context/auth';
 import { useLanguage } from '@/context/language';
+import { useContent } from '@/context/content';
+import { NoContent } from '@/components/ui';
 
 const TWO_PI = Math.PI * 2;
 /** Resting spot: bottom of the circle, in screen coords where +y points down. */
@@ -45,10 +47,14 @@ function nearestRest(current: number) {
 
 export default function MandirScreen() {
   const { width } = useWindowDimensions();
+  // The sanctum draws whatever the dashboard publishes. With nothing
+  // published there is no murti to perform an aarti to, and the screen says
+  // so rather than inventing one.
+  const { deityById, deityList } = useContent();
   // A deity id passed from the Temples tab ("Perform Pooja") preselects the murti.
   // `ts` is a per-navigation nonce so the same deity still restarts the aarti.
   const { deity: deityParam, ts } = useLocalSearchParams<{ deity?: string; ts?: string }>();
-  const [deity, setDeity] = useState<Deity>(() => deityById(deityParam));
+  const [deity, setDeity] = useState<Deity | undefined>(() => deityById(deityParam));
   const [stage, setStage] = useState({ w: width, h: 460 });
   const [circles, setCircles] = useState(0);
   const [done, setDone] = useState(false);
@@ -121,7 +127,7 @@ export default function MandirScreen() {
   useEffect(() => {
     swap.value = 0;
     swap.value = withTiming(1, { duration: 420, easing: Easing.out(Easing.cubic) });
-  }, [deity.id, swap]);
+  }, [deity?.id, swap]);
 
   const onCircles = useCallback((n: number) => {
     setCircles(Math.min(n, AARTI_CIRCLES));
@@ -207,12 +213,13 @@ export default function MandirScreen() {
   // Vertical swipe cycles the deity: flick up = next, flick down = previous.
   const changeDeity = useCallback(
     (dir: 1 | -1) => {
-      const i = DEITIES.findIndex((d) => d.id === deity.id);
-      const next = DEITIES[(i + dir + DEITIES.length) % DEITIES.length];
+      if (!deityList.length) return;
+      const i = deityList.findIndex((d) => d.id === deity?.id);
+      const next = deityList[(i + dir + deityList.length) % deityList.length];
       swapDir.value = dir;
       selectDeity(next);
     },
-    [deity.id, selectDeity, swapDir],
+    [deity?.id, deityList, selectDeity, swapDir],
   );
 
   // Vertical drag past a threshold changes the deity — more forgiving than a
@@ -231,9 +238,10 @@ export default function MandirScreen() {
   useEffect(() => {
     // Reacting to a route-param change is a legitimate effect-driven update.
     // `ts` in the deps makes every "Perform Pooja" restart, even for same deity.
+    const next = deityById(deityParam);
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (deityParam) selectDeity(deityById(deityParam));
-  }, [deityParam, ts, selectDeity]);
+    if (deityParam && next) selectDeity(next);
+  }, [deityParam, ts, selectDeity, deityById]);
 
   /**
    * The thali can only be picked up by touching the thali itself, so this
@@ -302,7 +310,7 @@ export default function MandirScreen() {
   const flowersFalling = flowersOn || autoRunning;
 
   const { user, signOut } = useAuth();
-  const { t, toggleLang } = useLanguage();
+  const { t, toggleLang, lang } = useLanguage();
   const initial = user?.name?.trim()?.[0]?.toUpperCase() || 'अ';
   const confirmLogout = useCallback(() => {
     Alert.alert(
@@ -376,6 +384,19 @@ export default function MandirScreen() {
     const id = setInterval(playBell, 1500);
     return () => clearInterval(id);
   }, [autoRunning, playBell]);
+
+  // All hooks have run. The sanctum needs a murti; with the dashboard empty
+  // and demo content off there is none, and an invented one would be the
+  // single most dishonest thing this screen could draw.
+  if (!deity) {
+    return (
+      <View style={styles.root}>
+        <SafeAreaView edges={['top']} style={styles.topArea}>
+          <NoContent hi={lang === 'hi'} />
+        </SafeAreaView>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.root}>

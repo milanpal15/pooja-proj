@@ -1,6 +1,7 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { DEITIES, type Deity } from '@/constants/deities';
+import type { Deity } from '@/constants/deities';
+import { useContent } from '@/context/content';
 
 /** Small circular murti bust used inside the strip pills. */
 export function DeityAvatar({ deity, size = 30 }: { deity: Deity; size?: number }) {
@@ -44,6 +45,9 @@ export function DeityStrip({
   selected: Deity;
   onSelect: (d: Deity) => void;
 }) {
+  // The strip draws whatever the dashboard publishes, not a compiled-in list.
+  const { deityList } = useContent();
+
   return (
     <ScrollView
       horizontal
@@ -59,7 +63,7 @@ export function DeityStrip({
 
       <View style={styles.divider} />
 
-      {DEITIES.map((d) => {
+      {deityList.map((d) => {
         const active = d.id === selected.id;
         return (
           <Pressable

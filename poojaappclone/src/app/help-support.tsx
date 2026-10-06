@@ -26,7 +26,7 @@ export default function HelpSupportScreen() {
   const { c } = useTheme();
   const { t, lang } = useLanguage();
   const toast = useToast();
-  const { faqs: remoteFaqs, settingText } = useContent();
+  const { demo, faqs: remoteFaqs, settingText } = useContent();
 
   /*
    * Dashboard first, then the env fallback from `constants/support.ts`.
@@ -56,8 +56,10 @@ export default function HelpSupportScreen() {
             answerEn: f.answer,
             answerHi: f.answerHi ?? f.answer,
           }))
-        : FAQS,
-    [remoteFaqs],
+        : demo
+          ? FAQS
+          : [],
+    [remoteFaqs, demo],
   );
   const scrollPad = useScrollPadding();
 

@@ -11,7 +11,6 @@ import {
 
 import { Button, Card, Chip, Icon, Mandala, Screen, Type, useToast } from '@/components/ui';
 import { AppBar } from '@/components/ui/surface';
-import { DEITIES } from '@/constants/deities';
 import { DEITY_IMAGES } from '@/constants/deity-images';
 import { WALLPAPER_STYLES } from '@/constants/reminders';
 import { useContent } from '@/context/content';
@@ -79,7 +78,7 @@ const DEITY_IDS = Object.keys(DEITY_IMAGES);
 export default function WallpaperScreen() {
   const { c } = useTheme();
   const { lang } = useLanguage();
-  const { deityArt } = useContent();
+  const { deityArt, deityList } = useContent();
   const toast = useToast();
   const hi = lang === 'hi';
 
@@ -94,7 +93,7 @@ export default function WallpaperScreen() {
   const canSet = Wallpaper.isAvailable();
   const splitTargets = canSet && Wallpaper.supportsLockScreen();
 
-  const deity = DEITIES.find((d) => d.id === deityId);
+  const deity = deityList.find((d) => d.id === deityId);
   const art = deityArt(deityId);
 
   /** Render the preview to a PNG on disk and hand back its file:// uri. */
@@ -184,7 +183,7 @@ export default function WallpaperScreen() {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
           {DEITY_IDS.map((id) => {
-            const d = DEITIES.find((x) => x.id === id);
+            const d = deityList.find((x) => x.id === id);
             return (
               <Chip
                 key={id}
