@@ -56,11 +56,24 @@ export default function HomeScreen() {
   const { user } = useAuth();
   const { flags } = useAdmin();
   // Admin-managed calendar, falling back to the bundled one.
-  const { deityArt, deityList, templeList, upcomingFestivals } = useContent();
+  const { deityArt, deityList, templeList, temples, upcomingFestivals } = useContent();
   const { t, lang } = useLanguage();
   const toast = useToast();
   const scrollPad = useScrollPadding();
   const hi = lang === 'hi';
+
+  /*
+   * The first temple the dashboard actually gave a stream.
+   *
+   * `liveUrl` is on the raw rows rather than the app-shaped `templeList`,
+   * which is why this reads `temples`. Undefined means nothing is
+   * streaming, and the card says so instead of claiming LIVE over a feed
+   * that does not exist.
+   */
+  const liveTemple = useMemo(
+    () => temples.find((tpl) => tpl.liveUrl?.trim()),
+    [temples],
+  );
 
   const features = FEATURES.filter((f) => flags[f.flag]);
   const festivals = useMemo(() => upcomingFestivals(2), [upcomingFestivals]);
@@ -312,7 +325,7 @@ export default function HomeScreen() {
           </View>
         </SectionBand>
 
-        {/* Daily darshan */}
+        {/* Daily darshan — the first temple the dashboard gave a stream. */}
         {flags.liveDarshan && (
           <View style={styles.section}>
             <SectionHeader title={t('daily_darshan')} />
@@ -326,14 +339,21 @@ export default function HomeScreen() {
                   <Icon name="play" size={20} color={c.onPrimary} />
                 </View>
                 <View style={{ flex: 1, gap: 1 }}>
-                  <Type v="titleMd" color={c.onPrimary}>
-                    Shri Mandir in Temple
+                  <Type v="titleMd" color={c.onPrimary} numberOfLines={1}>
+                    {liveTemple?.name ?? t('daily_darshan')}
                   </Type>
-                  <Type v="bodySm" color={c.onPrimary} style={{ opacity: 0.85 }}>
-                    Varanasi, India
-                  </Type>
+                  {!!liveTemple?.location && (
+                    <Type v="bodySm" color={c.onPrimary} style={{ opacity: 0.85 }} numberOfLines={1}>
+                      {liveTemple.location}
+                    </Type>
+                  )}
                 </View>
-                <Badge label={t('live')} tone="live" />
+                {/* Only when something is actually streaming. The badge used
+                    to be unconditional, over a hardcoded "Shri Mandir in
+                    Temple / Varanasi, India" — a LIVE claim for a feed that
+                    may not exist, which is the same invention the darshan
+                    screen itself was already cleaned of. */}
+                {!!liveTemple && <Badge label={t('live')} tone="live" />}
               </View>
             </Card>
           </View>

@@ -33,7 +33,7 @@ const STRINGS = {
     save: 'Save',
     app_version: 'Pooja Mandir · v1.0',
     // brand + home
-    brand: 'Shri Mandir',
+    brand: 'Bhakti',
     panchang: 'Panchang',
     tithi: 'Tithi',
     nakshatra: 'Nakshatra',
@@ -287,7 +287,7 @@ const STRINGS = {
     save: 'सहेजें',
     app_version: 'पूजा मंदिर · v1.0',
     // brand + home
-    brand: 'श्री मंदिर',
+    brand: 'भक्ति',
     panchang: 'पंचांग',
     tithi: 'तिथि',
     nakshatra: 'नक्षत्र',
