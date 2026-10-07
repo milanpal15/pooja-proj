@@ -17,12 +17,21 @@
 # was called `pooja-admin` and ran this API; rename it to `pooja-api` in
 # Render → Settings before syncing, or you get a duplicate.
 #
-# ── CORS_ORIGIN is a cross-Blueprint reference ────────────────────────
-# `fromService` may name a service from another Blueprint, but that
-# service has to exist already or the sync fails. So on a FIRST deploy
-# bring the dashboard up before syncing this one. If you would rather not
-# depend on that order, replace the CORS_ORIGIN block with
-# `sync: false` and paste the dashboard's URL once.
+# ── Why CORS_ORIGIN is typed and not `fromService` ───────────────────
+# It used to read the dashboard's host with `fromService`. That is a hard
+# dependency: Render refuses to sync a Blueprint whose reference does not
+# resolve —
+#
+#     env var depends on non-existent service: {web pooja-admin}
+#
+# — and the dashboard is precisely the service that has to be deleted and
+# recreated, because a service's TYPE cannot be changed. So the reference
+# broke at the exact moment it was most needed, and it made these two
+# Blueprints a cycle: each refused to sync until the other existed.
+#
+# One direction of dependency is fine, a cycle is not. The dashboard still
+# reads the API's host automatically — the API is the stable end — and
+# this one value is typed once instead.
 
 services:
   - type: web
@@ -63,18 +72,17 @@ services:
         generateValue: true
       - key: FIREBASE_SERVICE_ACCOUNT
         sync: false # the whole service-account JSON, on one line
-      # Filled in from the dashboard service, so there is no step where
-      # this is wrong and every dashboard call is refused. It cannot be
-      # '*': the browser forbids a wildcard origin on a credentialed
-      # request, and the admin session is a cookie.
+      # The dashboard's URL, e.g. https://pooja-admin.onrender.com — or just
+      # the bare host, which the API turns into https:// itself (see
+      # `allowedOrigins` in src/index.js). A trailing slash is tolerated.
       #
-      # `fromService` yields a bare host; the API prefixes https:// itself
-      # (see `allowedOrigins` in src/index.js).
+      # It cannot be '*': the browser forbids a wildcard origin on a
+      # credentialed request, and the admin session is a cookie, so every
+      # dashboard call would be refused.
+      #
+      # Comma-separate to allow more than one.
       - key: CORS_ORIGIN
-        fromService:
-          type: web
-          name: pooja-admin
-          property: host
+        sync: false
       # The dashboard is a separate origin, so the session cookie is
       # cross-site and `Strict` would stop the browser sending it at all —
       # sign-in would appear to work and every call after it would 401.

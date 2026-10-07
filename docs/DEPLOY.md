@@ -103,10 +103,23 @@ non-secret environment.
 > container serving, so the dashboard looks healthy while every deploy of
 > it fails.
 
-The two URLs are wired to each other by the blueprint, so neither has to be
-typed anywhere: the dashboard's `VITE_API_BASE` comes from the API service
-and the API's `CORS_ORIGIN` comes from the dashboard service. Render hands
-over a bare host (no scheme); both sides prefix `https://` themselves.
+The dashboard's `VITE_API_BASE` is filled in from the API service, so it
+is never typed. Render hands over a bare host with no scheme; the dashboard
+prefixes `https://` itself.
+
+The reverse — the API reading the dashboard's host — is **not** wired, on
+purpose. Render refuses to sync a Blueprint whose `fromService` does not
+resolve:
+
+```
+env var depends on non-existent service: {web pooja-admin}
+```
+
+and the dashboard is exactly the service that has to be deleted and
+recreated, because a service's type cannot be changed. Pointing the API at
+it made the two Blueprints a cycle, each refusing to sync until the other
+existed. `CORS_ORIGIN` is typed once instead; one direction of dependency
+is fine, a cycle is not.
 
 You will be prompted for the three secrets marked `sync: false`:
 
