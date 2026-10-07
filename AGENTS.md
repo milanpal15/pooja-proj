@@ -534,14 +534,38 @@ anyone in. See `docs/FIREBASE_SETUP.md`.
 
 ---
 
-## 6. Local services (when running)
+## 6. Configuration and local services
 
-| Service            | Port  | Command                                   |
-|--------------------|-------|-------------------------------------------|
-| MongoDB            | 27017 | `mongod` (or brew service)                |
-| Admin API          | 4000  | `cd pooja-admin/server && npm run dev`    |
-| Admin dashboard    | 5173  | `cd pooja-admin/client && npm run dev`    |
-| Metro (Expo)       | 8081  | `cd poojaappclone && npx expo start`      |
+**Every project has a `.env`, and a committed `.env.example` that lists
+every variable it reads.** The `.env` files are gitignored; the examples
+are the documentation, so a variable added in code belongs in its example
+in the same commit.
+
+| Project | `.env` holds | Notes |
+|---|---|---|
+| `pooja-api/` | `MONGODB_URI`, `CORS_ORIGIN`, `SESSION_SAMESITE`, Firebase key, `ADMIN_PASSWORD`, `MAX_UPLOAD_MB` | The only one with real secrets |
+| `pooja-admin/` | `API_ORIGIN` (dev proxy), `VITE_API_BASE` (build) | Static site — nothing secret can live here, it ends up in the bundle |
+| `poojaappclone/` | `EXPO_PUBLIC_ADMIN_API`, `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`, `EXPO_PUBLIC_SUPPORT_*` | `EXPO_PUBLIC_*` is embedded in the bundle, so none of it is secret |
+
+Two that catch people out:
+
+- **`EXPO_PUBLIC_*` is read at BUNDLE time.** Changing one needs Metro
+  restarted, not just the app reloaded. Metro prints which it exported on
+  boot (`env: export EXPO_PUBLIC_…`) — if a variable is not in that line,
+  the app is not seeing it.
+- **`API_ORIGIN` is the knob for pointing the local dashboard somewhere
+  else.** Vite proxies `/api` and `/uploads` to it, so the browser still
+  sees one origin and there is no CORS and no cookie problem.
+  `VITE_API_BASE` is the build-time equivalent and is baked in, so
+  changing it is a rebuild.
+
+| Service         | Port  | Command                                    |
+|-----------------|-------|--------------------------------------------|
+| MongoDB         | 27017 | `mongod` (or brew service) — only if `MONGODB_URI` is local |
+| API             | 4000  | `cd pooja-api && npm run dev`              |
+| Dashboard       | 5173  | `cd pooja-admin && npm run dev`            |
+| Metro (Expo)    | 8081  | `cd poojaappclone && npx expo start`       |
 
 Sign-in additionally needs `poojaappclone/google-services.json` and
-`pooja-admin/server/firebase-service-account.json` — see `docs/FIREBASE_SETUP.md`.
+`pooja-api/firebase-service-account.json`, both from the SAME Firebase
+project — see `docs/FIREBASE_SETUP.md`.
