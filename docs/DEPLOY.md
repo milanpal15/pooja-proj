@@ -84,6 +84,15 @@ non-secret environment.
 > a second service and the old one keeps failing with
 > `npm error Missing script: "serve"`.
 
+> **A service's TYPE cannot be changed.** The dashboard is a *static site*;
+> the pre-split `pooja-admin` was a *Node web service*. A sync adopts the
+> old service by name and applies what it can — so its build command starts
+> working and the deploy still dies on `npm run serve`, a script that moved
+> to `pooja-api` long ago. Delete that web service in Render, then sync,
+> and it comes back as a static site. Until then Render keeps the previous
+> container serving, so the dashboard looks healthy while every deploy of
+> it fails.
+
 The two URLs are wired to each other by the blueprint, so neither has to be
 typed anywhere: the dashboard's `VITE_API_BASE` comes from the API service
 and the API's `CORS_ORIGIN` comes from the dashboard service. Render hands

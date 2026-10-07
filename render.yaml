@@ -75,6 +75,16 @@ services:
         value: None
 
   # ──────────────────────────────────────────────────────── dashboard ──
+  #
+  # A STATIC SITE, and a service's type cannot be changed after it is made.
+  #
+  # If a Node web service already exists under this name — the pre-split one
+  # did — a sync adopts it and applies what it can, so the build command
+  # below starts working and the deploy still fails on the old
+  # `npm run serve`. Nothing in this file can fix that: delete the web
+  # service in Render first, then sync, and it is recreated as a static
+  # site. Render keeps the old container serving meanwhile, which is why
+  # the dashboard looks fine while every deploy of it fails.
   - type: web
     name: pooja-admin
     runtime: static
