@@ -41,18 +41,21 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 20.19.4
-      # Baked into the bundle at BUILD time, so pointing the dashboard at a
-      # different API is a rebuild, not a restart.
+      # The API's URL, e.g. https://pooja-api.onrender.com — a bare host is
+      # fine, the dashboard prefixes https:// itself (see `normalise` in
+      # src/client/api.js).
       #
-      # `fromService` may name a service from another Blueprint, but that
-      # service must already exist or the sync fails — so bring the API up
-      # first. It yields a bare host; the dashboard prefixes https://
-      # itself (see `normalise` in src/client/api.js).
+      # Typed, not `fromService`, and the reason is worth keeping: this is
+      # read at BUILD time, and when it came from the other Blueprint it
+      # arrived EMPTY. An empty base means same-origin, so the dashboard
+      # called itself — and because a static site rewrites /* to
+      # /index.html, every /api request returned the page instead of JSON
+      # and the UI just said "Failed to fetch". A wrong value fails loudly;
+      # an empty one fails like this, which is worse.
+      #
+      # Changing it is a REBUILD, not a restart.
       - key: VITE_API_BASE
-        fromService:
-          type: web
-          name: pooja-api
-          property: host
+        sync: false
 
     # A single-page app: any path that is not a real file is a client
     # route, so it must serve index.html rather than 404.
