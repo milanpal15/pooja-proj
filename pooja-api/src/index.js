@@ -60,10 +60,41 @@ function allowedOrigins(raw) {
     .map((o) => o.replace(/\/+$/, ''));
 }
 
+/*
+ * A reflected origin and `credentials` must never ship together.
+ *
+ * `origin: true` echoes whatever Origin asked, which is convenient in dev.
+ * In production it is a hole: the admin session is a cookie, and
+ * SESSION_SAMESITE=None — required, because the dashboard is a separate
+ * site — means the browser SENDS that cookie cross-site. Echo the origin
+ * back with `Access-Control-Allow-Credentials: true` and any page an
+ * operator visits while signed in can read and write the admin API as
+ * them: list devotees, edit content, delete accounts.
+ *
+ * Found live: production had CORS_ORIGIN unset, so it defaulted to '*' and
+ * answered `Access-Control-Allow-Origin: https://evil.example.com`.
+ *
+ * Refusing to boot would take the phone app down too, over a hole that
+ * only reaches the admin surface — so instead the credential is withheld.
+ * Public content keeps serving; the dashboard stops working until
+ * CORS_ORIGIN names it, which is the right pressure and is visible.
+ */
+const reflectsAnyOrigin = CORS_ORIGIN === '*';
+const inProduction = process.env.NODE_ENV === 'production';
+const allowCredentials = !(reflectsAnyOrigin && inProduction);
+
+if (!allowCredentials) {
+  console.error(
+    '✗ CORS_ORIGIN is \'*\' in production, so credentialed cross-origin\n' +
+      '  requests are being REFUSED — the dashboard cannot sign in.\n' +
+      '  Set CORS_ORIGIN to the dashboard\'s URL (e.g. https://pooja-admin.onrender.com).',
+  );
+}
+
 app.use(
   cors({
-    origin: CORS_ORIGIN === '*' ? true : allowedOrigins(CORS_ORIGIN),
-    credentials: true,
+    origin: reflectsAnyOrigin ? true : allowedOrigins(CORS_ORIGIN),
+    credentials: allowCredentials,
   }),
 );
 app.use(express.json());
