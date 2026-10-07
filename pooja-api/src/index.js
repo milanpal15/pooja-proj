@@ -20,6 +20,7 @@ import { ensureFirstOperator, mountAdminAuth, requireAdmin } from './admin.js';
 import { announcements, policies } from './broadcast.js';
 import { auth } from './auth.js';
 import { content, horoscope, panchang, publicContent, UPLOAD_DIR, users } from './content.js';
+import { setLegacyDir, uploads } from './files.js';
 import { connectDb } from './db.js';
 import { operators } from './operators.js';
 import { router } from './routes.js';
@@ -38,9 +39,30 @@ const app = express();
  * spec forbids a wildcard origin on a credentialed request, and the browser
  * will refuse every dashboard call. Set it to the dashboard's URL.
  */
+/**
+ * The dashboard origins allowed to call this.
+ *
+ * An `Origin` header is scheme + host, and `cors` compares it as a plain
+ * string, so two near-misses fail silently and identically — every call
+ * refused, nothing logged:
+ *   - a bare host, which is all Render's blueprint can hand over
+ *     (`fromService` yields `pooja-admin.onrender.com`, no scheme);
+ *   - a trailing slash, which is what you get from copying the URL out of
+ *     the browser's address bar.
+ * Both are normalised here rather than left for someone to debug.
+ */
+function allowedOrigins(raw) {
+  return raw
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean)
+    .map((o) => (/^https?:\/\//.test(o) ? o : `https://${o}`))
+    .map((o) => o.replace(/\/+$/, ''));
+}
+
 app.use(
   cors({
-    origin: CORS_ORIGIN === '*' ? true : CORS_ORIGIN.split(','),
+    origin: CORS_ORIGIN === '*' ? true : allowedOrigins(CORS_ORIGIN),
     credentials: true,
   }),
 );
@@ -64,7 +86,15 @@ app.get('/api/health', (_req, res) =>
     commit: process.env.RENDER_GIT_COMMIT || process.env.GIT_COMMIT || null,
   }),
 );
-app.use('/uploads', express.static(UPLOAD_DIR));
+/*
+ * Media comes out of the database, not the filesystem.
+ *
+ * This router also answers for anything still sitting in UPLOAD_DIR from
+ * before the move, so existing rows keep resolving until `npm run
+ * migrate:media` has been run.
+ */
+setLegacyDir(UPLOAD_DIR);
+app.use('/uploads', uploads);
 
 // Before the guard: these verify a Firebase ID token, which is a stronger
 // check than the admin password and belongs to the devotee, not the operator.
@@ -84,6 +114,37 @@ app.use('/api/users', users);
 app.use('/api', operators);
 app.use('/api', policies);
 app.use('/api', announcements);
+
+/**
+ * Last resort for anything a route threw.
+ *
+ * Must be mounted after every route, and must take four arguments — that
+ * arity is how Express recognises an error handler at all.
+ *
+ * Paired with `asyncRouter`, which is what actually delivers a rejected
+ * promise here instead of letting it become an unhandled rejection. The
+ * message is deliberately generic: a stack trace or a Mongo error string
+ * in the response body tells an attacker about the schema.
+ */
+// eslint-disable-next-line no-unused-vars -- Express needs the 4th argument.
+app.use('/api', (err, _req, res, _next) => {
+  console.error('✗ Unhandled error:', err?.stack || err);
+  if (res.headersSent) return;
+  res.status(500).json({ error: 'Something went wrong.' });
+});
+
+/*
+ * Nothing should reach these — `asyncRouter` and the handler above catch
+ * what routes throw — but a rejection from a timer or a stray listener
+ * would still end the process, and an API that dies on one bad request is
+ * worse than one that logs and keeps serving.
+ */
+process.on('unhandledRejection', (reason) => {
+  console.error('✗ Unhandled rejection:', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('✗ Uncaught exception:', err?.stack || err);
+});
 
 connectDb(MONGODB_URI)
   // Operators live in the database now, so the first one can only be

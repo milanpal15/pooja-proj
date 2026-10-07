@@ -1,10 +1,10 @@
-import { randomUUID } from 'crypto';
-import { existsSync, mkdirSync } from 'fs';
-import { dirname, extname, join } from 'path';
+import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
-import { Router } from 'express';
 import multer from 'multer';
+
+import { asyncRouter } from './async.js';
+import { deleteFile, saveFile } from './files.js';
 
 import { deleteFirebaseUser, revokeUser } from './firebase.js';
 import {
@@ -28,27 +28,30 @@ import {
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 /**
- * Where uploaded artwork is written.
+ * Where media written before the move to GridFS still lives.
  *
- * Defaults to the project root (not src/ — this file lives at src/server/).
- * UPLOAD_DIR overrides it, which is what a hosted deploy needs: the
- * container filesystem is wiped on every release, so this has to point at a
- * mounted disk or the images disappear with nothing in the logs to say why.
+ * Nothing is written here any more — see src/files.js. It is kept only so
+ * a local checkout keeps serving what it already has, and so the migration
+ * does not have to happen in the same breath as the deploy.
  */
 export const UPLOAD_DIR = process.env.UPLOAD_DIR || join(__dirname, '..', 'uploads');
-if (!existsSync(UPLOAD_DIR)) mkdirSync(UPLOAD_DIR, { recursive: true });
 
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
-  filename: (_req, file, cb) => cb(null, `${randomUUID()}${extname(file.originalname) || ''}`),
+/**
+ * Uploads are buffered in memory, not spooled to disk, because the next
+ * stop is the database rather than the filesystem. That makes the size
+ * limit a memory limit too, hence something a deploy can lower.
+ */
+const MAX_UPLOAD_MB = Number(process.env.MAX_UPLOAD_MB) || 25;
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_UPLOAD_MB * 1024 * 1024 },
 });
-const upload = multer({ storage, limits: { fileSize: 8 * 1024 * 1024 } });
 
-export const content = Router();
+export const content = asyncRouter();
 
 /** Build a generic CRUD router for a Mongoose model. */
 function crud(ModelName, Model, sort = { order: 1, createdAt: 1 }) {
-  const r = Router();
+  const r = asyncRouter();
   r.get('/', async (_req, res) => res.json(await Model.find().sort(sort).lean()));
   r.post('/', async (req, res) => {
     try {
@@ -91,14 +94,39 @@ content.use('/announcements', crud('Announcement', Announcement, { createdAt: -1
 // Returns a HOST-RELATIVE URL for the uploaded file (image or audio). Clients
 // (dashboard + mobile app) resolve it against their own API base, so the same
 // stored value works from localhost, the LAN IP, or any future host.
-content.post('/upload', upload.single('file'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'no file' });
-  res.json({ url: `/uploads/${req.file.filename}` });
+content.post(
+  '/upload',
+  (req, res, next) =>
+    upload.single('file')(req, res, (err) => {
+      // Multer's own errors are 500s otherwise, which reads as "the server
+      // broke" for what is usually "that file is too big".
+      if (err?.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ error: `File is larger than ${MAX_UPLOAD_MB}MB.` });
+      }
+      if (err) return res.status(400).json({ error: err.message });
+      next();
+    }),
+  async (req, res) => {
+    if (!req.file) return res.status(400).json({ error: 'no file' });
+    try {
+      const { url } = await saveFile(req.file);
+      res.json({ url });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  },
+);
+
+/** Drop a stored file. The URL is the one `/upload` handed back. */
+content.delete('/upload', async (req, res) => {
+  const { url } = req.body ?? {};
+  if (!url) return res.status(400).json({ error: 'no url' });
+  res.json({ ok: await deleteFile(url) });
 });
 
 /* --------------------------------------------------------------- users -- */
 
-export const users = Router();
+export const users = asyncRouter();
 
 /**
  * Accounts are created by `POST /api/auth/sync`, which requires a verified
@@ -165,7 +193,7 @@ export const RASHIS = [
  * Returns whatever exists. An empty array is a real answer — the app says
  * nothing is published rather than inventing a reading.
  */
-export const horoscope = Router();
+export const horoscope = asyncRouter();
 
 /**
  * Every sign for one day, read and written in a single call.
@@ -266,7 +294,7 @@ horoscope.get('/horoscope', async (req, res) => {
  * needs this when a temple publishes something different. Returning null
  * rather than 404 keeps the app's handling to one branch.
  */
-export const panchang = Router();
+export const panchang = asyncRouter();
 panchang.get('/panchang', async (req, res) => {
   const date = String(req.query.date || '').match(/^\d{4}-\d{2}-\d{2}$/)
     ? String(req.query.date)
@@ -287,7 +315,7 @@ panchang.get('/panchang', async (req, res) => {
 /* ------------------------------------------------ public app content -- */
 
 // The app fetches all enabled content in one call.
-export const publicContent = Router();
+export const publicContent = asyncRouter();
 publicContent.get('/content', async (_req, res) => {
   const [
     deities,

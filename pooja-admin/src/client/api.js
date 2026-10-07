@@ -8,7 +8,18 @@
  * service, so the build needs VITE_API_BASE. Without it the dashboard will
  * call itself and every request 404s — see pooja-admin/README.md.
  */
-const BASE = import.meta.env.VITE_API_BASE || '';
+function normalise(raw) {
+  // Empty stays empty: that is same-origin, which is what dev wants.
+  if (!raw) return '';
+  // Render's blueprint can only pass the API's HOST, with no scheme. Left
+  // as-is that is a relative path, so every call would hit this site
+  // instead of the API and 404 against the SPA fallback.
+  const absolute = /^https?:\/\//.test(raw) ? raw : `https://${raw}`;
+  // `${BASE}/api` would otherwise become `//api` and lose the path.
+  return absolute.replace(/\/+$/, '');
+}
+
+const BASE = normalise(import.meta.env.VITE_API_BASE);
 
 /**
  * Raised when the server says the admin session is missing or expired.

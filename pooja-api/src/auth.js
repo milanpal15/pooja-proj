@@ -1,9 +1,8 @@
-import { Router } from 'express';
-
+import { asyncRouter } from './async.js';
 import { firebaseError, firebaseProjectId, firebaseReady, verifyIdToken } from './firebase.js';
-import { User } from './models.js';
+import { Booking, User } from './models.js';
 
-export const auth = Router();
+export const auth = asyncRouter();
 
 /**
  * Read `aud` out of an UNVERIFIED token. Only ever used to make a mismatch
@@ -102,16 +101,12 @@ export async function requireAuth(req, res, next) {
  * sign-in — and flagged as unverified so nothing downstream mistakes it
  * for proof of address.
  */
-function applyEmail(doc, decoded, typed) {
-  if (decoded.email) {
-    doc.email = decoded.email;
-    doc.emailVerified = true;
-    return;
-  }
-  if (typed && !doc.emailVerified) {
-    doc.email = typed;
-    doc.emailVerified = false;
-  }
+function emailUpdate(existing, decoded, typed) {
+  // A provider-supplied address always wins and is the only verified one.
+  if (decoded.email) return { email: decoded.email, emailVerified: true };
+  // A self-declared one must never overwrite a verified address.
+  if (typed && !existing?.emailVerified) return { email: typed, emailVerified: false };
+  return {};
 }
 
 auth.post('/sync', requireAuth, async (req, res) => {
@@ -140,34 +135,47 @@ auth.post('/sync', requireAuth, async (req, res) => {
     lastActive: new Date(),
   };
 
-  // A row may already exist from before this account had a uid (the pre-Firebase
-  // dummy sign-in wrote contact-only rows). Adopt it instead of colliding with
-  // its unique `contact` index.
-  let doc = req.user ?? (await User.findOne({ contact: identity.contact }));
+  /*
+   * A row may already exist from before this account had a uid (the
+   * pre-Firebase dummy sign-in wrote contact-only rows). Adopt it instead
+   * of colliding with its unique `contact` index.
+   */
+  const existing = req.user ?? (await User.findOne({ contact: identity.contact }));
 
-  if (doc) {
-    Object.assign(doc, identity);
-    // Never blank out something the devotee already set by syncing with an
-    // empty body — every cold start calls this.
-    if (name?.trim()) doc.name = name.trim();
-    else if (!doc.name) doc.name = decoded.name || '';
-    if (bio !== undefined) doc.bio = bio;
-    if (cleanGender) doc.gender = cleanGender;
-    if (cleanDob) doc.dob = cleanDob;
-    if (deviceId) doc.deviceId = deviceId;
-    applyEmail(doc, decoded, cleanEmail);
-    await doc.save();
-  } else {
-    doc = await User.create({
-      ...identity,
-      name: name?.trim() || decoded.name || '',
-      bio: bio || '',
-      gender: cleanGender,
-      dob: cleanDob,
-      deviceId,
-    });
-    applyEmail(doc, decoded, cleanEmail);
-    await doc.save();
+  const $set = { ...identity, ...emailUpdate(existing, decoded, cleanEmail) };
+  // Never blank out something the devotee already set by syncing with an
+  // empty body — every cold start calls this.
+  if (name?.trim()) $set.name = name.trim();
+  else if (!existing?.name) $set.name = decoded.name || '';
+  if (bio !== undefined) $set.bio = bio;
+  if (cleanGender) $set.gender = cleanGender;
+  if (cleanDob) $set.dob = cleanDob;
+  if (deviceId) $set.deviceId = deviceId;
+
+  /*
+   * One atomic upsert, not load-then-save.
+   *
+   * The old shape read the document, mutated it and called `save()`, which
+   * carries Mongoose's version check — and the app fires this on every auth
+   * state change, so two land together routinely. If the row moved under
+   * the first one it threw `VersionError`, and with no error handler in
+   * Express that unhandled rejection took the whole API down. There is no
+   * version to disagree about here.
+   */
+  let doc;
+  try {
+    doc = await User.findOneAndUpdate(
+      existing ? { _id: existing._id } : { uid: decoded.uid },
+      { $set },
+      { new: true, upsert: true, setDefaultsOnInsert: true },
+    );
+  } catch (e) {
+    // Two first-time syncs racing: both saw no row, both tried to insert,
+    // and the unique index let exactly one through. The loser just reads
+    // what the winner wrote.
+    if (e?.code !== 11000) throw e;
+    doc = await User.findOneAndUpdate({ uid: decoded.uid }, { $set }, { new: true });
+    if (!doc) throw e;
   }
 
   res.json(toProfile(doc));
@@ -234,3 +242,111 @@ function toProfile(doc) {
     blocked: !!doc.blocked,
   };
 }
+
+/* ───────────────────────────────────────────────────── saved temples ── */
+
+/**
+ * The devotee's bookmarked temples.
+ *
+ * Slugs only — the app already has the temples from `/api/content` and
+ * joins them itself, so this stays a tiny list that cannot drift out of
+ * date when a temple is renamed.
+ */
+auth.get('/saved-temples', requireAuth, async (req, res) => {
+  res.json({ slugs: req.user?.savedTemples ?? [] });
+});
+
+auth.put('/saved-temples', requireAuth, async (req, res) => {
+  const { slugs } = req.body ?? {};
+  if (!Array.isArray(slugs) || slugs.some((s) => typeof s !== 'string')) {
+    return res.status(400).json({ error: 'slugs must be an array of strings' });
+  }
+  // Deduped and capped: this is written straight from the client, and a
+  // list that can grow without bound is a list someone will grow.
+  const unique = [...new Set(slugs.map((s) => s.trim()).filter(Boolean))].slice(0, 200);
+  const doc = await User.findOneAndUpdate(
+    { uid: req.token.uid },
+    { $set: { savedTemples: unique } },
+    { new: true },
+  );
+  res.json({ slugs: doc?.savedTemples ?? unique });
+});
+
+/* ──────────────────────────────────────────────────────────  bookings ── */
+
+/**
+ * Status is derived, never stored.
+ *
+ * A booking becomes 'completed' because the day passed, not because
+ * something remembered to write it down — a stored flag would need a cron
+ * job and would be wrong in between runs.
+ */
+function withStatus(b) {
+  const today = new Date().toISOString().slice(0, 10);
+  return {
+    id: String(b._id),
+    bookingRef: b.bookingRef,
+    templeId: b.templeSlug,
+    templeName: b.templeName,
+    templeLocation: b.templeLocation,
+    sevaId: b.sevaSlug,
+    sevaName: b.sevaName,
+    sevaNameHi: b.sevaNameHi,
+    price: b.price,
+    totalAmount: b.totalAmount,
+    date: b.date,
+    devoteeName: b.devoteeName,
+    gotra: b.gotra,
+    prasad: !!b.prasad,
+    status: b.date >= today ? 'upcoming' : 'completed',
+    bookedAt: b.createdAt,
+  };
+}
+
+auth.get('/bookings', requireAuth, async (req, res) => {
+  const rows = await Booking.find({ uid: req.token.uid, cancelled: { $ne: true } })
+    .sort({ date: -1, createdAt: -1 })
+    .lean();
+  res.json({ bookings: rows.map(withStatus) });
+});
+
+auth.post('/bookings', requireAuth, async (req, res) => {
+  const b = req.body ?? {};
+  if (!b.date || !/^\d{4}-\d{2}-\d{2}$/.test(b.date)) {
+    return res.status(400).json({ error: 'date must be YYYY-MM-DD' });
+  }
+  const suffix = Math.floor(1000 + Math.random() * 9000);
+  const prefix = String(b.templeId || 'XX').slice(0, 2).toUpperCase();
+  try {
+    const doc = await Booking.create({
+      // Never from the body: the devotee is whoever the token says.
+      uid: req.token.uid,
+      bookingRef: `SM-${new Date().getFullYear()}-${prefix}-${suffix}`,
+      templeSlug: b.templeId,
+      templeName: b.templeName,
+      templeLocation: b.templeLocation,
+      sevaSlug: b.sevaId,
+      sevaName: b.sevaName,
+      sevaNameHi: b.sevaNameHi,
+      price: b.price,
+      totalAmount: b.totalAmount,
+      date: b.date,
+      devoteeName: b.devoteeName,
+      gotra: b.gotra,
+      prasad: !!b.prasad,
+    });
+    res.status(201).json({ booking: withStatus(doc) });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+auth.delete('/bookings/:id', requireAuth, async (req, res) => {
+  // Scoped by uid as well as id, so guessing an id reaches nothing.
+  const doc = await Booking.findOneAndUpdate(
+    { _id: req.params.id, uid: req.token.uid },
+    { $set: { cancelled: true } },
+  );
+  if (!doc) return res.status(404).json({ error: 'booking not found' });
+  res.json({ ok: true });
+});

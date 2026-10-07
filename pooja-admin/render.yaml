@@ -1,0 +1,62 @@
+# Blueprint: the dashboard.  (The API has its own, in pooja-api/.)
+#
+# Render looks for `render.yaml` at the REPO ROOT by default, and this is
+# not there. Set **Blueprint Path** to `pooja-admin/render.yaml` when you
+# create this Blueprint.
+#
+# Paths inside a Blueprint stay relative to the REPO ROOT, not to this
+# file — `rootDir: pooja-admin` is correct even though the file already
+# sits in that folder. `staticPublishPath` is the one exception: it is
+# relative to `rootDir`. If a build ever fails with "publish directory
+# not found", that is the field to change to `pooja-admin/dist`.
+#
+# ── A service's TYPE cannot be changed ────────────────────────────────
+# This is a STATIC SITE. The pre-split `pooja-admin` was a Node web
+# service, and a sync adopts an existing service by name and applies only
+# what it can — so the build command takes effect and the deploy still
+# dies on the old `npm run serve`, a script that moved to pooja-api when
+# the backend was split out. Nothing in this file can fix that. Delete
+# the web service in Render first, then sync, and it comes back as a
+# static site.
+#
+# What hides it: Render keeps the previous container serving while
+# deploys fail, so the dashboard answers normally — on a commit from
+# several releases ago — while every deploy of it has failed.
+
+services:
+  - type: web
+    name: pooja-admin
+    runtime: static
+    rootDir: pooja-admin
+    # `--include=dev` is load-bearing: NODE_ENV=production makes `npm ci`
+    # skip devDependencies, and Vite is one of them, so the build dies with
+    # `vite: not found`. This has already cost one failed deploy.
+    buildCommand: npm ci --include=dev && npm run build
+    staticPublishPath: dist
+    # CI deploys, not Render — same rule as the API. That means this
+    # service needs its own deploy hook in GitHub
+    # (RENDER_DASHBOARD_DEPLOY_HOOK_URL) or it silently never ships.
+    autoDeploy: false
+
+    envVars:
+      - key: NODE_VERSION
+        value: 20.19.4
+      # Baked into the bundle at BUILD time, so pointing the dashboard at a
+      # different API is a rebuild, not a restart.
+      #
+      # `fromService` may name a service from another Blueprint, but that
+      # service must already exist or the sync fails — so bring the API up
+      # first. It yields a bare host; the dashboard prefixes https://
+      # itself (see `normalise` in src/client/api.js).
+      - key: VITE_API_BASE
+        fromService:
+          type: web
+          name: pooja-api
+          property: host
+
+    # A single-page app: any path that is not a real file is a client
+    # route, so it must serve index.html rather than 404.
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

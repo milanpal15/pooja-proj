@@ -1,0 +1,83 @@
+# Blueprint: the API.  (The dashboard has its own, in pooja-admin/.)
+#
+# Two files, two Blueprints, because the two services have different
+# lifecycles: the dashboard is a static site that occasionally has to be
+# deleted and recreated — a service's TYPE cannot be changed once it
+# exists — and doing that should never put the API at risk.
+#
+# Render looks for `render.yaml` at the REPO ROOT by default, and this is
+# not there. Set **Blueprint Path** to `pooja-api/render.yaml` when you
+# create or edit this Blueprint; the dashboard's is `pooja-admin/render.yaml`.
+#
+# Paths inside a Blueprint — `rootDir` here — stay relative to the REPO
+# ROOT, not to this file. Moving the file does not change them.
+#
+# ── Adopting an existing service ──────────────────────────────────────
+# Render matches a Blueprint to a service BY NAME. The pre-split service
+# was called `pooja-admin` and ran this API; rename it to `pooja-api` in
+# Render → Settings before syncing, or you get a duplicate.
+#
+# ── CORS_ORIGIN is a cross-Blueprint reference ────────────────────────
+# `fromService` may name a service from another Blueprint, but that
+# service has to exist already or the sync fails. So on a FIRST deploy
+# bring the dashboard up before syncing this one. If you would rather not
+# depend on that order, replace the CORS_ORIGIN block with
+# `sync: false` and paste the dashboard's URL once.
+
+services:
+  - type: web
+    name: pooja-api
+    runtime: node
+    plan: free
+    region: singapore
+    rootDir: pooja-api
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/health
+    # CI deploys, not Render: a push that fails the gate smoke test must not
+    # reach production just because it was pushed.
+    autoDeploy: false
+
+    # No disk, and none needed: uploaded media lives in MongoDB (GridFS),
+    # not on the container filesystem. That filesystem is ephemeral and the
+    # free plan cannot mount a disk, so anything written there was lost on
+    # every deploy — which, once the app stopped shipping media of its own,
+    # meant the whole sanctum went blank. The storage constraint is now the
+    # database's: Atlas M0 is 512MB for documents AND media together.
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 20.19.4
+      # Biggest file the dashboard may upload. Uploads are buffered in
+      # memory on their way to the database, so this is a memory ceiling
+      # as much as a policy one — the free instance has 512MB.
+      - key: MAX_UPLOAD_MB
+        value: 25
+      - key: MONGODB_URI
+        sync: false # must name a database of its OWN — see docs/DEPLOY.md
+      - key: ADMIN_PASSWORD
+        sync: false # bootstraps the first operator; production will not boot without it
+      - key: ADMIN_SESSION_SECRET
+        generateValue: true
+      - key: FIREBASE_SERVICE_ACCOUNT
+        sync: false # the whole service-account JSON, on one line
+      # Filled in from the dashboard service, so there is no step where
+      # this is wrong and every dashboard call is refused. It cannot be
+      # '*': the browser forbids a wildcard origin on a credentialed
+      # request, and the admin session is a cookie.
+      #
+      # `fromService` yields a bare host; the API prefixes https:// itself
+      # (see `allowedOrigins` in src/index.js).
+      - key: CORS_ORIGIN
+        fromService:
+          type: web
+          name: pooja-admin
+          property: host
+      # The dashboard is a separate origin, so the session cookie is
+      # cross-site and `Strict` would stop the browser sending it at all —
+      # sign-in would appear to work and every call after it would 401.
+      # `None` requires HTTPS, which Render terminates.
+      - key: SESSION_SAMESITE
+        value: None

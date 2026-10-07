@@ -55,6 +55,9 @@ const RESEND_SECONDS = 45;
 
 type Step = 'select' | 'entry' | 'otp' | 'profile';
 
+/** A field on Create Profile that a validation message can point at. */
+type ProfileField = 'name' | 'gender' | 'dob' | 'email';
+
 
 /** The four options, in the order they are shown. */
 const GENDERS: { value: Gender; labelKey: StringKey }[] = [
@@ -69,49 +72,78 @@ const GENDERS: { value: Gender; labelKey: StringKey }[] = [
  *
  * Deliberately not a platform date picker: that is another native module
  * and another rebuild, and a wheel scrolled back sixty years is worse than
- * typing a year. Emits YYYY-MM-DD, or '' while incomplete, so the caller
- * only ever sees a whole date or nothing.
+ * typing a year.
+ */
+/** A real date — not just three numbers of the right length. */
+function isRealDate(yyyy: string, mm: string, dd: string): boolean {
+  const y = Number(yyyy);
+  const m = Number(mm);
+  const d = Number(dd);
+  if (y < 1900 || m < 1 || m > 12 || d < 1) return false;
+  // Day 0 of the next month is the last day of this one, which is the
+  // short way to get February and the 30-day months right.
+  return d <= new Date(y, m, 0).getDate();
+}
+
+export type DobParts = { d: string; m: string; y: string };
+
+export const splitDob = (v: string): DobParts =>
+  /^\d{4}-\d{2}-\d{2}$/.test(v)
+    ? { d: v.slice(8, 10), m: v.slice(5, 7), y: v.slice(0, 4) }
+    : { d: '', m: '', y: '' };
+
+/** The parts as `YYYY-MM-DD`, or '' while they are incomplete or impossible. */
+export const joinDob = ({ d, m, y }: DobParts): string =>
+  d.length === 2 && m.length === 2 && y.length === 4 && isRealDate(y, m, d) ? `${y}-${m}-${d}` : '';
+
+/**
+ * Date of birth as three boxes.
+ *
+ * Fully controlled on the three PARTS, not on the joined `YYYY-MM-DD`
+ * string, and it keeps no state of its own. Two bugs came out of trying to
+ * be cleverer than that:
+ *
+ *  - Deriving the boxes from the joined string meant the first digit of the
+ *    day produced an incomplete date, which the parent stores as '', which
+ *    came straight back as three empty boxes. Every keystroke was discarded
+ *    and the field simply could not be typed into.
+ *  - Keeping the parts in local state instead fixed the typing but froze
+ *    them at mount, so a date already on the server — which arrives a
+ *    moment later, after the profile sync — never appeared.
  */
 function DobField({
   label,
-  value,
+  parts,
   onChange,
 }: {
   label: string;
-  value: string;
-  onChange: (v: string) => void;
+  parts: DobParts;
+  onChange: (p: DobParts) => void;
 }) {
   const { c } = useTheme();
-  const [d, m, y] = value ? [value.slice(8, 10), value.slice(5, 7), value.slice(0, 4)] : ['', '', ''];
+  const monthRef = useRef<TextInput>(null);
+  const yearRef = useRef<TextInput>(null);
 
-  const emit = (dd: string, mm: string, yyyy: string) => {
-    if (dd.length === 2 && mm.length === 2 && yyyy.length === 4) {
-      onChange(`${yyyy}-${mm}-${dd}`);
-    } else {
-      onChange('');
-    }
+  const edit = (
+    key: keyof DobParts,
+    raw: string,
+    max: number,
+    nextBox?: React.RefObject<TextInput | null>,
+  ) => {
+    const digits = raw.replace(/[^0-9]/g, '').slice(0, max);
+    onChange({ ...parts, [key]: digits });
+    // Move on once a box is full: three taps to fill a date people type in
+    // one breath is the kind of friction that gets a sign-up abandoned.
+    if (digits.length === max) nextBox?.current?.focus();
   };
 
-  const box = (
-    val: string,
-    place: string,
-    len: number,
-    set: (v: string) => void,
-    flex: number,
-  ) => (
-    <TextInput
-      value={val}
-      placeholder={place}
-      placeholderTextColor={c.onSurfaceFaint}
-      keyboardType="number-pad"
-      maxLength={len}
-      onChangeText={(t) => set(t.replace(/[^0-9]/g, '').slice(0, len))}
-      style={[
-        styles.dobBox,
-        { flex, color: c.onSurface, borderColor: c.outlineVariant, backgroundColor: c.containerLowest },
-      ]}
-    />
-  );
+  // Written out rather than built by a helper: passing the refs into one
+  // would be touching them during render, which is both what the lint rule
+  // forbids and a real way to end up reading a stale node.
+  const boxStyle = (flex: number) => [
+    styles.dobBox,
+    { flex, color: c.onSurface, borderColor: c.outlineVariant, backgroundColor: c.containerLowest },
+  ];
 
   return (
     <View style={{ gap: 6 }}>
@@ -119,16 +151,45 @@ function DobField({
         {label}
       </Type>
       <View style={styles.dobRow}>
-        {box(d, 'DD', 2, (v) => emit(v, m, y), 1)}
-        {box(m, 'MM', 2, (v) => emit(d, v, y), 1)}
-        {box(y, 'YYYY', 4, (v) => emit(d, m, v), 1.6)}
+        <TextInput
+          value={parts.d}
+          placeholder="DD"
+          placeholderTextColor={c.onSurfaceFaint}
+          keyboardType="number-pad"
+          maxLength={2}
+          accessibilityLabel={`${label} — day`}
+          onChangeText={(t) => edit('d', t, 2, monthRef)}
+          style={boxStyle(1)}
+        />
+        <TextInput
+          ref={monthRef}
+          value={parts.m}
+          placeholder="MM"
+          placeholderTextColor={c.onSurfaceFaint}
+          keyboardType="number-pad"
+          maxLength={2}
+          accessibilityLabel={`${label} — month`}
+          onChangeText={(t) => edit('m', t, 2, yearRef)}
+          style={boxStyle(1)}
+        />
+        <TextInput
+          ref={yearRef}
+          value={parts.y}
+          placeholder="YYYY"
+          placeholderTextColor={c.onSurfaceFaint}
+          keyboardType="number-pad"
+          maxLength={4}
+          accessibilityLabel={`${label} — year`}
+          onChangeText={(t) => edit('y', t, 4)}
+          style={boxStyle(1.6)}
+        />
       </View>
     </View>
   );
 }
 
 export function LoginScreen() {
-  const { completeProfile, needsProfile, authError, clearAuthError } = useAuth();
+  const { completeProfile, needsProfile, pendingProfile, authError, clearAuthError } = useAuth();
   const { t, lang, toggleLang } = useLanguage();
   /*
    * SMS OTP is gated because Firebase bills per message and refuses to send
@@ -141,12 +202,28 @@ export function LoginScreen() {
   const [localStep, setStep] = useState<Step>('select');
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
-  const [name, setName] = useState('');
-  const [bio, setBio] = useState('');
-  const [gender, setGender] = useState<Gender | null>(null);
+  /*
+   * Profile fields. `null` means "not touched yet", so whatever the backend
+   * already knows shows through until the devotee types over it.
+   *
+   * Derived at render rather than copied in by an effect: the pending
+   * profile arrives after this screen has mounted, and an effect that
+   * copied it into state would both fight `react-hooks/set-state-in-effect`
+   * and clobber anything typed in the meantime.
+   */
+  const [nameEdit, setName] = useState<string | null>(null);
+  const [bioEdit, setBio] = useState<string | null>(null);
+  const [genderEdit, setGender] = useState<Gender | null>(null);
   /** YYYY-MM-DD, typed as three parts so no date picker native module is needed. */
-  const [dob, setDob] = useState('');
-  const [email, setEmail] = useState('');
+  const [dobEdit, setDobParts] = useState<DobParts | null>(null);
+  const [emailEdit, setEmail] = useState<string | null>(null);
+
+  const name = nameEdit ?? pendingProfile?.name ?? '';
+  const bio = bioEdit ?? pendingProfile?.bio ?? '';
+  const gender = genderEdit ?? pendingProfile?.gender ?? null;
+  const dobParts = dobEdit ?? splitDob(pendingProfile?.dob ?? '');
+  const dob = joinDob(dobParts);
+  const email = emailEdit ?? pendingProfile?.email ?? '';
   /**
    * Which provider just succeeded.
    *
@@ -155,6 +232,14 @@ export function LoginScreen() {
    */
   const [signedInBy, setSignedInBy] = useState<'phone' | 'google' | null>(null);
   const [error, setError] = useState('');
+  /*
+   * Which field the message belongs to, or null for a general failure.
+   *
+   * There was one shared `error` string and the Full Name field rendered
+   * it, so "Enter a valid email address" appeared under Full Name — the
+   * message pointing at the one field that was filled in correctly.
+   */
+  const [errorField, setErrorField] = useState<ProfileField | null>(null);
   const [busy, setBusy] = useState(false);
   const [resendIn, setResendIn] = useState(0);
   const confirmation = useRef<OtpConfirmation | null>(null);
@@ -183,8 +268,15 @@ export function LoginScreen() {
   /** Any fresh attempt clears the last failure, local or provider-side. */
   const resetError = useCallback(() => {
     setError('');
+    setErrorField(null);
     clearAuthError();
   }, [clearAuthError]);
+
+  /** Fail with a message attached to the field it is actually about. */
+  const failField = useCallback((field: ProfileField, message: string) => {
+    setError(message);
+    setErrorField(field);
+  }, []);
 
   useEffect(() => {
     if (resendIn <= 0) return;
@@ -216,6 +308,10 @@ export function LoginScreen() {
       const key = err?.message || 'err_signin_failed';
       if (err?.detail) console.warn('[auth]', err.code, err.detail);
       setError(t(key));
+      // Belongs to no field — and clearing this matters, or a sign-in
+      // failure after a validation failure renders under whichever field
+      // the last one pointed at.
+      setErrorField(null);
     },
     [t],
   );
@@ -273,16 +369,31 @@ export function LoginScreen() {
    * Phone sign-in carries no email, so we ask for one. Google already
    * supplied a verified address — asking again would be asking for
    * something we have.
+   *
+   * Read from the pending profile first, because `signedInBy` is local
+   * state and does not survive a reload. It did not, and the result was a
+   * trap: a phone devotee who relaunched at this step got a form with no
+   * email field, and no email is exactly what holds them here. Complete
+   * saved happily (the server answered 200) and the same screen came
+   * straight back, with nothing on it to explain why.
    */
-  const needsEmail = signedInBy === 'phone';
+  const method = pendingProfile?.method ?? signedInBy;
+  // Mirrors `profileComplete` exactly: ask for the email precisely when a
+  // missing one is what is holding them on this screen.
+  const needsEmail = method === 'phone' && !pendingProfile?.email;
 
   const complete = useCallback(async () => {
-    if (!name.trim()) return setError(t('err_name'));
-    if (!gender) return setError(t('err_gender'));
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(dob)) return setError(t('err_dob'));
-    if (dob > new Date().toISOString().slice(0, 10)) return setError(t('err_dob_future'));
+    if (!name.trim()) return failField('name', t('err_name'));
+    if (!gender) return failField('gender', t('err_gender'));
+    // Shape AND existence: `2025-02-31` matches the pattern happily.
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dob) || !isRealDate(dob.slice(0, 4), dob.slice(5, 7), dob.slice(8, 10))) {
+      return failField('dob', t('err_dob'));
+    }
+    if (dob > new Date().toISOString().slice(0, 10)) {
+      return failField('dob', t('err_dob_future'));
+    }
     if (needsEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) {
-      return setError(t('err_email'));
+      return failField('email', t('err_email'));
     }
 
     setBusy(true);
@@ -300,7 +411,7 @@ export function LoginScreen() {
     } finally {
       setBusy(false);
     }
-  }, [name, bio, gender, dob, email, needsEmail, completeProfile, resetError, show, t]);
+  }, [name, bio, gender, dob, email, needsEmail, completeProfile, failField, resetError, show, t]);
 
   return (
     <Backdrop>
@@ -447,7 +558,7 @@ export function LoginScreen() {
                       resetError();
                     }}
                     placeholder={t('ph_full_name')}
-                    error={shownError || undefined}
+                    error={errorField === 'name' ? shownError : undefined}
                   />
                   <View style={{ gap: 6 }}>
                     <Type v="labelMd" tone="onSurfaceVariant">
@@ -466,16 +577,26 @@ export function LoginScreen() {
                         />
                       ))}
                     </View>
+                    {errorField === 'gender' && (
+                      <Type v="labelMd" tone="error">
+                        {shownError}
+                      </Type>
+                    )}
                   </View>
 
                   <DobField
                     label={t('dob_label')}
-                    value={dob}
+                    parts={dobParts}
                     onChange={(v) => {
-                      setDob(v);
+                      setDobParts(v);
                       resetError();
                     }}
                   />
+                  {errorField === 'dob' && (
+                    <Type v="labelMd" tone="error">
+                      {shownError}
+                    </Type>
+                  )}
 
                   {/* Phone sign-in gives us no email; Google already did. */}
                   {needsEmail && (
@@ -490,6 +611,7 @@ export function LoginScreen() {
                       keyboardType="email-address"
                       autoCapitalize="none"
                       autoComplete="email"
+                      error={errorField === 'email' ? shownError : undefined}
                     />
                   )}
                   {needsEmail && (
@@ -505,6 +627,13 @@ export function LoginScreen() {
                     placeholder={t('ph_bio')}
                     multilineRows={3}
                   />
+                  {/* A failure that belongs to no single field — the save
+                      itself, or a dropped session — still has to be said. */}
+                  {!!shownError && !errorField && (
+                    <Type v="labelMd" tone="error" center>
+                      {shownError}
+                    </Type>
+                  )}
                   <Button
                     label={t('complete_profile')}
                     size="lg"

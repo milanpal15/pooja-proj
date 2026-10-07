@@ -3,7 +3,7 @@
 #
 # The deploy job is what makes this worth having. Render can auto-deploy on
 # push by itself, but it does so without knowing whether anything passed —
-# so `autoDeploy: false` in render.yaml hands that decision to this file.
+# so `autoDeploy: false` in both Blueprints hands that decision to this file.
 # Nothing reaches production without the admin gate having been proven shut,
 # before the release and again against the live URL.
 #
@@ -22,7 +22,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NODE_VERSION: '20.19.4' # matches render.yaml; below 20.19 `expo` dies on util.parseEnv
+  NODE_VERSION: '20.19.4' # matches both Blueprints; below 20.19 `expo` dies on util.parseEnv
 
 jobs:
   # ───────────────────────────────────────────────────────── dashboard ──
@@ -154,46 +154,24 @@ jobs:
             echo "::error::RENDER_DEPLOY_HOOK_URL secret is not set. See docs/DEPLOY.md."
             exit 1
           }
+          test -n "${{ secrets.RENDER_DASHBOARD_DEPLOY_HOOK_URL }}" || {
+            echo "::error::RENDER_DASHBOARD_DEPLOY_HOOK_URL secret is not set. The dashboard is a Render service too now, with autoDeploy off, so without this it silently never ships. See docs/DEPLOY.md."
+            exit 1
+          }
           test -n "${{ vars.DEPLOY_URL }}" || {
             echo "::error::DEPLOY_URL variable is not set. See docs/DEPLOY.md."
             exit 1
           }
 
-      # Checks the shape before calling it. A wrong value here fails with a
-      # bare `curl: (22) ... 404`, which says nothing about what to fix —
-      # and the usual mistake is pasting the service URL rather than the
-      # hook from Settings → Deploy Hook.
-      - name: Trigger the deploy
-        env:
-          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
-        run: |
-          case "$HOOK" in
-            https://api.render.com/deploy/srv-*) ;;
-            *)
-              echo "::error::RENDER_DEPLOY_HOOK_URL does not look like a Render deploy hook."
-              echo "Expected: https://api.render.com/deploy/srv-XXXXXXXX?key=YYYYYYYY"
-              echo "Got a value starting: $(printf '%.30s' "$HOOK")…"
-              echo "Copy it from Render → your service → Settings → Deploy Hook."
-              exit 1
-              ;;
-          esac
+      # Both services have autoDeploy off, so this is the only thing that
+      # ships either of them. The API goes first: the dashboard's bundle is
+      # built against it, and a dashboard live before its API is a site
+      # whose every call fails.
+      - name: Trigger the API deploy
+        run: ./scripts/render-deploy-hook.sh pooja-api "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
 
-          CODE=$(curl -sS -o /tmp/hook.out -w '%{http_code}' -X POST "$HOOK")
-          echo "deploy hook responded $CODE"
-          if [ "$CODE" = "200" ] || [ "$CODE" = "201" ]; then
-            exit 0
-          fi
-
-          # Each of these means something different, and the difference is
-          # the whole value of reading the log.
-          case "$CODE" in
-            404) echo "::error::404 — the service id or key in the hook URL is wrong. Re-copy it from Render → Settings → Deploy Hook." ;;
-            409) echo "::error::409 — Render is refusing to deploy this service. Usually it is suspended: free instance hours exhausted for the month, or suspended manually. Open the service in Render; the banner says which. The running instance keeps serving the OLD commit meanwhile." ;;
-            401|403) echo "::error::$CODE — the key in the hook URL is no longer valid. Regenerate the Deploy Hook in Render and re-set the secret." ;;
-            *) echo "::error::Deploy hook returned $CODE." ;;
-          esac
-          cat /tmp/hook.out
-          exit 1
+      - name: Trigger the dashboard deploy
+        run: ./scripts/render-deploy-hook.sh pooja-admin "${{ secrets.RENDER_DASHBOARD_DEPLOY_HOOK_URL }}"
 
       # Polls for THIS commit rather than for "is it up": the old container
       # keeps serving during a deploy, so a plain health check passes

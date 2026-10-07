@@ -1,8 +1,7 @@
-import { Router } from 'express';
-
+import { asyncRouter } from './async.js';
 import { Event, Flag, Payment, Visitor } from './models.js';
 
-export const router = Router();
+export const router = asyncRouter();
 
 /* --------------------------------------------------------------- flags -- */
 

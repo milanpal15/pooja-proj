@@ -432,6 +432,35 @@ anyone in. See `docs/FIREBASE_SETUP.md`.
   second source of truth the dashboard could not correct without a store
   release. `assets/images/` is now icons and UI chrome only, and there is
   no `assets/audio/` at all.
+- **Uploaded media lives in MongoDB, in GridFS** (`src/files.js`, bucket
+  `media`), not on the filesystem. Render's container is wiped on every
+  deploy and the free plan cannot mount a disk, so a filesystem upload was
+  guaranteed to disappear — and once the app shipped no media of its own,
+  that was the entire sanctum. Things worth knowing:
+  - The URL shape did **not** change: still host-relative
+    `/uploads/<id>.<ext>`. Every row already stored keeps resolving, and
+    `assetUrl()` / `api.asset()` needed no edit.
+  - `/uploads` is served **outside `/api`**, so the gate does not apply —
+    deliberate, because the app fetches media with no session.
+  - The route answers **Range requests**. Android's `MediaPlayer` (the
+    alarm) and `expo-audio`'s seek both need them; without 206 every seek
+    re-downloads from the start. Verified for prefix, suffix and
+    unsatisfiable ranges.
+  - **Content-Type is inferred from the extension** when the browser says
+    `application/octet-stream`, because MediaPlayer picks its decoder from
+    that header and silently fails on a generic one.
+  - Files are immutable (a re-upload gets a new id), hence
+    `Cache-Control: immutable` plus an ETag.
+  - `npm run migrate:media` moves anything still on disk and rewrites the
+    documents that referenced it. Idempotent; `--dry-run` previews both
+    halves. The old `uploads/` directory is still served as a fallback
+    until then.
+  - **Not solved: orphans.** Replacing a deity's artwork leaves the old
+    file in GridFS. `DELETE /api/content/upload` with `{url}` removes one,
+    but nothing calls it automatically — reference-counting across every
+    content type is a bigger job than this was.
+  - Storage is now the database's problem: **Atlas M0 is 512MB** for
+    documents and media together.
 - **Read deity art via `useContent().deityArt(id)` / `deityImage(id)`,**
   never a bundled map — there is none. No upload means the **procedural
   murti**, which is drawn from plain Views and needs no assets, so an
@@ -483,9 +512,9 @@ anyone in. See `docs/FIREBASE_SETUP.md`.
   deletes the Firebase account too) to the open internet.
 - **CI deploys, Render does not.** `.github/workflows/ci.yml` runs the
   dashboard build + a real boot against a Mongo service container +
-  `pooja-admin/scripts/smoke.mjs`, and the app's typecheck/lint; only a green
+  `pooja-api/scripts/smoke.mjs`, and the app's typecheck/lint; only a green
   `main` triggers the Render deploy hook. `autoDeploy: false` in
-  `render.yaml` is what makes that the only path to production.
+  both Blueprints is what makes that the only path to production.
 - **`scripts/smoke.mjs` is the gate's regression test.** It asserts the
   public endpoints answer 200 and every admin route answers 401, and it runs
   twice — against localhost in CI, then against the deployed URL. Run it by
@@ -496,7 +525,9 @@ anyone in. See `docs/FIREBASE_SETUP.md`.
   container keeps serving during a release and a plain health check passes
   against the version being replaced.
 - **Deployment lives in `docs/DEPLOY.md`** — Render + Mongo Atlas, via
-  `pooja-admin/render.yaml`. Two things bite: uploads need a mounted disk
+  `pooja-api/render.yaml` and `pooja-admin/render.yaml` — one Blueprint per
+  service, neither at the repo root, so each needs its **Blueprint Path**
+  set. Two things bite: uploads need a mounted disk
   (`UPLOAD_DIR`) or they are wiped on every release, and
   `EXPO_PUBLIC_ADMIN_API` is baked into the app bundle at build time, so
   pointing the app at the deployed API needs a rebuild, not a reload.
@@ -505,14 +536,38 @@ anyone in. See `docs/FIREBASE_SETUP.md`.
 
 ---
 
-## 6. Local services (when running)
+## 6. Configuration and local services
 
-| Service            | Port  | Command                                   |
-|--------------------|-------|-------------------------------------------|
-| MongoDB            | 27017 | `mongod` (or brew service)                |
-| Admin API          | 4000  | `cd pooja-admin/server && npm run dev`    |
-| Admin dashboard    | 5173  | `cd pooja-admin/client && npm run dev`    |
-| Metro (Expo)       | 8081  | `cd poojaappclone && npx expo start`      |
+**Every project has a `.env`, and a committed `.env.example` that lists
+every variable it reads.** The `.env` files are gitignored; the examples
+are the documentation, so a variable added in code belongs in its example
+in the same commit.
+
+| Project | `.env` holds | Notes |
+|---|---|---|
+| `pooja-api/` | `MONGODB_URI`, `CORS_ORIGIN`, `SESSION_SAMESITE`, Firebase key, `ADMIN_PASSWORD`, `MAX_UPLOAD_MB` | The only one with real secrets |
+| `pooja-admin/` | `API_ORIGIN` (dev proxy), `VITE_API_BASE` (build) | Static site — nothing secret can live here, it ends up in the bundle |
+| `poojaappclone/` | `EXPO_PUBLIC_ADMIN_API`, `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`, `EXPO_PUBLIC_SUPPORT_*` | `EXPO_PUBLIC_*` is embedded in the bundle, so none of it is secret |
+
+Two that catch people out:
+
+- **`EXPO_PUBLIC_*` is read at BUNDLE time.** Changing one needs Metro
+  restarted, not just the app reloaded. Metro prints which it exported on
+  boot (`env: export EXPO_PUBLIC_…`) — if a variable is not in that line,
+  the app is not seeing it.
+- **`API_ORIGIN` is the knob for pointing the local dashboard somewhere
+  else.** Vite proxies `/api` and `/uploads` to it, so the browser still
+  sees one origin and there is no CORS and no cookie problem.
+  `VITE_API_BASE` is the build-time equivalent and is baked in, so
+  changing it is a rebuild.
+
+| Service         | Port  | Command                                    |
+|-----------------|-------|--------------------------------------------|
+| MongoDB         | 27017 | `mongod` (or brew service) — only if `MONGODB_URI` is local |
+| API             | 4000  | `cd pooja-api && npm run dev`              |
+| Dashboard       | 5173  | `cd pooja-admin && npm run dev`            |
+| Metro (Expo)    | 8081  | `cd poojaappclone && npx expo start`       |
 
 Sign-in additionally needs `poojaappclone/google-services.json` and
-`pooja-admin/server/firebase-service-account.json` — see `docs/FIREBASE_SETUP.md`.
+`pooja-api/firebase-service-account.json`, both from the SAME Firebase
+project — see `docs/FIREBASE_SETUP.md`.

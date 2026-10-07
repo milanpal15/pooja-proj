@@ -37,6 +37,16 @@ type AuthContextValue = {
    * to verify all over again.
    */
   needsProfile: boolean;
+  /**
+   * What we already know about the devotee being held at Create Profile.
+   *
+   * `user` is deliberately null while the profile is incomplete, which left
+   * the login screen unable to tell a phone sign-in from a Google one after
+   * a reload — and that decides whether it asks for an email. Without the
+   * email a phone account can never satisfy `profileComplete`, so Create
+   * Profile saved successfully and reappeared, forever.
+   */
+  pendingProfile: User | null;
   /** Finish a first sign-in by naming the account. */
   completeProfile: (input: {
     name: string;
@@ -65,6 +75,7 @@ const AuthContext = createContext<AuthContextValue>({
   user: null,
   loading: true,
   needsProfile: false,
+  pendingProfile: null,
   completeProfile: async () => {},
   refreshProfile: async () => {},
   signOut: async () => {},
@@ -122,6 +133,7 @@ function profileComplete(u: User): boolean {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [needsProfile, setNeedsProfile] = useState(false);
+  const [pendingProfile, setPendingProfile] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState<StringKey | null>(null);
 
@@ -138,11 +150,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (u && !profileComplete(u)) {
         // Verified, but we do not know enough about them yet — hold at
         // Create Profile rather than letting a half-made account through.
+        // Kept rather than discarded: the form needs it to know which
+        // fields are still missing, and to not make them retype the rest.
         setUser(null);
+        setPendingProfile(u);
         setNeedsProfile(true);
         return;
       }
       setNeedsProfile(false);
+      setPendingProfile(null);
       setUser(u);
       cache(u);
     },
@@ -153,6 +169,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (reason: StringKey | null) => {
       activeUid.current = null;
       setUser(null);
+      setPendingProfile(null);
       setNeedsProfile(false);
       setAuthError(reason);
       await cache(null);
@@ -175,6 +192,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!fu) {
         activeUid.current = null;
         setUser(null);
+        setPendingProfile(null);
         setNeedsProfile(false);
         await cache(null);
         setLoading(false);
@@ -185,12 +203,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // 1. Show something immediately.
       const raw = await AsyncStorage.getItem(PROFILE_KEY).catch(() => null);
-      const cached = raw ? (JSON.parse(raw) as User) : null;
+      const stored = raw ? (JSON.parse(raw) as User) : null;
+      /*
+       * Only this account's cache is usable.
+       *
+       * The check used to live inline on the `apply` below, which left the
+       * sync underneath reading `cached.name` unguarded — so a profile left
+       * by a previous devotee on this device could put their name on a
+       * different account the first time it signed in. Narrowed once, here,
+       * rather than at each use.
+       */
+      const cached = stored?.uid === fu.uid ? stored : null;
       if (activeUid.current !== fu.uid) return;
-      apply(cached?.uid === fu.uid ? cached : fromFirebase(fu));
-      setLoading(false);
+      /*
+       * Only a cache can shortcut the wait — and only a complete one gets
+       * anyone past the gate.
+       *
+       * This used to fall back to `fromFirebase(fu)`, which can never be a
+       * complete profile: Firebase knows no gender, no date of birth and,
+       * for a phone sign-in, no email. So every returning devotee was
+       * declared incomplete the moment they signed in, Create Profile
+       * appeared, and the sync a second later replaced it with Home. A
+       * form that flashes up and disappears reads as a glitch — and it is
+       * live long enough to start typing into before it is taken away.
+       */
+      if (cached) {
+        apply(cached);
+        setLoading(false);
+      }
 
-      // 2. Then reconcile with the backend.
+      /*
+       * 2. Then reconcile with the backend.
+       *
+       * With nothing cached this is also what decides the first screen, so
+       * the splash stays up until it answers rather than guessing. Bounded
+       * by `authedFetch`'s own timeout, and it only happens on a first
+       * sign-in or straight after a sign-out — moments when the devotee
+       * has just proved they are online.
+       */
       const deviceId = (await AsyncStorage.getItem(DEVICE_KEY).catch(() => null)) ?? undefined;
       try {
         const profile = await syncProfile({
@@ -207,9 +257,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (activeUid.current !== fu.uid) return;
         // 403 means an admin blocked this account — not survivable offline-style,
         // so drop the session rather than keep serving the cached copy.
-        if (e instanceof ApiError && e.status === 403) await hardSignOut('err_blocked');
-        // Anything else (backend down, no network, 503 because Firebase Admin
-        // is not configured yet) — keep what step 1 already put on screen.
+        if (e instanceof ApiError && e.status === 403) {
+          await hardSignOut('err_blocked');
+          return;
+        }
+        // Backend unreachable. With a cache, step 1 is already on screen.
+        // Without one, Firebase is all we know — enough to hold them at
+        // Create Profile, which is the honest state: a new account cannot
+        // be created without the backend anyway.
+        if (!cached) apply(fromFirebase(fu));
+      } finally {
+        // Must be in `finally`: every branch above can return early, and
+        // on the no-cache path nothing else lowers the splash — missing it
+        // leaves the app on the warm orange screen forever.
+        setLoading(false);
       }
     });
 
@@ -231,6 +292,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Offline: let them in with what they typed. The next successful sync
         // pushes it up, because `syncProfile` sends the cached name.
         setNeedsProfile(false);
+        setPendingProfile(null);
         setUser((prev) => {
           const next: User = prev
             ? { ...prev, name: trimmed, bio, gender, dob }
@@ -259,13 +321,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user,
       loading,
       needsProfile,
+      pendingProfile,
       completeProfile,
       refreshProfile,
       signOut,
       authError,
       clearAuthError,
     }),
-    [user, loading, needsProfile, completeProfile, refreshProfile, signOut, authError, clearAuthError],
+    [
+      user,
+      loading,
+      needsProfile,
+      pendingProfile,
+      completeProfile,
+      refreshProfile,
+      signOut,
+      authError,
+      clearAuthError,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

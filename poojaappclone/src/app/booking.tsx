@@ -298,7 +298,8 @@ export default function BookingScreen() {
               devoteeName: name.trim() || 'Devotee',
               gotra: gotra.trim() || undefined,
               prasad,
-              status: 'upcoming',
+              // No `status`: the server derives it from the date, so a
+              // booking cannot be marked upcoming on a day already past.
             }).catch(() => {});
             setTimeout(() => {
               setPayOpen(false);

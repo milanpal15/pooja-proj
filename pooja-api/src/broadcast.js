@@ -1,5 +1,4 @@
-import { Router } from 'express';
-
+import { asyncRouter } from './async.js';
 import { Announcement, Policy, User, Visitor } from './models.js';
 
 /**
@@ -12,7 +11,7 @@ import { Announcement, Policy, User, Visitor } from './models.js';
 
 /* ═══════════════════════════════════════════════════════════ policies ═══ */
 
-export const policies = Router();
+export const policies = asyncRouter();
 
 /** The seed rules, inserted once so the dashboard opens on something real. */
 const DEFAULT_TERMS = `## Rules & Regulations
@@ -118,7 +117,7 @@ policies.post('/policy/:key/accept', async (req, res) => {
 
 /* ══════════════════════════════════════════════════════ announcements ═══ */
 
-export const announcements = Router();
+export const announcements = asyncRouter();
 
 /** Public: everything the app should consider showing right now. */
 announcements.get('/announcements', async (_req, res) => {

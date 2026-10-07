@@ -69,12 +69,44 @@ every document cross the internet in clear text. Atlas (`mongodb+srv://`)
 forces TLS. If you are using your own server, either put it behind a VPN or
 enable TLS on mongod and add `?tls=true`.
 
-## 2. The service
+## 2. The services
 
 Render → **New → Blueprint** → pick this repo. It reads
-[`pooja-admin/render.yaml`](../pooja-admin/render.yaml), which already sets
-the build and start commands, the health check, and the non-secret
-environment.
+two Blueprint files — one per service, each in its own folder:
+[`pooja-api/render.yaml`](../pooja-api/render.yaml) and
+[`pooja-admin/render.yaml`](../pooja-admin/render.yaml). Render looks for
+`render.yaml` at the repo root by default and neither is there, so set
+**Blueprint Path** to the right file when you create each one.
+
+They are separate because the two services have different lifecycles: the
+dashboard is a static site that sometimes has to be deleted and recreated,
+and that should never put the API at risk.
+
+Between them they declare the API
+(`pooja-api`, a Node process) and the dashboard (`pooja-admin`, a static
+bundle) — along with their build commands, the health check, and the
+non-secret environment.
+
+> **Already have a service called `pooja-admin` running the API?**
+> That is the pre-split one, from when the backend lived inside the
+> dashboard folder. Render matches a blueprint to a service **by name**, so
+> rename it to `pooja-api` in Settings *before* syncing; otherwise you get
+> a second service and the old one keeps failing with
+> `npm error Missing script: "serve"`.
+
+> **A service's TYPE cannot be changed.** The dashboard is a *static site*;
+> the pre-split `pooja-admin` was a *Node web service*. A sync adopts the
+> old service by name and applies what it can — so its build command starts
+> working and the deploy still dies on `npm run serve`, a script that moved
+> to `pooja-api` long ago. Delete that web service in Render, then sync,
+> and it comes back as a static site. Until then Render keeps the previous
+> container serving, so the dashboard looks healthy while every deploy of
+> it fails.
+
+The two URLs are wired to each other by the blueprint, so neither has to be
+typed anywhere: the dashboard's `VITE_API_BASE` comes from the API service
+and the API's `CORS_ORIGIN` comes from the dashboard service. Render hands
+over a bare host (no scheme); both sides prefix `https://` themselves.
 
 You will be prompted for the three secrets marked `sync: false`:
 
@@ -92,8 +124,55 @@ jq -c . firebase-service-account.json | pbcopy
 
 Paste that as the value. `ADMIN_SESSION_SECRET` is generated for you.
 
-First deploy takes a few minutes. When it is up you get a URL like
-`https://pooja-admin.onrender.com`.
+First deploy takes a few minutes. When it is up you get two URLs, like
+`https://pooja-api.onrender.com` and `https://pooja-admin.onrender.com`.
+
+### Uploaded media
+
+Artwork, alert tones and bhajan recordings go into **MongoDB (GridFS)**, not
+onto the container's filesystem — Render wipes that on every deploy and the
+free plan cannot mount a disk, so a file written there was gone by the next
+release. There is nothing to configure: the same `MONGODB_URI` holds them,
+and one backup covers documents and media together.
+
+Two consequences:
+
+- **Atlas M0 is 512MB total.** Media counts against the same budget as the
+  documents. A few hundred images is fine; a library of full-length
+  recordings is not. `db.stats()` or the Atlas metrics tab show the split.
+- **`MAX_UPLOAD_MB`** (default 25) caps a single upload. Uploads are
+  buffered in memory on the way to the database, so raising it on a free
+  instance — 512MB of RAM — is not free.
+
+Upgrading from a deploy that stored files on disk? Run it once, against the
+production database:
+
+```bash
+cd pooja-api
+MONGODB_URI='…' npm run migrate:media -- --dry-run   # preview
+MONGODB_URI='…' npm run migrate:media                # do it
+```
+
+It copies each file into GridFS and rewrites every document that referenced
+the old path. It is idempotent, so a second run stores nothing new.
+
+### Deploy hooks
+
+Both services have `autoDeploy: false` — CI ships them, so a commit that
+fails the gate smoke test cannot reach production just because it was
+pushed. That means **each service needs its deploy hook in GitHub**, or it
+silently never ships:
+
+| GitHub secret | From |
+|---|---|
+| `RENDER_DEPLOY_HOOK_URL` | Render → `pooja-api` → Settings → Deploy Hook |
+| `RENDER_DASHBOARD_DEPLOY_HOOK_URL` | Render → `pooja-admin` → Settings → Deploy Hook |
+
+Also set the repo **variable** `DEPLOY_URL` to the API's URL — CI polls
+`$DEPLOY_URL/api/health` for the pushed commit before smoke-testing it.
+Renaming a service does **not** change its deploy hook (the hook is keyed to
+the service id), but it *does* change its URL, so `DEPLOY_URL` must be
+updated after a rename.
 
 > **The free plan sleeps after 15 minutes idle** and takes ~30–50s to wake.
 > Fine for a dashboard you open a few times a day. Less fine for the phone
@@ -105,7 +184,7 @@ First deploy takes a few minutes. When it is up you get a URL like
 ## 3. Turn on the pipeline
 
 [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs on every push
-and pull request, and deploys from a green `main`. `render.yaml` sets
+and pull request, and deploys from a green `main`. Both Blueprints set
 `autoDeploy: false` precisely so that Render does not release anything this
 has not checked.
 
@@ -247,7 +326,7 @@ nothing in the logs to say why. Three ways out, in order of effort:
 1. **Paste URLs instead of uploading.** Every image field accepts an absolute
    URL as well as an upload. Host the artwork anywhere stable.
 2. **Upgrade to Starter** and give it a disk. Add this back to
-   `render.yaml`, alongside `plan: starter`:
+   `pooja-api/render.yaml`, alongside `plan: starter`:
 
    ```yaml
        disk:

@@ -297,6 +297,13 @@ const userSchema = new Schema(
     dob: String,
     deviceId: String,
     blocked: { type: Boolean, default: false },
+    /**
+     * Temple slugs this devotee bookmarked.
+     *
+     * On the user rather than its own collection: it is a short list, only
+     * ever read and written whole, and only ever by its owner.
+     */
+    savedTemples: { type: [String], default: [] },
     /** Which policy version this devotee accepted, per policy key. */
     acceptedPolicies: { type: Map, of: Number, default: {} },
     lastActive: { type: Date, default: Date.now },
@@ -573,6 +580,49 @@ export const Deity = model('Deity', deitySchema);
 export const Temple = model('Temple', templeSchema);
 export const Aarti = model('Aarti', aartiSchema);
 export const User = model('User', userSchema);
+
+/**
+ * A seva a devotee booked.
+ *
+ * These used to live in the phone's AsyncStorage, seeded with two invented
+ * bookings — so every devotee saw the same two, a reinstall lost the real
+ * ones, and the temple could not see a single booking it had taken.
+ *
+ * `templeName`, `sevaName` and `price` are copied in rather than joined:
+ * a booking is a record of what was agreed, and renaming a seva or raising
+ * its price must not rewrite what someone already paid for.
+ */
+const bookingSchema = new Schema(
+  {
+    /** Firebase uid of the devotee. Indexed — every read is scoped by it. */
+    uid: { type: String, required: true, index: true },
+    /** Human-readable reference shown in the app and quoted to the temple. */
+    bookingRef: { type: String, required: true, unique: true },
+    templeSlug: String,
+    templeName: String,
+    templeLocation: String,
+    sevaSlug: String,
+    sevaName: String,
+    sevaNameHi: String,
+    price: Number,
+    totalAmount: Number,
+    /** The day the seva is performed, YYYY-MM-DD — a date, not a timestamp. */
+    date: { type: String, required: true },
+    devoteeName: String,
+    gotra: String,
+    prasad: { type: Boolean, default: false },
+    /**
+     * Derived from `date` on read, not stored: a booking does not become
+     * 'completed' by anyone editing it, it becomes completed by the day
+     * passing. Kept here only so an operator can cancel one.
+     */
+    cancelled: { type: Boolean, default: false },
+  },
+  { timestamps: true },
+);
+bookingSchema.index({ uid: 1, date: -1 });
+
+export const Booking = model('Booking', bookingSchema);
 export const Festival = model('Festival', festivalSchema);
 export const Horoscope = model('Horoscope', horoscopeSchema);
 export const Panchang = model('Panchang', panchangSchema);

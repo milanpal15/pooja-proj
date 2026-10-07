@@ -23,21 +23,43 @@ export default function MyPoojasScreen() {
 
   const [bookings, setBookings] = useState<BookedPooja[]>([]);
   const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [tab, setTab] = useState<FilterTab>('all');
 
-  const loadData = useCallback(async () => {
-    try {
-      const data = await getBookedPoojas();
-      setBookings(data);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
+  /*
+   * A promise chain rather than `await` in an async function: it keeps
+   * every setState in a later tick, which is what the effect below needs,
+   * and `alive` stops a slow response writing to a screen already left.
+   */
+  const loadData = useCallback(
+    (alive: () => boolean = () => true) =>
+      getBookedPoojas()
+        .then((data) => {
+          if (!alive()) return;
+          setBookings(data);
+          setFailed(false);
+        })
+        .catch(() => {
+          // An empty list and an unreachable temple look identical
+          // otherwise, and "you have no bookings" is a bad thing to tell
+          // someone wrongly.
+          if (alive()) setFailed(true);
+        })
+        .finally(() => {
+          if (!alive()) return;
+          setLoading(false);
+          setRefreshing(false);
+        }),
+    [],
+  );
 
   useEffect(() => {
-    loadData();
+    let alive = true;
+    loadData(() => alive);
+    return () => {
+      alive = false;
+    };
   }, [loadData]);
 
   const onRefresh = () => {
@@ -52,8 +74,15 @@ export default function MyPoojasScreen() {
         text: t('cancel_booking'),
         style: 'destructive',
         onPress: async () => {
-          const updated = await cancelBooking(b.id);
-          setBookings(updated);
+          try {
+            await cancelBooking(b.id);
+          } catch {
+            // The row is the server's now, so a failed cancel must not
+            // disappear from the list as though it had worked.
+            toast.error(t('booking_cancel_failed'));
+            return;
+          }
+          setBookings((prev) => prev.filter((x) => x.id !== b.id));
           toast.success(t('booking_cancelled'));
         },
       },
@@ -114,17 +143,20 @@ export default function MyPoojasScreen() {
                 <Icon name="diya" size={48} color={c.primary} />
               </View>
               <Type v="headlineMd" tone="goldInk" center>
-                {t('no_bookings_title')}
+                {failed ? t('bookings_unavailable_title') : t('no_bookings_title')}
               </Type>
               <Type v="bodyMd" tone="onSurfaceVariant" center style={styles.emptyDesc}>
-                {t('no_bookings_desc')}
+                {failed ? t('bookings_unavailable_desc') : t('no_bookings_desc')}
               </Type>
+              {/* Retry when the list could not be read; browse when it is
+                  genuinely empty. Offering "Book a Pooja" to someone whose
+                  bookings merely failed to load hides the real problem. */}
               <Button
-                label={t('book_a_pooja')}
-                icon="temple"
+                label={failed ? t('retry') : t('book_a_pooja')}
+                icon={failed ? undefined : 'temple'}
                 size="md"
-                onPress={() => router.push('/temples')}
-                style={{ marginTop: Space.md }}
+                onPress={() => (failed ? onRefresh() : router.push('/temples'))}
+                style={styles.emptyCta}
               />
             </View>
           ) : null
@@ -282,6 +314,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: Space.margin,
     paddingBottom: Space.xl,
     gap: Space.md,
+  },
+  /*
+   * `alignSelf` is the point of this, not the margin.
+   *
+   * A Button that is not `block` sets `alignSelf: 'flex-start'` so it does
+   * not stretch to fill a column — which also overrides the centred
+   * container around it, leaving the call to action hard against the left
+   * edge under centred text.
+   */
+  emptyCta: {
+    marginTop: Space.md,
+    alignSelf: 'center',
   },
   emptyContainer: {
     paddingVertical: 60,

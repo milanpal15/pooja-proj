@@ -111,3 +111,66 @@ export function updateProfile(body: {
     body: JSON.stringify(body),
   }) as Promise<Profile>;
 }
+
+/* ────────────────────────────────────────────────────────── bookings ── */
+
+/**
+ * A seva this devotee booked.
+ *
+ * Keyed to the Firebase uid on the server, so it follows the account to a
+ * new phone rather than living and dying with one install. `status` is
+ * derived from the date by the server, never stored.
+ */
+export type BookedPooja = {
+  id: string;
+  bookingRef: string;
+  templeId: string;
+  templeName: string;
+  templeLocation: string;
+  sevaId: string;
+  sevaName: string;
+  sevaNameHi: string;
+  price: number;
+  totalAmount: number;
+  /** YYYY-MM-DD. */
+  date: string;
+  devoteeName: string;
+  gotra?: string;
+  prasad: boolean;
+  status: 'upcoming' | 'completed';
+  bookedAt: string;
+};
+
+export type NewBooking = Omit<BookedPooja, 'id' | 'bookingRef' | 'status' | 'bookedAt'>;
+
+export async function fetchBookings(): Promise<BookedPooja[]> {
+  const { bookings } = (await authedFetch('/api/auth/bookings')) as { bookings: BookedPooja[] };
+  return bookings ?? [];
+}
+
+export async function postBooking(body: NewBooking): Promise<BookedPooja> {
+  const { booking } = (await authedFetch('/api/auth/bookings', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })) as { booking: BookedPooja };
+  return booking;
+}
+
+export function deleteBooking(id: string) {
+  return authedFetch(`/api/auth/bookings/${id}`, { method: 'DELETE' });
+}
+
+/* ───────────────────────────────────────────────────── saved temples ── */
+
+export async function fetchSavedTemples(): Promise<string[]> {
+  const { slugs } = (await authedFetch('/api/auth/saved-temples')) as { slugs: string[] };
+  return slugs ?? [];
+}
+
+export async function putSavedTemples(slugs: string[]): Promise<string[]> {
+  const res = (await authedFetch('/api/auth/saved-temples', {
+    method: 'PUT',
+    body: JSON.stringify({ slugs }),
+  })) as { slugs: string[] };
+  return res.slugs ?? slugs;
+}

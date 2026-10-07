@@ -118,8 +118,29 @@ if (PASSWORD) {
     const cookie = setCookie.split(';')[0];
     if (!/HttpOnly/i.test(setCookie)) fail('session cookie is HttpOnly');
     else pass('session cookie is HttpOnly');
-    if (!/SameSite=Strict/i.test(setCookie)) fail('session cookie is SameSite=Strict');
-    else pass('session cookie is SameSite=Strict');
+    /*
+     * SameSite is a deployment choice, not a constant, so this asserts the
+     * policy is coherent rather than that it is one particular value.
+     *
+     * Same-origin (dev, Vite proxying /api) wants Strict. Cross-site — the
+     * dashboard on its own host, which is how it is deployed — needs None,
+     * because Strict means the browser never sends the cookie and every
+     * call after a successful sign-in 401s.
+     *
+     * This used to demand Strict outright. Production sets None, and CI
+     * runs this same file against the deployed URL, so the deploy gate
+     * would have failed on every release.
+     */
+    const sameSite = (setCookie.match(/SameSite=(\w+)/i) || [])[1] || '(absent)';
+    if (!/^(Strict|Lax|None)$/i.test(sameSite)) {
+      fail('session cookie sets SameSite', `got ${sameSite}`);
+    } else if (/^None$/i.test(sameSite) && !/Secure/i.test(setCookie)) {
+      // A browser silently drops SameSite=None without Secure, so this
+      // combination is not a weaker policy — it is no cookie at all.
+      fail('SameSite=None cookie is also Secure', 'None without Secure is rejected by the browser');
+    } else {
+      pass(`session cookie is SameSite=${sameSite}`);
+    }
     // Secure only makes sense over TLS; locally the server omits it.
     if (BASE.startsWith('https://')) {
       if (!/Secure/i.test(setCookie)) fail('session cookie is Secure over https');
