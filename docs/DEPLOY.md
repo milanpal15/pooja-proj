@@ -72,7 +72,17 @@ enable TLS on mongod and add `?tls=true`.
 ## 2. The services
 
 Render → **New → Blueprint** → pick this repo. It reads
-[`render.yaml`](../render.yaml), which declares **both** services — the API
+two Blueprint files — one per service, each in its own folder:
+[`pooja-api/render.yaml`](../pooja-api/render.yaml) and
+[`pooja-admin/render.yaml`](../pooja-admin/render.yaml). Render looks for
+`render.yaml` at the repo root by default and neither is there, so set
+**Blueprint Path** to the right file when you create each one.
+
+They are separate because the two services have different lifecycles: the
+dashboard is a static site that sometimes has to be deleted and recreated,
+and that should never put the API at risk.
+
+Between them they declare the API
 (`pooja-api`, a Node process) and the dashboard (`pooja-admin`, a static
 bundle) — along with their build commands, the health check, and the
 non-secret environment.
@@ -174,7 +184,7 @@ updated after a rename.
 ## 3. Turn on the pipeline
 
 [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs on every push
-and pull request, and deploys from a green `main`. `render.yaml` sets
+and pull request, and deploys from a green `main`. Both Blueprints set
 `autoDeploy: false` precisely so that Render does not release anything this
 has not checked.
 
@@ -316,7 +326,7 @@ nothing in the logs to say why. Three ways out, in order of effort:
 1. **Paste URLs instead of uploading.** Every image field accepts an absolute
    URL as well as an upload. Host the artwork anywhere stable.
 2. **Upgrade to Starter** and give it a disk. Add this back to
-   `render.yaml`, alongside `plan: starter`:
+   `pooja-api/render.yaml`, alongside `plan: starter`:
 
    ```yaml
        disk:

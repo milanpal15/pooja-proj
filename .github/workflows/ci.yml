@@ -3,7 +3,7 @@
 #
 # The deploy job is what makes this worth having. Render can auto-deploy on
 # push by itself, but it does so without knowing whether anything passed —
-# so `autoDeploy: false` in render.yaml hands that decision to this file.
+# so `autoDeploy: false` in both Blueprints hands that decision to this file.
 # Nothing reaches production without the admin gate having been proven shut,
 # before the release and again against the live URL.
 #
@@ -22,7 +22,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NODE_VERSION: '20.19.4' # matches render.yaml; below 20.19 `expo` dies on util.parseEnv
+  NODE_VERSION: '20.19.4' # matches both Blueprints; below 20.19 `expo` dies on util.parseEnv
 
 jobs:
   # ───────────────────────────────────────────────────────── dashboard ──

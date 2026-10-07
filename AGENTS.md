@@ -514,7 +514,7 @@ anyone in. See `docs/FIREBASE_SETUP.md`.
   dashboard build + a real boot against a Mongo service container +
   `pooja-api/scripts/smoke.mjs`, and the app's typecheck/lint; only a green
   `main` triggers the Render deploy hook. `autoDeploy: false` in
-  `render.yaml` is what makes that the only path to production.
+  both Blueprints is what makes that the only path to production.
 - **`scripts/smoke.mjs` is the gate's regression test.** It asserts the
   public endpoints answer 200 and every admin route answers 401, and it runs
   twice — against localhost in CI, then against the deployed URL. Run it by
@@ -525,7 +525,9 @@ anyone in. See `docs/FIREBASE_SETUP.md`.
   container keeps serving during a release and a plain health check passes
   against the version being replaced.
 - **Deployment lives in `docs/DEPLOY.md`** — Render + Mongo Atlas, via
-  `render.yaml` at the repo root. Two things bite: uploads need a mounted disk
+  `pooja-api/render.yaml` and `pooja-admin/render.yaml` — one Blueprint per
+  service, neither at the repo root, so each needs its **Blueprint Path**
+  set. Two things bite: uploads need a mounted disk
   (`UPLOAD_DIR`) or they are wiped on every release, and
   `EXPO_PUBLIC_ADMIN_API` is baked into the app bundle at build time, so
   pointing the app at the deployed API needs a rebuild, not a reload.
