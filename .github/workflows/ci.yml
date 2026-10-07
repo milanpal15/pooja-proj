@@ -25,7 +25,69 @@ env:
   NODE_VERSION: '20.19.4' # matches both Blueprints; below 20.19 `expo` dies on util.parseEnv
 
 jobs:
-  # ───────────────────────────────────────────────────────── dashboard ──
+  # ─────────────────────────────────────────────────────── blueprints ──
+  # Two Blueprint files now, neither at the repo root. A typo in either is
+  # only discovered when a deploy fails, which is the worst place to find
+  # out — so parse them here and assert the handful of fields that have
+  # actually gone wrong before.
+  blueprints:
+    name: Blueprints — parse and sanity-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate
+        run: |
+          ruby -ryaml -e '
+            bad = []
+            check = ->(cond, msg) { bad << msg unless cond }
+
+            api  = YAML.load_file("pooja-api/render.yaml")["services"]
+            dash = YAML.load_file("pooja-admin/render.yaml")["services"]
+            check.(api.size  == 1, "pooja-api/render.yaml should declare exactly one service")
+            check.(dash.size == 1, "pooja-admin/render.yaml should declare exactly one service")
+            a, d = api[0], dash[0]
+
+            check.(a["name"] == "pooja-api",   "api name is #{a["name"].inspect}")
+            check.(d["name"] == "pooja-admin", "dashboard name is #{d["name"].inspect}")
+
+            # A service TYPE cannot be changed after creation, so a wrong
+            # runtime here is not something you fix by editing the file.
+            check.(a["runtime"] == "node",   "api runtime is #{a["runtime"].inspect}")
+            check.(d["runtime"] == "static", "dashboard runtime is #{d["runtime"].inspect}")
+
+            # rootDir is relative to the REPO root, not to the Blueprint file.
+            check.(a["rootDir"] == "pooja-api",   "api rootDir is #{a["rootDir"].inspect}")
+            check.(d["rootDir"] == "pooja-admin", "dashboard rootDir is #{d["rootDir"].inspect}")
+
+            # Vite is a devDependency; without this the build dies on "vite: not found".
+            check.(d["buildCommand"].include?("--include=dev"), "dashboard build must pass --include=dev")
+
+            # CI is the only path to production; autoDeploy would bypass the gate.
+            check.(a["autoDeploy"] == false, "api autoDeploy must be false")
+            check.(d["autoDeploy"] == false, "dashboard autoDeploy must be false")
+
+            # A cycle between the two Blueprints makes each unsyncable while
+            # the other is being recreated. One direction only.
+            a["envVars"].each do |e|
+              check.(!e.key?("fromService"), "api env #{e["key"]} uses fromService — that re-creates the cycle")
+            end
+
+            # The admin session is a cookie: a wildcard origin is refused by
+            # the browser, and Strict is never sent cross-site.
+            cors = a["envVars"].find { |e| e["key"] == "CORS_ORIGIN" }
+            check.(cors && cors["value"] != "*", "CORS_ORIGIN must not be '"'"'*'"'"'")
+            same = a["envVars"].find { |e| e["key"] == "SESSION_SAMESITE" }
+            check.(same && same["value"] == "None", "SESSION_SAMESITE must be None, got #{same && same["value"].inspect}")
+
+            bad.each { |m| puts "::error::#{m}" }
+            puts(bad.empty? ? "both Blueprints parse and look sane" : "#{bad.size} problem(s)")
+            exit(bad.empty? ? 0 : 1)
+          '
+
+      - name: Deploy script is valid shell
+        run: bash -n scripts/render-deploy-hook.sh
+
+  # ─────────────────────────────────────────────────────────────── api ──
   api:
     name: API — build, boot, prove the gate
     runs-on: ubuntu-latest
@@ -61,6 +123,11 @@ jobs:
           PORT: '4000'
           MONGODB_URI: mongodb://127.0.0.1:27017/pooja_ci
           ADMIN_PASSWORD: ci-only-password
+          # Deliberately the PRODUCTION cookie shape. Dev runs SameSite=Strict
+          # because Vite proxies /api, so Strict is the one policy that gets
+          # exercised by hand — and None is the one that ships.
+          SESSION_SAMESITE: None
+          CORS_ORIGIN: pooja-admin.onrender.com
         run: |
           node src/index.js > /tmp/server.log 2>&1 &
           echo $! > /tmp/server.pid
@@ -78,6 +145,16 @@ jobs:
           BASE: http://127.0.0.1:4000
           ADMIN_PASSWORD: ci-only-password
         run: npm run smoke
+
+      # The smoke test proves who may call what. This proves the thing that
+      # actually carries the temple's artwork and recordings: upload, read
+      # back byte-for-byte, serve a byte range, delete.
+      - name: Media round trip through MongoDB
+        working-directory: pooja-api
+        env:
+          BASE: http://127.0.0.1:4000
+          ADMIN_PASSWORD: ci-only-password
+        run: node scripts/media-check.mjs
 
       - name: Server log
         if: always()
@@ -136,7 +213,7 @@ jobs:
   # ──────────────────────────────────────────────────────────── deploy ──
   deploy:
     name: Deploy to Render
-    needs: [dashboard, api, app]
+    needs: [blueprints, dashboard, api, app]
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     # Add required reviewers to this environment in repo settings if you ever
@@ -191,6 +268,28 @@ jobs:
           done
           echo "::error::$WANT did not go live within 15 minutes"
           exit 1
+
+      # The dashboard deploy was fired above and nothing confirmed it
+      # landed, so a failed static build left this job green. Render keeps
+      # the previous container serving while deploys fail, which is exactly
+      # how that goes unnoticed.
+      - name: Wait for the dashboard to answer
+        if: vars.DASHBOARD_URL != ''
+        env:
+          DASHBOARD_URL: ${{ vars.DASHBOARD_URL }}
+        run: |
+          for i in $(seq 1 60); do
+            CODE=$(curl -fsS -o /dev/null -w '%{http_code}' --max-time 20 "$DASHBOARD_URL/" 2>/dev/null || echo 000)
+            [ "$CODE" = "200" ] && { echo "dashboard answering after $((i*10))s"; exit 0; }
+            echo "  [$i] dashboard says ${CODE}"
+            sleep 10
+          done
+          echo "::error::the dashboard did not answer within 10 minutes"
+          exit 1
+
+      - name: Dashboard not verified
+        if: vars.DASHBOARD_URL == ''
+        run: echo "::warning::DASHBOARD_URL is not set, so the dashboard deploy was triggered but never checked. Set it to the static site's URL."
 
       # The same assertions as pre-deploy, now against the real thing. This
       # is the one that would catch an env var set wrong in Render — a build
