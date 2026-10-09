@@ -339,3 +339,8 @@ export const Motion = {
   /** Ambient loops: flame flicker, glow breathing. */
   ambient: 2400,
 } as const;
+
+/** Height reserved for the custom bottom tab bar (above the safe-area inset). */
+export const BottomTabInset = 62;
+/** The tab bar now sits at the bottom on every platform, so no top offset. */
+export const TopTabInset = 0;

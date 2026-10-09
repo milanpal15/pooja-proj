@@ -1,0 +1,27 @@
+/** My poojas (bookings). */
+export const booking = {
+  // my poojas
+  my_poojas_title: 'My Booked Poojas',
+  filter_all: 'All',
+  filter_upcoming: 'Upcoming',
+  filter_completed: 'Completed',
+  retry: 'Try again',
+  bookings_unavailable_title: 'Could not load your poojas',
+  bookings_unavailable_desc: 'The temple could not be reached. Your bookings are safe — pull down to try again.',
+  booking_cancel_failed: 'Could not cancel that booking. Please try again.',
+  no_bookings_title: 'No Poojas Booked Yet',
+  no_bookings_desc: 'Book an authentic seva performed by temple priests with sacred sankalp in your name.',
+  book_a_pooja: 'Book a Pooja',
+  seva_date: 'Pooja Date',
+  devotee_label: 'Devotee',
+  prasad_status: 'Prasad Status',
+  prasad_opted: 'Prasad Included (Courier)',
+  prasad_not_opted: 'No Prasad Delivery',
+  booking_ref: 'Booking Ref',
+  status_upcoming: 'Scheduled',
+  status_completed: 'Completed 🙏',
+  view_temple: 'View Temple',
+  cancel_booking: 'Cancel Seva',
+  cancel_confirm_title: 'Cancel Seva?',
+  cancel_confirm_msg: 'Are you sure you want to cancel this booked pooja?',
+} as const;

@@ -115,6 +115,17 @@ jobs:
         working-directory: pooja-api
         run: npm ci
 
+      # The module suites: wallet ledger, coins, bookings, chadhava, astrologers,
+      # calls, payouts, content, operators and the role/permission matrix. They
+      # talk to the real Mongo above; one file at a time because they share a
+      # database and some of them drop it. Files are passed explicitly because
+      # `node --test <dir>` finds nothing on newer Node versions.
+      - name: Module tests
+        working-directory: pooja-api
+        env:
+          TEST_MONGODB_URI: mongodb://127.0.0.1:27017/pooja_ci_tests
+        run: node --test --test-concurrency=1 $(find src -name '*.test.mjs' | sort)
+
       # Boots the real server against a real Mongo. A build that installs but
       # cannot start is not a passing build.
       - name: Boot
@@ -181,6 +192,11 @@ jobs:
         env:
           VITE_API_BASE: https://example.invalid
         run: npm run build
+      # The dashboard keeps a copy of the API's coin-pack maths for its live
+      # preview. This fails the day the two drift apart.
+      - name: Coin-pack parity with the API
+        working-directory: pooja-admin
+        run: node --test src/client/features/coins/lib/coin-pack.test.mjs
 
   # ─────────────────────────────────────────────────────────────── app ──
   app:
@@ -209,6 +225,13 @@ jobs:
       - name: Lint
         working-directory: poojaappclone
         run: npm run lint
+
+      # Includes the translation key parity check (en / hi): every user-facing
+      # string must exist in both languages. `node --test <dir>` finds nothing
+      # on newer Node versions, so the files are listed.
+      - name: App tests
+        working-directory: poojaappclone
+        run: node --test --test-concurrency=1 $(find src -name '*.test.mjs' | sort)
 
   # ──────────────────────────────────────────────────────────── deploy ──
   deploy:

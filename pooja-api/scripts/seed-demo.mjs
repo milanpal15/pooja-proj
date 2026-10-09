@@ -7,7 +7,7 @@
  *
  * The catalogue — deities, temples, aartis, festivals, sevas, knowledge,
  * FAQs, hero slides — already seeds itself on a database's first boot
- * (`db.js`). What it does NOT seed is the editorial content that is written
+ * (`db/seed.js`). What it does NOT seed is the editorial content that is written
  * fresh each day, so a new deployment shows an empty Horoscope screen and no
  * announcement. That is what this fills.
  *

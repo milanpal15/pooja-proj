@@ -57,12 +57,3 @@ export const Space = {
   gutter: 16,
   cardPadding: 16,
 } as const;
-
-/** Ambient saffron glow shadow (no harsh grey shadows in this system). */
-export const glow = {
-  shadowColor: '#FF9800',
-  shadowOpacity: 0.18,
-  shadowRadius: 16,
-  shadowOffset: { width: 0, height: 6 },
-  elevation: 4,
-} as const;

@@ -1,0 +1,40 @@
+/* Sidebar grouping for tabs registered in app/tabs.js. */
+.nav-group {
+  margin: 14px 0 2px;
+  padding: 0 14px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #d9c7a5;
+}
+.nav-group-end {
+  height: 1px;
+  margin: 10px 14px 6px;
+  background: rgba(255, 255, 255, 0.14);
+}
+.nav:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: -3px;
+}
+.content-lede {
+  margin: -8px 0 20px;
+  max-width: 78ch;
+  font-size: 14px;
+  color: var(--on-surface-variant);
+}
+.ui-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+.ui-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  align-items: flex-start;
+}
+.ui-row > * {
+  flex: 1 1 440px;
+  min-width: 0;
+}

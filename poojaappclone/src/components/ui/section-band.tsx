@@ -1,8 +1,9 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { type LayoutChangeEvent, Pressable, StyleSheet, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
-import { Radius, Space, useTheme } from '@/theme';
+import { Space, useTheme } from '@/theme';
 
 import { Icon } from './icon';
 import { Type } from './type';
@@ -16,18 +17,25 @@ import { Type } from './type';
  * are told apart before a word is read.
  *
  * This is the one place the system carries hues outside its own palette. They
- * are deliberately narrow — four fixed tones, chosen once here — rather than
- * per-screen literals, so a fifth kind of shelf has to be a decision rather
+ * are deliberately narrow — five fixed tones, chosen once here — rather than
+ * per-screen literals, so a sixth kind of shelf has to be a decision rather
  * than an accident.
+ *
+ * The band meets the body in a scalloped edge: a strip of the tone's darker
+ * shade with white semicircles rising into it. It is drawn (react-native-svg)
+ * rather than clipped, and the wrapper carries no `overflow: 'hidden'` — that
+ * plus a large corner radius clips absolutely positioned children on Android.
+ * Rounded corners are put on the band and the body separately instead.
  */
 
-export type BandTone = 'gold' | 'purple' | 'crimson' | 'forest';
+export type BandTone = 'gold' | 'purple' | 'crimson' | 'forest' | 'maroon';
 
 const TONES: Record<BandTone, readonly [string, string]> = {
   gold: ['#C08A1E', '#A97213'],
   purple: ['#563274', '#432459'],
   crimson: ['#C2185B', '#A0134B'],
   forest: ['#0F6B4A', '#0A5238'],
+  maroon: ['#7A1C2A', '#5E1420'],
 };
 
 export function SectionBand({
@@ -60,6 +68,8 @@ export function SectionBand({
         <Flourish />
       </LinearGradient>
 
+      <Scallop color={TONES[tone][1]} bump={c.containerLowest} />
+
       <View style={[styles.body, { backgroundColor: c.containerLowest }]}>
         {children}
 
@@ -75,6 +85,30 @@ export function SectionBand({
           </Pressable>
         )}
       </View>
+    </View>
+  );
+}
+
+const SCALLOP_W = 16;
+const SCALLOP_H = 8;
+
+/** A row of semicircles (radius 7, 16px pitch) in the body colour, on a strip of the band's shade. */
+function Scallop({ color, bump }: { color: string; bump: string }) {
+  const [width, setWidth] = useState(0);
+  const count = Math.ceil(width / SCALLOP_W);
+  // One path for all bumps: each is an arc from (x+1, 8) over to (x+15, 8).
+  let d = '';
+  for (let i = 0; i < count; i++) d += `M${i * SCALLOP_W + 1} ${SCALLOP_H}a7 7 0 0 1 14 0Z`;
+
+  return (
+    <View
+      onLayout={(e: LayoutChangeEvent) => setWidth(e.nativeEvent.layout.width)}
+      style={{ height: SCALLOP_H, backgroundColor: color }}>
+      {width > 0 && (
+        <Svg width={width} height={SCALLOP_H}>
+          <Path d={d} fill={bump} />
+        </Svg>
+      )}
     </View>
   );
 }
@@ -111,21 +145,25 @@ function Flourish({ flip = false }: { flip?: boolean }) {
 }
 
 const styles = StyleSheet.create({
-  wrap: {
-    borderRadius: Radius.lg,
-    overflow: 'hidden',
-  },
+  wrap: {},
   band: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: Space.sm,
-    paddingVertical: 12,
+    height: 50,
     paddingHorizontal: Space.sm,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
   },
   bandTitle: { flexShrink: 1, textAlign: 'center' },
   flourish: { flex: 1, maxWidth: 80 },
-  body: { padding: Space.cardPadding, gap: Space.sm },
+  body: {
+    padding: 14,
+    gap: Space.sm,
+    borderBottomLeftRadius: 18,
+    borderBottomRightRadius: 18,
+  },
   footer: {
     flexDirection: 'row',
     alignItems: 'center',

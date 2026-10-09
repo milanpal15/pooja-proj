@@ -30,6 +30,8 @@ export type FieldProps = Omit<TextInputProps, 'style'> & {
   label?: string;
   /** Leading glyph — a rupee sign, a phone icon. */
   icon?: IconName;
+  /** Leading adornment of any kind — the coin disc on an amount field. */
+  left?: React.ReactNode;
   /** Trailing adornment. */
   right?: React.ReactNode;
   /** Error text; also turns the border red. */
@@ -44,6 +46,7 @@ export type FieldProps = Omit<TextInputProps, 'style'> & {
 export function Field({
   label,
   icon,
+  left,
   right,
   error,
   multilineRows,
@@ -97,6 +100,7 @@ export function Field({
           // The "glow when active" — an ambient saffron cast, not a hard ring.
           focused && !error ? [elevation.low, { shadowColor: c.glowTint }] : null,
         ]}>
+        {left}
         {!!icon && <Icon name={icon} size={18} color={c.onSurfaceFaint} />}
         <TextInput
           ref={inputRef}

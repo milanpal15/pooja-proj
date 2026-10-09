@@ -10,9 +10,12 @@
  * screen hand-rolling an "immersive" variant.
  */
 
+import '@/global.css';
+
 export { contrast, type ContrastGrade, grade, luminance } from './contrast';
 export { Ember, Gold, Kumkum, Saffron, Sandal, Status } from './palette';
 export {
+  BottomTabInset,
   type ColorRoles,
   Elevation,
   Fill,
@@ -22,6 +25,7 @@ export {
   Schemes,
   Space,
   type SurfaceMode,
+  TopTabInset,
 } from './tokens';
 export {
   DEVA_LINE_BOOST,

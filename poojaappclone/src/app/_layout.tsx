@@ -15,12 +15,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Radius, Sacred, Space } from '@/constants/sacred';
 
 import { ToastProvider } from '@/components/ui';
-import { LanguageScreen } from '@/components/auth/language-screen';
-import { LoginScreen } from '@/components/auth/login-screen';
-import { AdminProvider, useAdmin } from '@/context/admin';
-import { AuthProvider, useAuth } from '@/context/auth';
-import { ContentProvider } from '@/context/content';
-import { LanguageProvider, useLanguage } from '@/context/language';
+import { AstrologerShell } from '@/features/astrologer-mode';
+import { AuthGate } from '@/features/auth';
+import { AdminProvider, useAdmin } from '@/providers/admin';
+import { AuthProvider, useAuth } from '@/providers/auth';
+import { ContentProvider } from '@/providers/content';
+import { LanguageProvider, useLanguage } from '@/i18n';
+import { WalletProvider } from '@/providers/wallet';
 import { ThemeProvider as SacredThemeProvider, useSacredFonts } from '@/theme';
 
 SplashScreen.preventAutoHideAsync();
@@ -36,6 +37,7 @@ export default function TabLayout() {
         <SacredThemeProvider>
           <LanguageProvider>
             <AuthProvider>
+              <WalletProvider>
               <AdminProvider>
                 <ContentProvider>
                   {/* Innermost: toasts must draw above every screen, and any
@@ -45,6 +47,7 @@ export default function TabLayout() {
                   </ToastProvider>
                 </ContentProvider>
               </AdminProvider>
+              </WalletProvider>
             </AuthProvider>
           </LanguageProvider>
         </SacredThemeProvider>
@@ -56,7 +59,7 @@ export default function TabLayout() {
 /** Onboarding gate: pick language (first launch) → sign in → app. */
 function RootGate() {
   const { lang, loading: langLoading } = useLanguage();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, devoteeView } = useAuth();
   // Hold the splash until the typefaces are registered too — otherwise the
   // first frame renders in the system face and visibly re-flows a beat later.
   const fontsReady = useSacredFonts();
@@ -71,17 +74,32 @@ function RootGate() {
   // Keep a blank warm screen while persisted prefs load (native splash is up).
   if (!ready) return <View style={{ flex: 1, backgroundColor: '#C9741B' }} />;
 
-  if (!lang) return <LanguageScreen />;
-  if (!user) return <LoginScreen />;
+  if (!lang || !user) return <AuthGate />;
 
   // Authenticated: a Stack whose first screen is the (tabs) group. Sub-screens
   // (temples-map, darshan, chadhava, journal, admin) are sibling stack routes.
+  //
+  // An astrologer gets their own minimal shell INSTEAD of the devotee tabs
+  // (never Create Profile — `needsProfile` is false for them). The guard keeps
+  // the other group unreachable by navigation; the "Switch to devotee view"
+  // toggle in their Profile just flips `devoteeView`. Server permissions are
+  // unaffected either way.
+  const astrologer = user.role === 'astrologer' && !devoteeView;
+  const stack = (
+    <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+      <Stack.Protected guard={astrologer}>
+        <Stack.Screen name="(astrologer)" />
+      </Stack.Protected>
+      <Stack.Protected guard={!astrologer}>
+        <Stack.Screen name="(tabs)" />
+      </Stack.Protected>
+    </Stack>
+  );
+
   return (
     <>
       <ScreenTracker />
-      <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
-        <Stack.Screen name="(tabs)" />
-      </Stack>
+      {astrologer ? <AstrologerShell>{stack}</AstrologerShell> : stack}
     </>
   );
 }

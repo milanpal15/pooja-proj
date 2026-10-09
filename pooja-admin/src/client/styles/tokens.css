@@ -1,0 +1,95 @@
+/*
+ * Design tokens — role -> value (DESIGN.md §3). Screens and kit components use
+ * these names only; a literal colour or size in a component is a review comment.
+ * Values match the live palette in styles.css so old and new screens agree.
+ * A dark scheme is an additive `:root[data-theme="dark"]` block.
+ */
+:root {
+  /* surfaces */
+  --surface: #fff9eb;
+  --container-lowest: #ffffff;
+  --container: #fffdf6;
+  --container-high: #f6efdb;
+
+  /* text */
+  --on-surface: #1d1c13;
+  --on-surface-variant: #6b5f46;
+  --on-surface-faint: #8a7d63;
+
+  /* lines */
+  --outline: #cdbf9c;
+  --outline-variant: #eadfc8;
+  --divider: #f0e6cf;
+
+  /* identity */
+  --primary: #af101a;
+  --on-primary: #ffffff;
+  --primary-container: #fff2f0;
+
+  /* action (saffron) */
+  --accent: #ff9800;
+  --on-accent: #2c1600;
+  --accent-container: #ffdcbe;
+  --on-accent-container: #693c00;
+
+  /* ornament; gold-ink is the only gold that may be text */
+  --gold: #c9a227;
+  --gold-ink: #7a5a12;
+
+  /* status — always paired with a word */
+  --success: #17622e;
+  --success-container: #dff3e4;
+  --warning-container: #fbefc4;
+  --on-warning-container: #6b5000;
+  --warning-line: #e6d28a;
+  --error: #ba1a1a;
+  --error-ink: #a3180f;
+  --error-container: #fde8e8;
+  --error-line: #f5b5b5;
+  --on-error-container: #8f1a12;
+  --live: #c62828;
+  --info-container: #e8e2f6;
+  --on-info-container: #3d2f7a;
+
+  /* Home band tones — data colours, the same five names the phone paints (gold/purple/crimson/forest/maroon) */
+  --tone-gold: #c08a1e;
+  --tone-purple: #563274;
+  --tone-crimson: #c2185b;
+  --tone-forest: #0f6b4a;
+  --tone-maroon: #7a1c2a;
+
+  /* switch */
+  --switch-off: #8a7d63;
+  --switch-on: #1e7a37;
+
+  /* table row hover */
+  --row-hover: rgba(255, 152, 0, 0.06);
+
+  /* overlay */
+  --scrim: rgba(29, 28, 19, 0.45);
+  --focus-ring: #ff9800;
+
+  /* space (4-pt base) */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-xxl: 48px;
+  --target: 44px;
+
+  /* radius */
+  --radius-sm: 4px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-full: 999px;
+
+  /* elevation — tinted saffron, never grey */
+  --shadow-low: 0 6px 18px rgba(255, 152, 0, 0.06);
+  --shadow-high: 0 20px 60px rgba(29, 28, 19, 0.3);
+
+  /* motion */
+  --motion-quick: 160ms;
+  --motion-settle: 320ms;
+}

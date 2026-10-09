@@ -1,0 +1,27 @@
+/** My poojas (bookings). */
+export const booking = {
+  // my poojas
+  my_poojas_title: 'मेरी बुक की गई पूजाएँ',
+  filter_all: 'सभी',
+  filter_upcoming: 'आगामी',
+  filter_completed: 'संपन्न',
+  retry: 'फिर प्रयास करें',
+  bookings_unavailable_title: 'आपकी पूजाएँ लोड नहीं हो सकीं',
+  bookings_unavailable_desc: 'मंदिर से संपर्क नहीं हो पाया। आपकी बुकिंग सुरक्षित है — पुनः प्रयास के लिए नीचे खींचें।',
+  booking_cancel_failed: 'बुकिंग रद्द नहीं हो सकी। कृपया फिर प्रयास करें।',
+  no_bookings_title: 'अभी कोई पूजा बुक नहीं है',
+  no_bookings_desc: 'मंदिर के पुजारियों द्वारा अपने नाम पर पवित्र संकल्प के साथ प्रामाणिक सेवा बुक करें।',
+  book_a_pooja: 'पूजा बुक करें',
+  seva_date: 'पूजा तिथि',
+  devotee_label: 'भक्त',
+  prasad_status: 'प्रसाद स्थिति',
+  prasad_opted: 'प्रसाद शामिल (कूरियर)',
+  prasad_not_opted: 'प्रसाद नहीं चुना गया',
+  booking_ref: 'बुकिंग संदर्भ',
+  status_upcoming: 'निर्धारित',
+  status_completed: 'संपन्न 🙏',
+  view_temple: 'मंदिर देखें',
+  cancel_booking: 'सेवा रद्द करें',
+  cancel_confirm_title: 'सेवा रद्द करें?',
+  cancel_confirm_msg: 'क्या आप इस बुक की गई पूजा को रद्द करना चाहते हैं?',
+} as const;

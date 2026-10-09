@@ -15,7 +15,7 @@ import {
   type User,
 } from '@react-native-firebase/auth';
 
-import type { StringKey } from '@/context/language';
+import type { StringKey } from '@/i18n';
 
 import { GOOGLE_WEB_CLIENT_ID } from '@/constants/config';
 
@@ -66,7 +66,7 @@ function fail(code: AuthError['code'], message: AuthError['message'], detail?: s
 }
 
 /** Map a Firebase error code onto ours + the i18n key the screen should show. */
-export function toAuthError(e: unknown): AuthError {
+function toAuthError(e: unknown): AuthError {
   const code = (e as { code?: string })?.code ?? '';
   const detail = (e as { message?: string })?.message;
 
@@ -112,7 +112,7 @@ export function toAuthError(e: unknown): AuthError {
  * accepts. A number the devotee typed with +91, 0, or spaces already still
  * ends up as +91XXXXXXXXXX.
  */
-export function toE164(input: string): string | null {
+function toE164(input: string): string | null {
   const digits = input.replace(/\D/g, '');
   const local = digits.startsWith('91') && digits.length === 12
     ? digits.slice(2)
@@ -218,6 +218,16 @@ export async function getIdToken(force = false): Promise<string | null> {
 export async function firebaseSignOut() {
   // Clear the Google session too, or the next sign-in silently reuses the same
   // account instead of showing the picker.
-  await GoogleSignin.signOut().catch(() => {});
+  //
+  // `configure()` must have run in THIS process first: the native module's
+  // `signOut` rejects with "apiClient is null — call configure() first" otherwise,
+  // and the catch below would swallow it. Configuration used to happen only inside
+  // `signInWithGoogle`, so after any app restart a logout did nothing to Google's
+  // session and the next "Continue with Google" signed straight back in as the
+  // same account, with no chooser — a devotee could never switch accounts.
+  configureGoogle();
+  await GoogleSignin.signOut().catch((e) => {
+    if (__DEV__) console.warn('[auth] Google sign-out failed:', e);
+  });
   await signOut(auth()).catch(() => {});
 }

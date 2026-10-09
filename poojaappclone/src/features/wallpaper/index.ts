@@ -1,0 +1,1 @@
+export { WallpaperScreen } from './WallpaperScreen';

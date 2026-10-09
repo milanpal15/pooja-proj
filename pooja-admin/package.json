@@ -6,10 +6,13 @@
   "description": "Admin dashboard for the Divine Temple Portal — a React UI over the pooja-api backend.",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "build": "node scripts/check-deps.mjs && node scripts/check-access.mjs && vite build",
+    "preview": "vite preview",
+    "check:deps": "node scripts/check-deps.mjs",
+    "check:access": "node scripts/check-access.mjs"
   },
   "dependencies": {
+    "dompurify": "^3.4.16",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

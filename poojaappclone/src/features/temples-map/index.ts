@@ -1,0 +1,1 @@
+export { TemplesMapScreen } from './TemplesMapScreen';

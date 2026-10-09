@@ -1,29 +1,22 @@
-:root {
-  --bg: #fff9eb;
-  --panel: #ffffff;
-  --line: #eadfc8;
-  --ink: #1d1c13;
-  --muted: #8a7d63;
-  --primary: #af101a;
-  --saffron: #ff9800;
-  --gold: #c9a227;
-  --green: #1e8e3e;
-}
-
 * {
   box-sizing: border-box;
 }
 body {
   margin: 0;
   font-family: 'Plus Jakarta Sans', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  background: var(--bg);
-  color: var(--ink);
+  background: var(--surface);
+  color: var(--on-surface);
 }
 
 .app {
   display: grid;
   grid-template-columns: 240px 1fr;
   min-height: 100vh;
+}
+@media (max-width: 900px) {
+  .app {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Sidebar */
@@ -43,7 +36,7 @@ body {
 }
 .om {
   font-size: 34px;
-  color: var(--saffron);
+  color: var(--accent);
 }
 .brand-title {
   font-weight: 800;
@@ -61,7 +54,7 @@ body {
   border: 0;
   color: #e9dcc0;
   padding: 12px 14px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
@@ -70,8 +63,8 @@ body {
   background: rgba(255, 255, 255, 0.08);
 }
 .nav.active {
-  background: var(--saffron);
-  color: #3a1e00;
+  background: var(--accent);
+  color: var(--on-accent);
 }
 .status {
   margin-top: auto;
@@ -95,10 +88,24 @@ body {
   opacity: 0.6;
   margin-top: 4px;
 }
+/* Pushed away from the nav list so signing out is never a misclick. */
+.sidebar .sign-out {
+  margin-top: 10px;
+  width: 100%;
+}
+/* Who is signed in, above the sign-out button. */
+.whoami {
+  margin-top: 14px;
+  font-size: 12px;
+  color: #d9c7a5;
+  text-transform: capitalize;
+}
 
 /* Content */
 .content {
   padding: 28px 32px;
+  /* A grid item: without this a wide table's toolbar stretches the whole column past the viewport. */
+  min-width: 0;
 }
 h1 {
   margin: 0 0 20px;
@@ -109,61 +116,28 @@ h2 {
   font-size: 18px;
 }
 .muted {
-  color: var(--muted);
+  color: var(--on-surface-variant);
+}
+code {
+  background: rgba(0, 0, 0, 0.06);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
 }
 
-.cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 14px;
-  margin-bottom: 20px;
-}
-.card {
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  padding: 18px;
-  box-shadow: 0 6px 18px rgba(255, 152, 0, 0.06);
-}
-.card-value {
-  font-size: 28px;
-  font-weight: 800;
-  color: var(--primary);
-}
-.card-label {
-  font-size: 13px;
-  color: var(--muted);
-  margin-top: 2px;
-}
-
+/* Overview */
 .grid2 {
   align-items: start;
   display: grid;
   grid-template-columns: 1.2fr 1fr;
-  gap: 16px;
-  margin-bottom: 16px;
+  gap: var(--space-md);
 }
 @media (max-width: 900px) {
   .grid2 {
     grid-template-columns: 1fr;
   }
-  .app {
-    grid-template-columns: 1fr;
-  }
 }
-
-.panel {
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  padding: 20px;
-  margin-bottom: 16px;
-}
-
-/* The panel stretched to match the taller "Top Screens" beside it, leaving a
-   170px void under a 160px chart. The grid no longer stretches its children,
-   and the bars own a real track so their percentage heights resolve against
-   something definite instead of collapsing to min-height. */
+/* The grid does not stretch its children, and the bars own a real track so
+   their percentage heights resolve against something definite. */
 .chart {
   display: flex;
   align-items: stretch;
@@ -178,24 +152,21 @@ h2 {
   flex-direction: column;
   justify-content: flex-end;
   align-items: center;
-  justify-content: flex-end;
-  height: 100%;
   gap: 4px;
 }
 .bar {
   width: 100%;
   min-height: 3px;
-  background: linear-gradient(180deg, var(--saffron), var(--gold));
+  background: linear-gradient(180deg, var(--accent), var(--gold));
   border-radius: 4px 4px 0 0;
 }
 .bar-label {
   font-size: 10px;
-  color: var(--muted);
+  color: var(--on-surface-variant);
   white-space: nowrap;
   margin-top: 5px;
   font-variant-numeric: tabular-nums;
 }
-
 .list {
   list-style: none;
   margin: 0;
@@ -205,453 +176,51 @@ h2 {
   display: flex;
   justify-content: space-between;
   padding: 10px 0;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--outline-variant);
 }
 .list li:last-child {
   border-bottom: 0;
 }
 
-.flag {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 14px 0;
-  border-bottom: 1px solid var(--line);
-}
-.flag:last-child {
-  border-bottom: 0;
-}
-.flag-label {
-  font-weight: 700;
-}
-.flag-desc {
-  font-size: 13px;
-  color: var(--muted);
-}
-
-/* Switch */
-.switch {
-  position: relative;
-  width: 50px;
-  height: 28px;
-  display: inline-block;
-}
-.switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-.slider {
-  position: absolute;
-  inset: 0;
-  background: #ccc;
-  border-radius: 999px;
-  transition: 0.2s;
-}
-.slider::before {
-  content: '';
-  position: absolute;
-  height: 22px;
-  width: 22px;
-  left: 3px;
-  top: 3px;
-  background: #fff;
-  border-radius: 50%;
-  transition: 0.2s;
-}
-.switch input:checked + .slider {
-  background: var(--saffron);
-}
-.switch input:checked + .slider::before {
-  transform: translateX(22px);
-}
-.switch.busy {
-  opacity: 0.5;
-}
-
-.table {
-  width: 100%;
-  border-collapse: collapse;
-}
-.table th {
-  text-align: left;
-  font-size: 12px;
-  color: var(--muted);
-  padding: 8px 10px;
-  border-bottom: 2px solid var(--line);
-}
-.table td {
-  padding: 12px 10px;
-  border-bottom: 1px solid var(--line);
-  font-size: 14px;
-  vertical-align: middle;
-}
-.table tbody tr:last-child td {
-  border-bottom: 0;
-}
-.table tbody tr:hover {
-  background: rgba(255, 152, 0, 0.05);
-}
-
-/* Inline on/off control for boolean columns. */
-.toggle {
-  border: 1px solid var(--line);
-  background: #fff;
-  border-radius: 999px;
-  padding: 4px 12px 4px 8px;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  color: var(--muted);
-}
-.toggle .dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: #c9c2b4;
-}
-.toggle.on {
-  border-color: #9fd3b0;
-  background: #eef7f1;
-  color: var(--green);
-}
-.toggle.on .dot {
-  background: var(--green);
-}
-.toggle:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-.pill {
-  padding: 3px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 700;
-}
-.pill.success {
-  background: #e6f4ea;
-  color: var(--green);
-}
-.pill.failed {
-  background: #fde8e8;
-  color: var(--primary);
-}
-
-.error {
-  background: #fde8e8;
-  border: 1px solid #f5b5b5;
-  border-radius: 12px;
-  padding: 16px;
-  color: var(--primary);
-}
-
-/* Content manager */
-.cm-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-.btn {
-  background: var(--saffron);
-  color: #3a1e00;
-  border: 0;
-  border-radius: 10px;
-  padding: 10px 16px;
-  font-weight: 800;
-  cursor: pointer;
-}
-.btn.ghost {
-  background: transparent;
-  color: var(--ink);
-  border: 1px solid var(--line);
-}
-.btn.small {
-  padding: 6px 12px;
-  font-size: 13px;
-}
-.thumb {
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
-  object-fit: cover;
-  background: var(--bg);
-}
-.thumb.ph {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 800;
-  color: var(--muted);
-  border: 1px solid var(--line);
-}
-/* A <td> must stay a table-cell. `display: flex` here took it out of the
-   table layout entirely, so the Edit/Delete column stopped sharing its row's
-   height and baseline — every action pair sat ~14px above its own row and
-   drew its border in the wrong place. */
-.row-actions {
-  white-space: nowrap;
-  text-align: right;
-  vertical-align: middle;
-}
-.row-actions .link-btn + .link-btn {
-  margin-left: 14px;
-}
-.link-btn {
-  background: none;
-  border: 0;
-  color: var(--saffron);
-  font-weight: 700;
-  cursor: pointer;
-  padding: 0;
-}
-.link-btn.danger {
-  color: var(--primary);
-}
-
-/* Modal */
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  z-index: 10;
-}
-.modal {
-  background: #fff;
-  border-radius: 16px;
-  padding: 22px;
-  width: min(560px, 100%);
-  max-height: 88vh;
-  overflow: auto;
-}
-.modal h3 {
-  margin: 0 0 16px;
-}
-.form {
-  display: grid;
-  gap: 12px;
-}
-.field {
-  display: grid;
-  gap: 4px;
-}
-.field label {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--muted);
-}
-.field input[type='text'],
-.field input[type='number'],
-.field textarea {
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 10px 12px;
-  font-size: 14px;
-  font-family: inherit;
-  width: 100%;
-}
-.field textarea {
-  min-height: 70px;
-}
-.upload-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.upload-row input {
-  flex: 1;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 10px 12px;
-}
-.modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 18px;
-}
-code {
-  background: rgba(0, 0, 0, 0.06);
-  padding: 2px 6px;
-  border-radius: 4px;
-}
-
-
-/* Markdown editor (Rules) */
-.md-split {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 18px;
-  align-items: start;
-}
-@media (max-width: 1100px) {
-  .md-split { grid-template-columns: 1fr; }
-}
-.field textarea.md-editor {
-  min-height: 460px;
-  height: 460px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 13px;
-  line-height: 1.6;
-  resize: vertical;
-}
-.md-preview {
-  min-height: 460px;
-  max-height: 620px;
-  overflow: auto;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 18px 20px;
-  background: #fff;
-  font-size: 14px;
-  line-height: 1.65;
-}
-.md-preview h2 { font-size: 20px; margin: 0 0 10px; }
-.md-preview h3 { font-size: 16px; margin: 20px 0 6px; }
-.md-preview h4 { font-size: 14px; margin: 16px 0 4px; }
-.md-preview p { margin: 0 0 10px; }
-.md-preview ul, .md-preview ol { margin: 0 0 12px; padding-left: 22px; }
-.md-preview li { margin: 4px 0; }
-.md-preview code {
-  background: var(--bg);
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  padding: 1px 5px;
-  font-size: 12px;
-}
-.md-preview blockquote {
-  margin: 0 0 12px;
-  padding: 6px 14px;
-  border-left: 3px solid var(--saffron);
-  background: var(--bg);
-  border-radius: 0 8px 8px 0;
-}
-.md-preview hr { border: 0; border-top: 1px solid var(--line); margin: 16px 0; }
-.btn.ghost {
-  background: transparent;
-  color: var(--saffron);
-  border: 1px solid var(--line);
-}
-
-
-/* Boolean fields use the same switch as the Feature Flags tab, so a boolean
-   looks the same everywhere in the dashboard rather than being a checkbox
-   here and a switch there. */
-.switch-row {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-}
-.switch-state {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--muted);
-}
-.field select {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  font: inherit;
-  font-size: 14px;
-  background: #fff;
-  color: var(--ink);
-  cursor: pointer;
-  appearance: none;
-  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%238a7a5e' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 12px center;
-  padding-right: 34px;
-}
-.field select:focus {
-  outline: none;
-  border-color: var(--saffron);
-}
-
 /* ------------------------------------------------------------- sign-in -- */
-
 .login-wrap {
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg);
+  background: var(--surface);
   padding: 24px;
 }
-
 .login-card {
   width: 100%;
   max-width: 360px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 16px;
+  background: var(--container-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-lg);
   padding: 32px 28px;
   text-align: center;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  box-shadow: 0 8px 32px rgba(29, 28, 19, 0.08);
+  gap: 12px;
+  box-shadow: var(--shadow-low);
 }
-
+.login-card .ui-field {
+  text-align: left;
+}
 .login-mark {
   font-size: 40px;
   line-height: 1;
-  color: var(--saffron);
+  color: var(--accent);
 }
-
 .login-card h1 {
   margin: 4px 0 0;
   font-size: 22px;
 }
-
 .login-card p.muted {
   margin: 0 0 8px;
 }
-
-.login-card input {
-  width: 100%;
-  padding: 11px 13px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  font-size: 15px;
-  background: var(--bg);
-  color: var(--ink);
-}
-
-.login-card input:focus {
-  outline: 2px solid var(--gold);
-  outline-offset: 1px;
-}
-
 .login-error {
   margin: 0;
-  color: var(--primary);
+  color: var(--error-ink);
   font-size: 13px;
-}
-
-/* Pushed away from the nav list so signing out is never a misclick. */
-.nav.sign-out {
-  margin-top: 10px;
-  text-align: left;
-  color: var(--muted);
-}
-
-.nav.sign-out:hover {
-  color: var(--primary);
-}
-
-/* Who is signed in, above the sign-out button. */
-.whoami {
-  margin-top: 14px;
-  font-size: 12px;
-  color: var(--muted);
-  text-transform: capitalize;
 }
