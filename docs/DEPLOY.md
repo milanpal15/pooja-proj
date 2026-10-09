@@ -262,7 +262,7 @@ curl https://pooja-admin.onrender.com/api/content | head -c 200
 ## 5. Seed the content
 
 Nothing to do: a fresh database seeds itself with the bundled catalogue on
-first boot (`db.js` seeds only what is empty). Verified on a cold, empty
+first boot (`db/seed.js` seeds only what is empty). Verified on a cold, empty
 database — 8 deities, 5 temples, 6 aartis, 16 festivals, 5 sevas, 9 FAQs and
 the settings table all appear. Sign in to the dashboard and adjust from
 there.
@@ -278,7 +278,7 @@ accounts are managed in the **Operators** tab.
 
 | Role | May do |
 |---|---|
-| **admin** | Everything: content, plus Operators, devotee Users, Feature Flags, Payments, Visitors, Rules |
+| **admin** | Everything: content, plus Operators, devotee Users, Feature Flags, Coin Orders, Visitors, Rules |
 | **editor** | Content only — deities, temples, aartis, festivals, sevas, knowledge, FAQs, home slides, horoscope, panchang, announcements, settings |
 
 The split that matters: whoever writes the daily horoscope cannot delete a
@@ -286,7 +286,7 @@ devotee's account — and deleting a devotee here deletes their Firebase
 account too.
 
 Enforcement is server-side, in `ADMIN_ONLY` in
-[`src/server/admin.js`](../pooja-admin/src/server/admin.js). The sidebar
+[`src/middleware/access.js`](../pooja-api/src/middleware/access.js). The sidebar
 hides tabs an editor cannot use, but that is only cosmetic: an editor who
 calls `/api/users` directly gets 403.
 
@@ -316,7 +316,7 @@ their Firebase accounts** — requires it.
   That is deliberate: there is no degraded mode where the admin API is open,
   because an open admin API is the entire problem.
 - The allowlist of public endpoints lives in
-  [`src/server/admin.js`](../pooja-admin/src/server/admin.js) and is
+  [`src/middleware/access.js`](../pooja-api/src/middleware/access.js) and is
   **fail-closed** — a route added later is private unless it is listed. When
   you add an endpoint the app needs, add it there too or the app will get 401.
 - Sessions are a signed HttpOnly `SameSite=Strict` cookie, good for 12 hours.
@@ -356,7 +356,7 @@ nothing in the logs to say why. Three ways out, in order of effort:
    ```
 
 3. **Move to object storage.** Swap the multer disk storage in
-   `src/server/content.js` for an S3 or Cloudinary client. Nothing else
+   `pooja-api/src/modules/media/files.js` for an S3 or Cloudinary client. Nothing else
    changes — the stored value is just a URL, and both clients already resolve
    absolute URLs.
 

@@ -25,12 +25,11 @@ import {
   Pressable,
   type PressableProps,
   type StyleProp,
-  StyleSheet,
   View,
   type ViewStyle,
 } from 'react-native';
 
-import { Radius, Space, useTheme } from '@/theme';
+import { Radius, useTheme } from '@/theme';
 
 import { Icon, type IconName } from './icon';
 import { Type } from './type';
@@ -205,7 +204,3 @@ export function IconButton({
     </Pressable>
   );
 }
-
-export const buttonStyles = StyleSheet.create({
-  row: { flexDirection: 'row', gap: Space.sm, alignItems: 'center' },
-});

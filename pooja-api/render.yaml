@@ -72,9 +72,23 @@ services:
         generateValue: true
       - key: FIREBASE_SERVICE_ACCOUNT
         sync: false # the whole service-account JSON, on one line
+      # Buying coins (Razorpay) and astrologer calls (Agora). With none of these
+      # set the server stays up and answers those two features with 503 — it never
+      # falls back to the development "mock" providers in production. Set the pair
+      # for each feature you turn on; see docs/PAYMENTS_SETUP.md and docs/CALLS_SETUP.md.
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false # the secret you type into Razorpay's webhook settings
+      - key: AGORA_APP_ID
+        sync: false
+      - key: AGORA_APP_CERTIFICATE
+        sync: false
       # The dashboard's URL, e.g. https://pooja-admin.onrender.com — or just
       # the bare host, which the API turns into https:// itself (see
-      # `allowedOrigins` in src/index.js). A trailing slash is tolerated.
+      # `allowedOrigins` in src/config/cors.js). A trailing slash is tolerated.
       #
       # It cannot be '*': the browser forbids a wildcard origin on a
       # credentialed request, and the admin session is a cookie, so every

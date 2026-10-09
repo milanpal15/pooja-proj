@@ -21,7 +21,7 @@ const toRad = (deg: number) => (deg * Math.PI) / 180;
  * 30° of latitude, and the flat approximation drifts by several kilometres
  * over Kashi-to-Madurai distances — enough to reorder the list wrongly.
  */
-export function distanceKm(a: Coords, b: Coords): number {
+function distanceKm(a: Coords, b: Coords): number {
   const dLat = toRad(b.lat - a.lat);
   const dLng = toRad(b.lng - a.lng);
   const lat1 = toRad(a.lat);

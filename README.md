@@ -6,33 +6,36 @@ deities, listen to bhajans, and more. The admin dashboard lets you manage that
 content, toggle features on/off remotely, manage users, and watch analytics — all
 without shipping a new app build.
 
-This is a monorepo with two independently-runnable projects:
+This is a monorepo with three independently-runnable projects:
 
 | Folder            | What it is                        | Tech                          |
 |-------------------|-----------------------------------|-------------------------------|
 | `poojaappclone/`  | The phone app                     | Expo SDK 57, React Native, TS |
-| `pooja-admin/`    | Admin dashboard (web + API)       | React + Vite / Express + Mongo|
-| `docs/`           | Design docs (`lld.html`, `plan.html`) |                           |
+| `pooja-api/`      | The backend (app + dashboard API) | Express + Mongoose + MongoDB  |
+| `pooja-admin/`    | Admin dashboard (static site)     | React + Vite                  |
+| `docs/`           | Setup and deploy guides (`DEPLOY.md`, `FIREBASE_SETUP.md`, ...) |  |
+
+`AGENTS.md` is the working handoff; `DESIGN.md` is the design for the larger features.
 
 ---
 
 ## Prerequisites
 
-- **Node.js** 18+ and npm
+- **Node.js** 20.19.4+ and npm
 - **MongoDB** running locally on `:27017` (`brew install mongodb-community` → `brew services start mongodb-community`, or run `mongod`)
-- **Expo Go** app on your phone, or an Android emulator / iOS simulator
+- An Android device or emulator for a development build (Expo Go does not work: sign-in uses native Firebase modules)
 - For Android-over-USB testing: **Android platform tools** (`adb`)
 
 ---
 
 ## Quick start
 
-You'll run **three things**: MongoDB, the admin API, and either the dashboard or
+You'll run **three things**: MongoDB, the API, and either the dashboard or
 the app.
 
-### 1. Admin backend (API on `:4000`)
+### 1. Backend (API on `:4000`)
 ```bash
-cd pooja-admin/server
+cd pooja-api
 cp .env.example .env          # defaults are fine for local dev
 npm install
 npm run dev                   # http://localhost:4000
@@ -43,18 +46,18 @@ On first run it seeds default feature flags and content (8 deities, 5 temples,
 
 ### 2. Admin dashboard (web UI on `:5173`)
 ```bash
-cd pooja-admin/client
+cd pooja-admin
 npm install
 npm run dev                   # http://localhost:5173
 ```
-Sidebar tabs: **Overview, Feature Flags, Deities, Temples, Aartis, Users,
-Payments, Visitors**.
+The sidebar lists the tabs your role may use (content, devotees, flags,
+payments, analytics, operators, ...); see `AGENTS.md`.
 
 ### 3. The mobile app
 ```bash
 cd poojaappclone
 npm install
-npx expo start                # press 'a' for Android, or scan the QR in Expo Go
+npx expo prebuild --clean && npx expo run:android   # development build; see docs/FIREBASE_SETUP.md
 ```
 
 > **Important:** the app talks to the admin backend at the URL in
@@ -76,7 +79,7 @@ defaults):
   Manage them in the *Deities / Temples / Aartis* tabs, including image/audio
   uploads. An uploaded deity image replaces the app's built-in artwork.
 - **Users & analytics** — signing in on the app registers the user
-  (`POST /api/users`, visible in the *Users* tab); the app also reports sessions
+  (`POST /api/auth/sync`, visible in the *Users* tab); the app also reports sessions
   and screen views that power the *Overview* charts.
 
 ```
@@ -130,17 +133,21 @@ poojaappclone/
     constants/config.ts   # ADMIN_API backend URL
     components/            # UI (app-tabs, mandir/deity-idol, auth, payment, ...)
 
+pooja-api/
+  src/
+    index.js, server.js, app.js   # entry, boot, middleware order (the admin gate lives here)
+    config/  middleware/  access/ # env + CORS, auth/gate, roles and permissions
+    db/                           # Mongo connect + first-boot seeding
+    modules/                      # one folder per feature: model, routes, service, tests
+      content/ media/ operators/ users/ auth/ flags/ analytics/ ...
+      wallet/ coins/ bookings/ chadhava/ astrologers/ calls/ payouts/
+  scripts/                        # smoke.mjs, media-check.mjs, migrate-media.mjs, seed-demo.mjs
+
 pooja-admin/
-  server/src/
-    index.js              # Express entry
-    models.js             # Flag, Visitor, Event, Payment, Deity, Temple, Aarti, User
-    routes.js             # flags, analytics, ingest, payments, visitors
-    content.js            # deity/temple/aarti CRUD, uploads, users
-    db.js                 # Mongo connect + seed
-  client/src/
-    App.jsx               # dashboard shell + tabs
-    ContentManager.jsx    # generic CRUD table + edit modal
-    Users.jsx             # user management
+  src/client/
+    app/                  # shell, sidebar, tab registry
+    features/             # one folder per dashboard area
+    ui/  lib/             # shared components and helpers
     api.js                # API client
 ```
 
@@ -187,8 +194,8 @@ npx tsc --noEmit
 | Service         | Port  | Start command                             |
 |-----------------|-------|-------------------------------------------|
 | MongoDB         | 27017 | `mongod` / brew service                   |
-| Admin API       | 4000  | `cd pooja-admin/server && npm run dev`    |
-| Admin dashboard | 5173  | `cd pooja-admin/client && npm run dev`    |
+| Admin API       | 4000  | `cd pooja-api && npm run dev`    |
+| Admin dashboard | 5173  | `cd pooja-admin && npm run dev`    |
 | Metro (Expo)    | 8081  | `cd poojaappclone && npx expo start`      |
 
 ---

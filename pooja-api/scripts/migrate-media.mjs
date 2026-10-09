@@ -19,8 +19,10 @@ import { join } from 'node:path';
 import 'dotenv/config';
 import mongoose from 'mongoose';
 
-import { UPLOAD_DIR } from '../src/content.js';
-import { bucket, saveFile } from '../src/files.js';
+import { config } from '../src/config/env.js';
+import { bucket, saveFile } from '../src/modules/media/files.js';
+
+const UPLOAD_DIR = config.uploadDir;
 
 const DRY = process.argv.includes('--dry-run');
 const URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/pooja_admin';

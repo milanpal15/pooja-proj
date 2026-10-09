@@ -12,6 +12,13 @@ pooja proj/
 └── CLAUDE.md          includes this file via @AGENTS.md
 ```
 
+> **UI and code structure follow [`DESIGN.md`](DESIGN.md)** — design tokens, the
+> shared component kit, and the folder/decomposition rules for the app, the API
+> and the dashboard. Read it before adding a screen, component or API route.
+> **Dashboard roles (admin / editor / viewer) and what each may see and edit are
+> specified in `DESIGN.md` §21** — a new dashboard screen or admin route must be
+> given an area there.
+
 > The app has its own `poojaappclone/AGENTS.md` with one hard rule:
 > **Expo SDK 57 — read https://docs.expo.dev/versions/v57.0.0/ before writing app code.**
 
@@ -45,27 +52,46 @@ npx tsc --noEmit            # typecheck
 - Root stack sub-screens: `chadhava`, `darshan`, `journal`, `temples-map`,
   `alarm`, `ringtone`, `wallpaper`, `gallery`, `knowledge`, `booking`.
 
-**Contexts** — `src/context/`:
-- `language.tsx` — EN/Hindi i18n. `t()` + `STRINGS.{en,hi}`. Add keys to BOTH.
-- `auth.tsx` — **Firebase Auth** session. Driven by `onAuthStateChanged`; on
+**Structure** (DESIGN.md §13): `src/app/` is **route shims only** (each file imports
+a `*Screen` from `src/features/<name>/`); every screen lives in its feature folder
+with `components/`, `hooks/`, `lib/`, `constants/` as it needs. Features: alarm,
+astrologer-mode, astrologers, auth, bhajan, booking, call, chadhava, darshan, festivals,
+gallery, help-support, home, horoscope, journal, knowledge, my-poojas, panchang, pooja,
+profile, ringtone, saved-temples, temples, temples-map, wallet, wallpaper.
+Shared: `components/ui/` (the kit), `components/illustrations/` (murti, thali, scenes),
+`theme/` (tokens — the only theme), `providers/`, `i18n/`, `lib/`, `hooks/`,
+`constants/` (config + defaults). Notable splits: `features/auth` (AuthGate →
+LanguageScreen / LoginScreen / CreateProfileScreen; derived-step, DOB-overlay and
+SMS-Retriever rules are in its hooks' docblocks; pure logic in `lib/` with tests),
+`lib/api/` (client + one file per domain, `index.ts` re-exports everything so
+`@/lib/api` is unchanged), `components/ui/card/` (one file per component) and
+`components/ui/icon-glyphs.tsx` (the 31-glyph drawing table behind `Icon`).
+**A feature may not deep-import another feature**
+(ESLint `no-restricted-imports` enforces it; import its `index.ts`).
+
+**Providers** — `src/providers/` (and `src/i18n/`; the old `src/context/` is gone):
+- `i18n/` — EN/Hindi. `t()` + `STRINGS.{en,hi}`, each split into 14 topic files with
+  identical names; `i18n.test.mjs` fails if the two trees' key sets differ.
+  **Add keys to BOTH.**
+- `providers/auth` — **Firebase Auth** session. Driven by `onAuthStateChanged`; on
   every sign-in it POSTs the ID token to `/api/auth/sync` and keeps the
-  returned profile. Shows the cached profile first and reconciles in the
-  background, so a cold start never waits on the network. Exposes
-  `needsProfile` (verified but unnamed → Create Profile) and `authError`
-  (`err_blocked` when an admin blocked the account). Providers live in
-  `src/lib/firebase-auth.ts` (OTP + Google) and `src/lib/api.ts` (`authedFetch`,
+  returned profile (now with `role` and `astrologer`). Shows the cached profile
+  first and reconciles in the background, so a cold start never waits on the
+  network. Exposes `needsProfile` (verified but unnamed → Create Profile; never
+  true for an astrologer) and `authError` (`err_blocked`). Providers live in
+  `src/lib/firebase-auth.ts` (OTP + Google) and `src/lib/api/` (`authedFetch`,
   which attaches the token and retries once on 401 with a fresh one).
-- `admin.tsx` — **feature flags** + local analytics. On mount: loads cached flags,
-  then fetches remote (`GET /api/flags`) and merges (known keys, coerced to bool).
-  Posts session/screen/payment events to the backend. Flags fall back to
-  `DEFAULT_FLAGS` (all `true`) when the backend is unreachable.
-- `content.tsx` — fetches `GET /api/content` and exposes remote deities/temples/
+- `providers/admin` — **feature flags** + local analytics. Loads cached flags, then
+  `GET /api/flags` and merges (known keys, coerced to bool); flags fall back to
+  `DEFAULT_FLAGS` (all `true`) when the backend is unreachable. (The old payment
+  analytics event was removed with the dummy checkout.)
+- `providers/content` — fetches `GET /api/content` and exposes remote deities/temples/
   aartis/**festivals** + `upcomingFestivals(n)` (admin calendar first, bundled
   list as fallback), `templeRating(slug)` (undefined unless a real rating is
   entered), `deityImage(id)` / `deityArt(id)` (dashboard artwork; no upload
-  means the procedural murti) and `toneSound(slug)` (a tone's recording, or
-  null when there is nothing to play). `assetUrl()` resolves host-relative
-  `/uploads/..` paths.
+  means the procedural murti) and `toneSound(slug)`. `assetUrl()` resolves
+  host-relative `/uploads/..` paths. Per-resource logic is in `providers/content/resources/`.
+- `providers/wallet` — the live coin balance (`useWallet()`).
 
 **Backend URL:** `src/constants/config.ts` → `ADMIN_API`. See §3 for the
 reachability rules — this is the #1 source of "it doesn't work on the phone".
@@ -81,7 +107,7 @@ dashboard down locked the app out. They are separate concerns over one
 MongoDB, and now separate deployables.
 
 - `pooja-api/` — Express + Mongoose. Serves BOTH surfaces, gated: the app's
-  endpoints are the allowlist in `admin.js`, everything else needs an
+  endpoints are the allowlist in `middleware/access.js`, everything else needs an
   operator session. This is the only thing that talks to MongoDB.
 - `pooja-admin/` — a static React/Vite site that calls that API. It serves
   nothing itself.
@@ -102,10 +128,9 @@ pooja-admin/
 ├── package.json        one package for both halves
 ├── vite.config.js      builds src/client → dist/, proxies /api in dev
 ├── index.html          Vite entry
-├── src/server/         the API
 ├── src/client/         the dashboard UI
-├── uploads/            multer's destination
-└── dist/               built UI, served by Express (gitignored)
+├── scripts/            check-deps.mjs (runs in `npm run build`)
+└── dist/               built static site (gitignored)
 ```
 
 **Run (needs MongoDB on `:27017`) — two terminals:**
@@ -121,61 +146,63 @@ is a rebuild, not a restart.
 Vite proxies `/api` and `/uploads` to :4000, so the client always calls its own
 origin — `api.js` has no absolute base URL any more.
 
-**Server** — `pooja-api/src/`:
-- `index.js` — entry; mounts `/uploads`, the `/api` routers, then `dist/` and
-  an SPA fallback. There is deliberately **no `GET /` handler**: it used to
-  return an API banner, which shadowed the dashboard once the UI moved here.
-- `firebase.js` — Firebase Admin init + `verifyIdToken`. Boots without a key,
-  but then `/api/auth/*` answers 503 rather than trusting anyone. Also
-  `revokeUser` / `deleteFirebaseUser`.
-- `auth.js` — `requireAuth` (verifies the Bearer ID token, 403s blocked
-  accounts) and `POST /auth/sync`, `GET|PUT /auth/me`.
-- `models.js` — `Flag, Visitor, Event, Payment, Deity, Temple, Aarti,
-  Festival, Seva, Knowledge, Faq, HeroSlide, Setting, User, Policy,
-  Announcement` + `DEFAULT_FLAGS`.
-- `admin.js` — **the gate**, and the role policy. `requireAdmin` is mounted at `/api` before every
-  router, with a **fail-closed allowlist** of the endpoints the phone app
-  needs; everything else wants an admin session. Also `POST /admin/login`,
-  `/admin/logout`, `GET /admin/session`. Sessions are a signed HttpOnly
-  `SameSite=Strict` cookie carrying the operator's id and role.
-  `ADMIN_ONLY` is the second list: paths an **editor** may not touch
-  (devotees, flags, payments, analytics, operators, policies). Written as a
-  denylist on purpose — a new *content* route is editable by default, a new
-  *administrative* one has to be named. **Production refuses to start with
-  no operators and no `ADMIN_PASSWORD`.**
-- `operators.js` — who may sign in. Admin-only CRUD over the `Operator`
-  model, with refusals that prevent a lockout: no self-demotion, no
-  self-suspension, no self-delete, and never the last active admin.
-- `db.js` — Mongo connect; seeds flags and default content only when empty.
-- `routes.js` — flags, analytics, ingest, payments, visitors.
-- `content.js` — generic CRUD for `/deities /temples /aartis /festivals
-  /sevas /knowledge /faqs /hero /settings`,
-  `POST /upload` (returns **host-relative** `/uploads/<file>`), `users`
-  (dashboard list/update/delete — the old unauthenticated `POST /users` now
-  answers **410 Gone**), `publicContent` (`GET /content`).
+**Server** — `pooja-api/src/` (DESIGN.md §14; one folder per feature):
+- `index.js` is a 2-line entry (`render.yaml` runs `node src/index.js`); `server.js`
+  boots (connect → seed → listen); `app.js` assembles Express in a fixed order
+  (CORS → body parser → `/uploads` → `/api/auth` → open feature modules → **the gate**
+  → admin routers → error handler). There is deliberately **no `GET /` handler**.
+- `config/env.js` reads and normalises the environment once; `config/cors.js` holds
+  the origin policy (never reflect an arbitrary origin AND allow credentials in prod).
+- `middleware/require-auth.js` — verifies the Bearer Firebase ID token (503 if no key,
+  403 if blocked) and attaches `req.token`, `req.user`, `req.role`.
+  `middleware/access.js` — **the gate**: `PUBLIC` allowlist (fail-closed) + role
+  permissions (`access/permissions.js`, `access/routes.js`: every admin path maps to an
+  *area*; GET needs `<area>:view`, writes need `<area>:edit`; an unmapped path is
+  admin-only). A new `/api` route is private unless added to `PUBLIC`; a new admin route
+  needs an entry in `access/routes.js` (a test enumerates every route and fails without).
+- `models.js` is a 27-line **barrel** over per-module `*.model.js` files (so
+  `import {…} from '../models.js'` still works) plus `DEFAULT_FLAGS`.
+- `modules/<feature>/` — `auth` (+`firebase.js`), `operators` (login/session/CRUD,
+  lockout refusals), `users` (devotee admin; the old `POST /users` answers 410),
+  `flags`, `analytics`, `announcements`, `policies`, `content` (generic CRUD factory
+  + `resources/*`, `seed-content.json`), `horoscope`, `panchang`, `media` (GridFS in
+  `files.js`), `public` (`GET /content`), and the coin/astrologer modules in §4b.
+  Each exports `routers(...)`/`seed()`/`start()` where it has them (`modules/index.js`).
+- `db/connect.js` + `db/seed.js` (runs each module's idempotent seed; never overwrites
+  operators' edits). `lib/` — `http-error`, `settings`, `coin-pack`, `async-handler`.
+  `health.js` — `/api/health` (reports `commit`).
 
-**Client** — `pooja-admin/src/client/`:
-- `App.jsx` — sidebar tabs: Overview, Feature Flags, Announcements, Rules,
-  Deities, Temples, Aartis, Festivals, Sevas, Knowledge, FAQs, Home Slides,
-  Horoscope, Panchang, Settings, Users, Payments, Visitors (hash-routed),
-  plus the field config for each content type.
-- `ContentManager.jsx` — generic CRUD table + edit modal; image/audio upload.
-  **The modal is the only place content is written.** Optional props:
-  `filterRows` (scope the table), `scopeNote` (what the count describes),
-  `onChange` (fired after a write so a sibling can restate itself).
-  A field may carry `type:'date'` (real picker) and `default()`.
-- `HoroscopeCopyDay.jsx` — the Horoscope tab's day bar. Picks the day the
-  table below is scoped to, counts how much of it is published, and seeds it
-  from the day before. It does **not** edit readings; see §5.
-- `Login.jsx` — username + password. `App` asks `/api/admin/session` and
-  renders this or the dashboard; any 401 anywhere drops back to it.
-- `Operators.jsx` — **dashboard** accounts (admin-only tab). Distinct from
-  `Users.jsx`, which is **devotees** — they sign in to the app with Firebase
-  and have no access here. Keeping the words apart is deliberate.
-- `Users.jsx` — devotee list with block/unblock/delete.
-- `api.js` — API client. **Same-origin by default**; `api.asset(url)` resolves
-  relative upload paths. Sends `credentials: 'include'` (the session is an
-  HttpOnly cookie) and raises `Unauthorized` on 401.
+**Client** — `pooja-admin/src/client/` (DESIGN.md §15):
+- `main.jsx` mounts the providers; `app/` = `App` (session gate → `Login` or
+  `AdminShell`), `AdminShell`, `Sidebar`, `NavItem`, `ApiStatus`, `providers`
+  (Toast + Confirm), and **`tabs.js`**, the single ordered tab registry
+  (`tabsFor(isAdmin)`; add a tab by adding one object).
+- `features/<name>/` — overview, flags, coin-orders, visitors, operators, users, policies,
+  login, horoscope, content, offerings, astrologers, coins, calls, bookings, poojas, chadhava, home-layout, home-slider (the "Home slider" tab: slides under Home's search bar; docs/POOJA_AND_HOME.md §1b). Each has a
+  `*Page.jsx` container, `components/`, `hooks/`, `lib/`, `index.js`.
+  - `features/content/` — `ContentManager` (container) with `components/` (toolbar,
+    table, row, row actions, edit modal, `fields/*` registry), `useContentResource`, and
+    `resources/*` (the per-resource field configs). **The modal is the only place content
+    is written.**
+  - `features/horoscope/` — twelve rashi cards for one day, 7-day strip, **Copy previous
+    day**; its modal is the only place a reading is written; "Show all dates" falls back to
+    the content table.
+  - `features/operators` is **dashboard** accounts (admin-only), distinct from
+    `features/users` = **devotees** (they sign in to the app with Firebase; no access here).
+- `ui/` — the kit, **used by every screen** (Button, IconButton, Switch, Badge, Modal,
+  ConfirmDialog, Toast, Field/FileField/ReadoutField, Card, StatCard, DataTable,
+  EmptyState/ErrorState, Banner, Skeleton, ProgressBar, ViewOnly pieces). One look: maroon
+  primary, 44px controls, kit modals (`md` 720 / `sm` 440). `styles/` — `tokens.css` (roles),
+  `ui.css` (`ui-*` kit classes), `features.css` (feature layout: horoscope tiles, markdown
+  split, flags, coins…), `shell.css`; `styles.css` holds only the shell/sidebar, login and
+  the Overview chart. There is no `.btn`/`.modal`/`.pill`/`.toggle`/`.panel` any more; new
+  screens compose the kit. Native `confirm()`/`alert()` are not used.
+- `lib/api/` (`client.js` req + credentials + `Unauthorized`; `resources.js`; `index.js`;
+  `src/client/api.js` is a re-export shim), `lib/hooks/`, `lib/dates.js`, `lib/money.js`.
+  **Same-origin by default**; `api.asset(url)` resolves relative upload paths.
+- **`npm run build` runs `scripts/check-deps.mjs` first**: `ui/` and `lib/` may not import
+  `features/` or `app/`, `features/` may not import `app/`, and one feature may reach
+  another only through its `index.js`.
 
 ## 3. How the two connect (READ THIS before debugging "flags/content don't apply")
 
@@ -361,6 +388,60 @@ anyone in. See `docs/FIREBASE_SETUP.md`.
 - **Diagnosed the "flags don't apply" report:** root cause was backend
   unreachability (phone on cellular), not app logic. Documented in §3.
 
+## 4b. Coins and astrologer calls (built; read `docs/COINS_AND_ASTROLOGERS.md`)
+
+**Coins are the only in-app currency.** Seva/pooja booking, e-Chadhava, the prasad
+delivery fee and astrologer calls all spend coins; Razorpay is used only to *buy*
+coins. 1 coin = ₹1 base value. The API is the authority: it prices every spend from
+the database, debits the wallet and records the order in one step, with a
+client-generated `requestId` so a retry never double-charges.
+
+- **API modules** live in `pooja-api/src/modules/<name>/` (wallet, coins, bookings,
+  chadhava, astrologers, calls, payouts), mounted by `modules/index.js` — open routes
+  *before* the admin gate, dashboard routes after it under `/api/admin/...`.
+  `wallet.service.js` is the **only** code that may change a balance (append-only
+  `WalletTxn` ledger, atomic conditional update, no DB transactions needed).
+  Errors are `{ error, code, ...extra }` (e.g. `402 insufficient_coins` + `shortfall`).
+- **Coin packs**: an operator sets *coins* and *price*; extra coins and the "N% EXTRA"
+  label are derived (`src/lib/coin-pack.js`, copied byte-for-byte to
+  `pooja-admin/.../features/coins/lib/coin-pack.js`, parity-tested). Keep both in sync.
+- **Astrologers** are added in the dashboard with a sign-in email or mobile; they sign
+  in like any devotee and `POST /auth/sync` claims the invite (provider-verified
+  identifier only), sets `role: 'astrologer'`, and the app shows the astrologer shell
+  (no Create Profile). Calls bill per started minute via a restart-safe ticker.
+- **Dev modes**: `PAYMENTS_PROVIDER=mock` and `RTC_PROVIDER=mock` work with no
+  accounts and are **refused in production**. Real Razorpay / Agora need keys plus
+  native modules in the app — see `docs/PAYMENTS_SETUP.md` and `docs/CALLS_SETUP.md`.
+  **The app has no native payment/voice SDK installed**; installing them needs a
+  prebuild and was not testable here.
+- **Tests**: `node --test <file>` per module (`*.test.mjs`, need a local `mongod`;
+  `--test-concurrency=1`; `node --test <dir>` finds nothing on Node 25). Use
+  `PATH=/opt/homebrew/bin:$PATH` (default node is too old).
+- **Not yet verified on a device**: real two-way audio, the Razorpay sheet, background
+  incoming calls (the astrologer app only receives calls while foregrounded — no push).
+
+## 4c. Pooja Seva, Chadhava and the dashboard-driven Home (built; read `docs/POOJA_AND_HOME.md`)
+
+- **Home is data.** `GET /api/content` returns `home.sections` (ordered, schedule-filtered) and an extended
+  `hero`; the app (`features/home`) dispatches on each section's `source` and falls back to a bundled default
+  layout (`features/home/constants/default-layout.ts`) when the API is unreachable. A hero slide is a banner
+  image **or sanitised HTML**: the API cleans it on save *and* on read (`modules/home/html-sanitizer.js`), the
+  app shows it in a JS-off WebView and routes taps itself (`bhakti://route`, https only), the dashboard previews
+  it in a sandboxed iframe. Never render stored HTML any other way.
+- **Poojas replace sevas.** A `Pooja` (modules/poojas) carries embedded `packages[]` (persons + coins); a
+  booking sends package key + one name/gotra per person and **never a price**. `import-sevas` migrates old
+  sevas (blank temple = offered at every temple, so the temple filter includes them).
+- **Chadhava is priced offerings** (`ChadhavaListing.offerings[]`, orders computed from the DB); the old
+  free-amount `POST /api/chadhava` answers 410.
+- **Reviews** exist only for performed bookings and can be hidden, never edited; ratings/counts show only
+  when real.
+- Dashboard tabs: Home layout (shelves only), Home slider, Poojas, Chadhava, Bookings (+ Reviews). Content tabs are
+  `content` (editor writes); bookings/reviews are `orders` (status/hide need `orders:edit`).
+- Testing the app against a local API: run the API on a throwaway mongod (`MONGODB_URI=… PORT=4400
+  PAYMENTS_PROVIDER=mock`), `adb reverse tcp:4400 tcp:4400`, and start a **separate** Metro
+  (`EXPO_PUBLIC_ADMIN_API=http://127.0.0.1:4400 npx expo start --dev-client --port 8082`) so the normal one on
+  8081 is untouched; open it with `exp+bhakti://expo-development-client/?url=http%3A%2F%2F127.0.0.1%3A8082`.
+
 ## 5. Gotchas / conventions
 
 - **Expo 57**: consult the versioned docs; APIs differ from older Expo.
@@ -432,7 +513,7 @@ anyone in. See `docs/FIREBASE_SETUP.md`.
   second source of truth the dashboard could not correct without a store
   release. `assets/images/` is now icons and UI chrome only, and there is
   no `assets/audio/` at all.
-- **Uploaded media lives in MongoDB, in GridFS** (`src/files.js`, bucket
+- **Uploaded media lives in MongoDB, in GridFS** (`modules/media/files.js`, bucket
   `media`), not on the filesystem. Render's container is wiped on every
   deploy and the free plan cannot mount a disk, so a filesystem upload was
   guaranteed to disappear — and once the app shipped no media of its own,
@@ -495,18 +576,39 @@ anyone in. See `docs/FIREBASE_SETUP.md`.
 - **Don't invent social proof.** Ratings, review counts and the like are real
   data or they are hidden — `templeRating()` returns undefined rather than a
   default, and the row disappears.
-- **Two roles: `admin` and `editor`.** An editor writes content and nothing
-  else — no devotees, flags, payments, analytics or operators. The sidebar
-  hides those tabs, but that is cosmetic; `ADMIN_ONLY` in `admin.js` is what
-  enforces it, and an editor calling `/api/users` directly gets 403. Verified
-  in `scratchpad/e2e/rbac.mjs`.
+- **Hardening in place (found by a security review; each has a regression test in
+  `pooja-api/src/security.test.mjs`).** Uploads accept only an extension allowlist (no SVG/HTML),
+  the stored type comes from the extension — never the browser — and `/uploads` is served with
+  `nosniff` + `Content-Security-Policy: sandbox`. There is **no public payment ingest**; the two
+  remaining public ingest routes take bounded strings only. `POST /policy/:key/accept` needs a
+  Firebase token and uses its uid. `POST /admin/login` is throttled (10 failures per client+user,
+  40 per client, per 15 min → 429) and refuses passwords over 256 chars; in production the gate
+  answers **503 rather than opening** if no active operator exists. Behind Render, `trust proxy`
+  is set so `req.ip` is the real client.
+- **Google sign-out needs `configure()` first.** `GoogleSignin.signOut()` rejects with "apiClient
+  is null" in a process where `configure()` has not run, so a logout after an app restart used to
+  leave Google's session alive and the next "Continue with Google" signed straight back in as the
+  same account (no chooser). `firebaseSignOut()` now configures first. Found on a real device.
+- **Three roles: `admin`, `editor`, `viewer`** (DESIGN.md §21). Permissions are
+  `<area>:view|edit` strings defined once in `pooja-api/src/access/permissions.js`;
+  `GET /api/admin/session` returns them and the dashboard derives everything from that list
+  (`useAccess()`, `<Can>`, tab `area` in `app/tab-areas.js`; no component checks a role name —
+  `scripts/check-access.mjs` fails the build if one does). Editors edit content, horoscope,
+  panchang and announcements and can only *view* everything else except devotees, operators
+  and push; viewers are read-only. **Without edit rights actions are hidden and forms are
+  read-only** ("View only"). Devotee names/phones/emails and astrologers' sign-in identifiers
+  are **masked in the API response** (`Devotee ••4821`) for roles without access; editors also
+  cannot change money-affecting rows in the generic settings table. Set
+  `ADMIN_SESSION_SECRET` in real deployments or the masking pseudonyms change on every
+  restart. Every successful operator write is recorded in `AuditLog` (admin-only
+  `GET /api/admin/audit-log`).
 - **`ADMIN_PASSWORD` only bootstraps the first admin** on an empty operator
   collection. Changing it later does nothing; passwords are changed in the
   Operators tab. Locked out? Delete the operator rows and restart.
 - **Operator ≠ User.** `Operator` is a dashboard login (scrypt hash, role).
   `User` is a devotee keyed by Firebase uid. Never let one become the other.
 - **The admin API is fail-closed.** A new `/api` route is private unless you
-  add it to `PUBLIC` in `src/server/admin.js`. If the app starts getting 401s
+  add it to `PUBLIC` in `pooja-api/src/middleware/access.js`. If the app starts getting 401s
   after you add an endpoint, that is why — and it is the safe direction to
   fail, because the alternative once exposed `DELETE /api/users/:id` (which
   deletes the Firebase account too) to the open internet.

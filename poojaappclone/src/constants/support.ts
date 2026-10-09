@@ -22,6 +22,3 @@ export const SUPPORT_PHONE = process.env.EXPO_PUBLIC_SUPPORT_PHONE ?? '';
 /** Shown under the helpline heading. Blank hides the line. */
 export const SUPPORT_HOURS_EN = process.env.EXPO_PUBLIC_SUPPORT_HOURS_EN ?? '';
 export const SUPPORT_HOURS_HI = process.env.EXPO_PUBLIC_SUPPORT_HOURS_HI ?? '';
-
-/** True when at least one channel is configured. */
-export const HAS_SUPPORT_CONTACT = !!(SUPPORT_EMAIL || SUPPORT_PHONE);

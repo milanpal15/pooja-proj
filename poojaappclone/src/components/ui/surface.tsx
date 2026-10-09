@@ -17,8 +17,8 @@ import { StatusBar } from 'expo-status-bar';
 import { type StyleProp, StyleSheet, View, type ViewStyle } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { BottomTabInset } from '@/constants/theme';
-import { Fill, Space, Surface, type SurfaceMode, useTheme } from '@/theme';
+
+import { BottomTabInset, Fill, Space, Surface, type SurfaceMode, useTheme } from '@/theme';
 
 import { IconButton } from './button';
 import { Mandala } from './mandala';
@@ -27,7 +27,7 @@ import { Type } from './type';
 /* ─────────────────────────────────────────────────────────── backdrop ── */
 
 /** The ember wash behind sanctum screens, with its mandala halo. */
-export function SanctumBackdrop({ children }: { children?: React.ReactNode }) {
+function SanctumBackdrop({ children }: { children?: React.ReactNode }) {
   const { c } = useTheme();
   return (
     <LinearGradient
@@ -123,6 +123,8 @@ export type AppBarProps = {
   brand?: string;
   /** Tint the bar with the accent container, as the Journal screen does. */
   tinted?: boolean;
+  /** Left-aligned bold title in the primary ink (the list/detail design) instead of a centred gold one. */
+  leftTitle?: boolean;
 };
 
 export function AppBar({
@@ -133,6 +135,7 @@ export function AppBar({
   right,
   brand,
   tinted = false,
+  leftTitle = false,
 }: AppBarProps) {
   const { c } = useTheme();
   const router = useRouter();
@@ -158,7 +161,7 @@ export function AppBar({
           )}
         </View>
 
-        <View style={styles.center}>
+        <View style={[styles.center, leftTitle && { alignItems: 'flex-start', paddingLeft: Space.sm }]}>
           {brand ? (
             <Type v="headlineMd" tone="primary" numberOfLines={1}>
               {brand}
@@ -166,7 +169,12 @@ export function AppBar({
           ) : (
             <>
               {!!title && (
-                <Type v="titleLg" tone="goldInk" center numberOfLines={1}>
+                <Type
+                  v="titleLg"
+                  tone={leftTitle ? 'onSurface' : 'goldInk'}
+                  center={!leftTitle}
+                  numberOfLines={1}
+                  style={leftTitle ? { fontSize: 17, fontWeight: '700' } : undefined}>
                   {title}
                 </Type>
               )}

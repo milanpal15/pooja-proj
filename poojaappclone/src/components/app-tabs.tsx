@@ -26,10 +26,10 @@ import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Icon, type IconName, Type } from '@/components/ui';
-import { type StringKey, useLanguage } from '@/context/language';
+import { type StringKey, useLanguage } from '@/i18n';
 import { Radius, Surface, useTheme } from '@/theme';
 
-type TabDef = { name: string; href: string; icon: IconName; labelKey: StringKey };
+export type TabDef = { name: string; href: string; icon: IconName; labelKey: StringKey };
 
 /** The five tabs. */
 const TABS: TabDef[] = [
@@ -40,7 +40,7 @@ const TABS: TabDef[] = [
   { name: 'profile', href: '/profile', icon: 'person', labelKey: 'tab_profile' },
 ];
 
-export default function AppTabs() {
+export default function AppTabs({ tabs = TABS }: { tabs?: TabDef[] }) {
   const { t } = useLanguage();
 
   return (
@@ -48,7 +48,7 @@ export default function AppTabs() {
       <TabSlot />
       <TabList asChild>
         <TabBar>
-          {TABS.map((tab) => (
+          {tabs.map((tab) => (
             <TabTrigger key={tab.name} name={tab.name} href={tab.href as never} asChild>
               <TabButton icon={tab.icon} label={t(tab.labelKey)} />
             </TabTrigger>

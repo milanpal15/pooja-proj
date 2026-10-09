@@ -1,10 +1,10 @@
 import 'dotenv/config';
 import mongoose from 'mongoose';
 
-import { connectDb } from './db.js';
-import { Event, Payment, Visitor } from './models.js';
+import { config } from './config/env.js';
+import { connectDb } from './db/connect.js';
+import { Event, Visitor } from './models.js';
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/pooja_admin';
 
 const SCREENS = ['/', '/pooja', '/temples', '/bhajan', '/profile', '/chadhava', '/journal', '/darshan'];
 const MODELS = ['motorola edge 60 pro', 'Pixel 8', 'iPhone 15', 'OnePlus 12', 'Galaxy S24'];
@@ -14,8 +14,8 @@ function rand(n) {
 }
 
 async function run() {
-  await connectDb(MONGODB_URI);
-  await Promise.all([Visitor.deleteMany({}), Event.deleteMany({}), Payment.deleteMany({})]);
+  await connectDb(config.mongodbUri);
+  await Promise.all([Visitor.deleteMany({}), Event.deleteMany({})]);
 
   const now = Date.now();
   for (let v = 0; v < 24; v++) {
@@ -38,20 +38,9 @@ async function run() {
         await Event.create({ type: 'screen', deviceId, screen: SCREENS[rand(SCREENS.length)], at });
       }
     }
-    if (rand(3) === 0) {
-      const ok = rand(10) > 1;
-      await Payment.create({
-        deviceId,
-        amount: [51, 101, 251, 501][rand(4)] + 5,
-        method: rand(2) ? 'UPI' : 'Card',
-        status: ok ? 'success' : 'failed',
-        note: 'flowers · Kashi Vishwanath',
-        at: new Date(now - rand(10) * 864e5),
-      });
-    }
   }
 
-  console.log('✓ Seeded demo visitors, events and payments.');
+  console.log('✓ Seeded demo visitors and events.');
   await mongoose.disconnect();
 }
 
