@@ -43,10 +43,13 @@ export function mountAdminModules(app) {
 /** Run every module's idempotent seed once the database is connected. */
 export async function seedModules() {
   for (const [name, m] of Object.entries(MODULES)) {
+    if (!m.seed) continue;
+    const t = Date.now();
     try {
-      await m.seed?.();
+      await m.seed();
+      console.log(`✓ seeded ${name} (${Date.now() - t} ms)`);
     } catch (e) {
-      console.error(`✗ seeding module "${name}" failed:`, e.message);
+      console.error(`✗ seeding module "${name}" failed after ${Date.now() - t} ms:`, e.message);
     }
   }
 }

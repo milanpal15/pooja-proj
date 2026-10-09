@@ -16,6 +16,8 @@ import 'dotenv/config';
 import { createApp } from './app.js';
 import { config } from './config/env.js';
 import { connectDb } from './db/connect.js';
+import { seedDefaults } from './db/seed.js';
+import { markReady } from './lib/readiness.js';
 import { ensureFirstOperator } from './modules/operators/index.js';
 import { seedModules, startModuleJobs } from './modules/index.js';
 
@@ -34,18 +36,49 @@ process.on('uncaughtException', (err) => {
   console.error('✗ Uncaught exception:', err?.stack || err);
 });
 
-connectDb(config.mongodbUri)
-  // Operators live in the database now, so the first one can only be
-  // created once there is a connection — not at import time.
-  .then(ensureFirstOperator)
-  .then(seedModules)
+/** Run one startup step with timing, and give up on it (not on the server) after `ms`. */
+async function step(name, fn, ms = 90_000) {
+  const t = Date.now();
+  let timer;
+  try {
+    await Promise.race([
+      fn(),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`still running after ${ms / 1000}s, moving on`)), ms);
+      }),
+    ]);
+    console.log(`✓ ${name} (${Date.now() - t} ms)`);
+  } catch (e) {
+    console.error(`✗ ${name} failed after ${Date.now() - t} ms:`, e?.message || e);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/*
+ * Bind the port as soon as the database is connected, THEN seed. Seeding used to come first, and on
+ * a hosted database every seed query is a network round trip: Render saw no open port, concluded
+ * the service had not started ("Port scan timeout") and killed it. Every seed is idempotent and
+ * none is needed to answer a request, and until `markReady()` the health check says 503 and the
+ * admin gate fails closed (an empty operator table is a 503 in production, never an open door).
+ */
+connectDb(config.mongodbUri, { seed: false })
   .then(() => {
-    startModuleJobs();
-    app.listen(config.port, () =>
-      console.log(`✓ API on http://localhost:${config.port}`),
-    );
+    app.listen(config.port, () => console.log(`✓ API on http://localhost:${config.port}`));
+    return startUp();
   })
   .catch((err) => {
     console.error('✗ Failed to start — is MongoDB running?', err.message);
     process.exit(1);
   });
+
+async function startUp() {
+  await step('seeded defaults', seedDefaults);
+  // Operators live in the database, so the first one can only be created once connected.
+  // (It exits the process itself in production when there is no way to sign in.)
+  await step('first operator checked', ensureFirstOperator);
+  await step('modules seeded', seedModules);
+  startModuleJobs();
+  markReady();
+  console.log('✓ Startup finished');
+}

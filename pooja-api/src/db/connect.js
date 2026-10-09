@@ -20,9 +20,13 @@ function redactUri(uri) {
   }
 }
 
-export async function connectDb(uri) {
+/**
+ * Connect, and (by default) seed. The server passes `seed: false` and seeds after it is
+ * listening — see `server.js` — so a slow seed cannot keep the port closed.
+ */
+export async function connectDb(uri, { seed = true } = {}) {
   mongoose.set('strictQuery', true);
   await mongoose.connect(uri);
   console.log('✓ MongoDB connected:', redactUri(uri));
-  await seedDefaults();
+  if (seed) await seedDefaults();
 }
