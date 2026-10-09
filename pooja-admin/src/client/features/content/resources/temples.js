@@ -6,8 +6,6 @@ const TEMPLE_FIELDS = [
   // Left blank the app hides the rating row rather than inventing one.
   { key: 'rating', label: 'Rating (0-5)', type: 'number', col: true },
   { key: 'reviews', label: 'Rating count', type: 'number' },
-  // YouTube link or a direct HLS/mp4 URL. Blank = not streaming.
-  { key: 'liveUrl', label: 'Live darshan URL', type: 'text' },
   { key: 'imageUrl', label: 'Image', type: 'image' },
   { key: 'offerings', label: 'Offerings (comma-separated)', type: 'csv' },
   { key: 'bookingEnabled', label: 'Booking', type: 'bool', col: true },

@@ -5,7 +5,10 @@ import { ActivityIndicator, Linking, Pressable, StyleSheet, View } from 'react-n
 import { WebView } from 'react-native-webview';
 
 import { Type } from '@/components/ui';
+import { ADMIN_API } from '@/constants/config';
 import { useTheme } from '@/theme';
+
+import { streamAddress, youTubeId } from '../lib/stream-url';
 
 /**
  * Plays a temple's live darshan feed.
@@ -28,28 +31,17 @@ export type LivePlayerProps = {
   label?: string;
 };
 
-/** Pull the video id out of the YouTube URL shapes people actually paste. */
-function youTubeId(url: string): string | null {
-  const patterns = [
-    /[?&]v=([A-Za-z0-9_-]{11})/,
-    /youtu\.be\/([A-Za-z0-9_-]{11})/,
-    /youtube\.com\/live\/([A-Za-z0-9_-]{11})/,
-    /youtube\.com\/embed\/([A-Za-z0-9_-]{11})/,
-  ];
-  for (const re of patterns) {
-    const m = url.match(re);
-    if (m) return m[1];
-  }
-  return null;
-}
-
 export function LivePlayer({ url, height, label }: LivePlayerProps) {
-  const ytId = useMemo(() => youTubeId(url), [url]);
+  const address = useMemo(() => streamAddress(url) ?? '', [url]);
+  const ytId = useMemo(() => (/youtube|youtu\.be/i.test(address) ? youTubeId(address) : null), [address]);
   if (ytId) return <YouTubeFeed id={ytId} height={height} label={label} />;
-  return <NativeFeed url={url} height={height} />;
+  return <NativeFeed url={address} height={height} />;
 }
 
 /* ───────────────────────────────────────────────────────────── youtube ── */
+
+/** The embedding page's origin: the API's own site (https), the one address this app can claim. */
+const PAGE_ORIGIN = /^https:\/\/[^/]+/.exec(ADMIN_API)?.[0] ?? 'https://pooja-api.onrender.com';
 
 function YouTubeFeed({ id, height, label }: { id: string; height: number; label?: string }) {
   const { c } = useTheme();
@@ -63,7 +55,10 @@ function YouTubeFeed({ id, height, label }: { id: string; height: number; label?
    *  1. A bare `source={{ uri }}` WebView sends no Referer, and YouTube
    *     refuses embedded playback without an origin — it renders "Video
    *     player configuration error / Error 153". The document below is
-   *     loaded with `baseUrl` on youtube.com, which supplies one.
+   *     loaded with a `baseUrl`, which supplies one. It must be OUR site, not
+   *     youtube.com: YouTube treats an embed hosted on its own origin as
+   *     invalid and answers error 152 (found on a real device with an
+   *     embeddable video). The same origin is passed to the player below.
    *  2. Channels can switch embedding off. When they have, the embed shows
    *     YouTube's own "This video is unavailable" (error 101/150) and the
    *     devotee is stuck. `onError` posts back so the screen can offer to
@@ -87,7 +82,7 @@ function YouTubeFeed({ id, height, label }: { id: string; height: number; label?
       function onYouTubeIframeAPIReady() {
         new YT.Player('p', {
           videoId: '${id}',
-          playerVars: { playsinline: 1, rel: 0, modestbranding: 1, autoplay: 1, mute: 1 },
+          playerVars: { playsinline: 1, rel: 0, modestbranding: 1, autoplay: 1, mute: 1, origin: '${PAGE_ORIGIN}', enablejsapi: 1 },
           events: {
             onReady: function (e) { post('ready'); e.target.playVideo(); },
             // 101 and 150 both mean "the owner disallows embedding".
@@ -143,7 +138,7 @@ function YouTubeFeed({ id, height, label }: { id: string; height: number; label?
   return (
     <View style={[styles.fill, { height, backgroundColor: '#000' }]}>
       <WebView
-        source={{ html, baseUrl: 'https://www.youtube.com' }}
+        source={{ html, baseUrl: PAGE_ORIGIN }}
         style={styles.web}
         originWhitelist={['*']}
         allowsInlineMediaPlayback

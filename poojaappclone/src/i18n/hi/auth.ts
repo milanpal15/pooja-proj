@@ -11,8 +11,6 @@ export const auth = {
   change_photo: 'फ़ोटो बदलें',
   full_name: 'पूरा नाम',
   ph_full_name: 'अपना पूरा नाम भरें',
-  bio_label: 'परिचय',
-  ph_bio: 'अपने बारे में बताएँ...',
   complete_profile: 'प्रोफ़ाइल पूर्ण करें',
   ph_phone: '10 अंकों का नंबर',
   ph_email: 'you@example.com',

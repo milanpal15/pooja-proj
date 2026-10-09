@@ -19,7 +19,7 @@ export const ROUTE_AREAS = [
   { path: /^\/content\/announcements(\/|$)/, area: 'announcements' },
   { path: /^\/content\/upload$/, area: 'content' },
   { path: /^\/content(\/|$)/, area: 'content' }, // deities, temples, aartis, … settings (money keys guarded separately)
-  { path: /^\/admin\/(offerings|home-sections|poojas|chadhava-listings|chadhava-categories)(\/|$)/, area: 'content' },
+  { path: /^\/admin\/(offerings|home-sections|poojas|chadhava-listings|chadhava-categories|live-streams|live-categories)(\/|$)/, area: 'content' },
 
   { path: /^\/flags(\/|$)/, area: 'flags' },
   { path: /^\/admin\/policies(\/|$)/, area: 'policies' },

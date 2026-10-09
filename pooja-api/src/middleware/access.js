@@ -39,6 +39,11 @@ export const PUBLIC = [
   { method: 'GET', path: /^\/announcements$/ },
   { method: 'GET', path: /^\/policy\/[^/]+$/ },
 
+  // Live darshan: list and player are open; saying Jai verifies a Firebase token inside the route.
+  { method: 'GET', path: /^\/live$/ },
+  { method: 'GET', path: /^\/live\/[^/]+$/ },
+  { method: 'POST', path: /^\/live\/[^/]+\/jai$/ },
+
   // Written by the app, not by a person at a keyboard.
   { method: 'POST', path: /^\/policy\/[^/]+\/accept$/ },
   { method: 'POST', path: /^\/ingest\/(session|screen)$/ },

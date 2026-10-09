@@ -57,7 +57,8 @@ publicContent.get('/content', async (_req, res) => {
 
   res.json({
     deities,
-    temples,
+    // `liveUrl` is legacy: the app reads streams from /api/live, and a raw link must not leak while a feed is off-air.
+    temples: temples.map(({ liveUrl: _legacy, ...t }) => t),
     aartis,
     festivals,
     sevas,

@@ -23,6 +23,7 @@ import { FlagsPage } from '../features/flags/index.js';
 import { HomeLayoutPage } from '../features/home-layout/index.js';
 import { HomeSliderPage } from '../features/home-slider/index.js';
 import { HoroscopePage } from '../features/horoscope/index.js';
+import { LivePage } from '../features/live/index.js';
 import { OfferingsPage } from '../features/offerings/index.js';
 import { OperatorsPage } from '../features/operators/index.js';
 import { OverviewPage } from '../features/overview/index.js';
@@ -60,6 +61,7 @@ const PAGES = {
   FAQs: contentPage(faqResource),
   'Home layout': HomeLayoutPage,
   'Home slider': HomeSliderPage,
+  'Live darshan': LivePage,
   Horoscope: HoroscopePage,
   Panchang: contentPage(panchangResource),
   Reminders: contentPage(reminderResource),

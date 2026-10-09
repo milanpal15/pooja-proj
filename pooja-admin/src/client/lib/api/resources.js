@@ -160,6 +160,16 @@ export const api = {
     reorder: (ids) => req('/admin/home-sections/order', send('PUT', { ids })),
   },
 
+  /** Live darshan (docs/LIVE_DARSHAN.md). Area content. */
+  liveStreams: {
+    ...adminResource('live-streams', 'streams'),
+    /** Rewrites `order` to follow `ids`. */
+    reorder: (ids) => req('/admin/live-streams/order', send('PUT', { ids })),
+    /** "Test link": { sourceType, url } -> { ok, broadcasting: true|false|null, viewers, message }. */
+    check: (body) => req('/admin/live-streams/check', send('POST', body)),
+  },
+  liveCategories: adminResource('live-categories', 'categories'),
+
   /** Chadhava offering catalogue — editors may manage it. */
   offerings: adminResource('offerings', 'offerings'),
 

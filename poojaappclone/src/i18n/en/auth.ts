@@ -12,8 +12,6 @@ export const auth = {
   change_photo: 'Change Photo',
   full_name: 'Full Name',
   ph_full_name: 'Enter your full name',
-  bio_label: 'Bio',
-  ph_bio: 'Tell us about yourself...',
   complete_profile: 'Complete Profile',
   ph_phone: '10-digit number',
   send_otp: 'Send OTP',

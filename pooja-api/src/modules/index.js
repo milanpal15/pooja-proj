@@ -5,6 +5,7 @@ import * as calls from './calls/index.js';
 import * as chadhava from './chadhava/index.js';
 import * as coins from './coins/index.js';
 import * as home from './home/index.js';
+import * as live from './live/index.js';
 import * as payouts from './payouts/index.js';
 import * as poojas from './poojas/index.js';
 import * as wallet from './wallet/index.js';
@@ -23,7 +24,7 @@ import * as wallet from './wallet/index.js';
  *
  * A module that exports nothing mounts nothing, so a half-built one is inert.
  */
-const MODULES = { wallet, coins, home, poojas, bookings, chadhava, astrologers, calls, payouts };
+const MODULES = { wallet, coins, home, live, poojas, bookings, chadhava, astrologers, calls, payouts };
 
 const built = Object.fromEntries(
   Object.entries(MODULES).map(([name, m]) => [name, m.routers({ requireAuth })]),

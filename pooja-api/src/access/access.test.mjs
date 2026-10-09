@@ -8,7 +8,7 @@ import mongoose from 'mongoose';
 
 import { createApp } from '../app.js';
 import { PUBLIC } from '../middleware/access.js';
-import { AuditLog, Operator, Pooja, PoojaReview, Setting, User } from '../models.js';
+import { AuditLog, Operator, Pooja, PoojaReview, Setting, Temple, User } from '../models.js';
 import { Booking } from '../modules/bookings/booking.model.js';
 import { CallSession } from '../modules/calls/call.model.js';
 import { ChadhavaOrder } from '../modules/chadhava/chadhava.model.js';
@@ -252,6 +252,35 @@ describe('pooja, home and chadhava admin routes', () => {
     assert.ok([401, 503].includes((await call(null, 'POST', '/bookings', {})).status)); // needs a Firebase token (503 when no key is configured)
     assert.equal((await call(null, 'POST', '/chadhava', {})).status, 410);
     assert.equal((await call(null, 'GET', '/admin/home-sections')).status, 401);
+  });
+});
+
+/* ----------------------------------------------------------- live darshan -- */
+describe('live darshan routes', () => {
+  test('areas: every admin live path is content', () => {
+    for (const [m, p] of [['GET', '/admin/live-streams'], ['POST', '/admin/live-streams'], ['PUT', '/admin/live-streams/order'], ['PUT', '/admin/live-streams/x'],
+      ['POST', '/admin/live-streams/check'], ['DELETE', '/admin/live-streams/x'], ['GET', '/admin/live-categories'], ['PUT', '/admin/live-categories/order']]) assert.equal(areaFor(m, p).area, 'content', `${m} ${p}`);
+  });
+
+  test('public list and player need no session; jai needs a Firebase token; admin routes need a role', async () => {
+    assert.equal((await call(null, 'GET', '/live')).status, 200);
+    assert.equal((await call(null, 'GET', '/live/none')).status, 404);
+    assert.ok([401, 503].includes((await call(null, 'POST', '/live/none/jai', {})).status));
+    assert.equal((await call(null, 'GET', '/admin/live-streams')).status, 401);
+    assert.equal((await call(null, 'POST', '/admin/live-streams/check', {})).status, 401);
+    assert.equal((await call('viewer', 'GET', '/admin/live-streams')).status, 200);
+    assert.equal((await call('viewer', 'POST', '/admin/live-streams/check', { sourceType: 'youtube', url: 'https://youtu.be/iD7bdfmqzXE' })).status, 403);
+    assert.equal((await call('viewer', 'PUT', '/admin/live-streams/order', { ids: [] })).status, 403);
+    assert.equal((await call('editor', 'POST', '/admin/live-categories', { name: 'RBAC cat' })).status, 201);
+    assert.equal((await call('editor', 'POST', '/admin/live-streams/check', { sourceType: 'youtube', url: 'https://youtu.be/iD7bdfmqzXE' })).status, 200);
+  });
+
+  test('GET /content no longer serves a temple\'s raw liveUrl', async () => {
+    await Temple.create({ slug: 'live-leak', name: 'Leak', liveUrl: 'https://www.youtube.com/watch?v=iD7bdfmqzXE' });
+    const { body } = await call(null, 'GET', '/content');
+    const t = body.temples.find((x) => x.slug === 'live-leak');
+    assert.ok(t);
+    assert.equal('liveUrl' in t, false);
   });
 });
 

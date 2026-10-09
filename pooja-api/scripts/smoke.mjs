@@ -69,6 +69,8 @@ await expect('GET /api/chadhava/offerings', '/api/chadhava/offerings', 200);
 await expect('GET /api/poojas', '/api/poojas', 200);
 await expect('GET /api/poojas/:slug (unknown is 404)', '/api/poojas/smoke-none', 404);
 await expect('GET /api/poojas/:slug/reviews (unknown is 404)', '/api/poojas/smoke-none/reviews', 404);
+await expect('GET /api/live', '/api/live', 200);
+await expect('GET /api/live/:slug (unknown is 404)', '/api/live/smoke-none', 404);
 await expect('GET /api/chadhava/listings', '/api/chadhava/listings', 200);
 await expect('GET /api/chadhava/listings/:slug (unknown is 404)', '/api/chadhava/listings/smoke-none', 404);
 
@@ -101,9 +103,10 @@ await expect('POST /api/wallet/orders/:id/verify', '/api/wallet/orders/000000000
   if (code === 400 || code === 503) pass('POST /api/webhooks/razorpay (unsigned) refused', `${code}`);
   else fail('POST /api/webhooks/razorpay (unsigned) refused', `got ${code}, want 400 or 503`);
 }
-for (const p of ['coin-packs', 'coin-orders', 'coin-stats', 'billing/rules', 'bookings', 'reviews', 'offerings', 'chadhava-orders', 'home-sections', 'poojas', 'chadhava-listings', 'chadhava-categories']) {
+for (const p of ['coin-packs', 'coin-orders', 'coin-stats', 'billing/rules', 'bookings', 'reviews', 'offerings', 'chadhava-orders', 'home-sections', 'poojas', 'chadhava-listings', 'chadhava-categories', 'live-streams', 'live-categories']) {
   await expect(`GET /api/admin/${p}`, `/api/admin/${p}`, 401);
 }
+await expect('POST /api/admin/live-streams/check', '/api/admin/live-streams/check', 401, { method: 'POST', body: {} });
 await expect('POST /api/admin/poojas', '/api/admin/poojas', 401, { method: 'POST', body: { slug: 'x' } });
 await expect('POST /api/admin/poojas/import-sevas', '/api/admin/poojas/import-sevas', 401, { method: 'POST', body: {} });
 await expect('POST /api/admin/home-sections', '/api/admin/home-sections', 401, { method: 'POST', body: { key: 'x' } });

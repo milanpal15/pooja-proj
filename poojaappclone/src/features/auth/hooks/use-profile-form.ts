@@ -26,14 +26,12 @@ export function useProfileForm(errs: AuthErrors, { run }: AuthAction, signedInBy
   const { resetError, failField } = errs;
 
   const [nameEdit, setName] = useState<string | null>(null);
-  const [bioEdit, setBio] = useState<string | null>(null);
   const [genderEdit, setGender] = useState<Gender | null>(null);
   /** YYYY-MM-DD, typed as three parts so no date picker native module is needed. */
   const [dobEdit, setDobParts] = useState<DobParts | null>(null);
   const [emailEdit, setEmail] = useState<string | null>(null);
 
   const name = nameEdit ?? pendingProfile?.name ?? '';
-  const bio = bioEdit ?? pendingProfile?.bio ?? '';
   const gender = genderEdit ?? pendingProfile?.gender ?? null;
   const dobParts = dobEdit ?? splitDob(pendingProfile?.dob ?? '');
   const dob = joinDob(dobParts);
@@ -58,15 +56,14 @@ export function useProfileForm(errs: AuthErrors, { run }: AuthAction, signedInBy
     await run(() =>
       completeProfile({
         name: name.trim(),
-        bio: bio.trim(),
         gender: gender!,
         dob,
         ...(needsEmail ? { email: email.trim() } : {}),
       }),
     );
-  }, [name, bio, gender, dob, email, needsEmail, completeProfile, failField, run, t]);
+  }, [name, gender, dob, email, needsEmail, completeProfile, failField, run, t]);
 
-  // Every edit but the bio clears the last failure; the bio never did.
+  // Every edit clears the last failure.
   const edited = <T,>(set: (v: T) => void) => (v: T) => {
     set(v);
     resetError();
@@ -74,7 +71,6 @@ export function useProfileForm(errs: AuthErrors, { run }: AuthAction, signedInBy
 
   return {
     name,
-    bio,
     gender,
     dobParts,
     dob,
@@ -84,7 +80,6 @@ export function useProfileForm(errs: AuthErrors, { run }: AuthAction, signedInBy
     onGender: edited(setGender),
     onDob: edited(setDobParts),
     onEmail: edited(setEmail),
-    onBio: setBio,
     complete,
   };
 }

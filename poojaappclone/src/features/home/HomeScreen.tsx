@@ -1,6 +1,7 @@
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { Screen, useScrollPadding } from '@/components/ui';
+import { useAnyLive } from '@/features/darshan';
 import { WalletChip } from '@/features/wallet';
 import { useLanguage } from '@/i18n';
 import { useAdmin } from '@/providers/admin';
@@ -41,6 +42,7 @@ export function HomeScreen() {
   const { flags } = useAdmin();
   const { t, lang } = useLanguage();
   const { deityList, deityArt } = useContent();
+  const anyLive = useAnyLive();
   const pad = useScrollPadding(100);
   const here = useGrantedLocation();
   const slides = useHomeSlides();
@@ -52,7 +54,7 @@ export function HomeScreen() {
   const quick = ([
     { key: 'pooja', label: t('hv_q_pooja'), icon: 'diya', href: '/poojas' },
     { key: 'chadhava', label: t('hv_q_chadhava'), icon: 'marigold', href: '/chadhava', off: flags.chadhava === false },
-    { key: 'live', label: t('hv_q_live'), icon: 'play', href: '/darshan', badge: t('hv_live'), off: flags.liveDarshan === false },
+    { key: 'live', label: t('hv_q_live'), icon: 'play', href: '/darshan', badge: anyLive ? t('hv_live') : undefined, off: flags.liveDarshan === false },
     { key: 'temples', label: t('hv_q_temples'), icon: 'temple', href: '/temples' },
     { key: 'panchang', label: t('hv_q_panchang'), icon: 'calendar', href: '/panchang' },
     { key: 'rashifal', label: t('hv_q_rashifal'), icon: 'star', href: '/horoscope' },

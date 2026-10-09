@@ -31,7 +31,7 @@ const session = (role) => ({ required: true, authed: true, username: role, role,
 
 const ALL = TAB_AREAS.map((t) => t.id);
 const byIdEarly = Object.fromEntries(TAB_AREAS.map((t) => [t.id, t]));
-const CONTENT_EDITABLE = ['Announcements', 'Deities', 'Temples', 'Aartis', 'Festivals', 'Sevas', 'Offerings', 'Knowledge', 'FAQs', 'Home layout', 'Poojas', 'Chadhava', 'Home slider', 'Horoscope', 'Panchang', 'Reminders', 'Alert Tones', 'Wallpapers', 'Settings'];
+const CONTENT_EDITABLE = ['Announcements', 'Deities', 'Temples', 'Aartis', 'Festivals', 'Sevas', 'Offerings', 'Knowledge', 'FAQs', 'Home layout', 'Poojas', 'Chadhava', 'Home slider', 'Live darshan', 'Horoscope', 'Panchang', 'Reminders', 'Alert Tones', 'Wallpapers', 'Settings'];
 const EXPECT = {
   // Admin sees and edits everything (orders:edit = move a booking on, hide a review).
   admin: { visible: ALL, readOnly: [] },

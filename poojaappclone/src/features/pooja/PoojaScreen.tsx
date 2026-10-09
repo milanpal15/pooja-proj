@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -7,6 +8,7 @@ import { HangingBell, Toran } from '@/components/illustrations/temple-scene';
 import { NoContent } from '@/components/ui';
 import { AARTI_CIRCLES } from '@/constants/deities';
 import { useLanguage } from '@/i18n';
+import { useAuth } from '@/providers/auth';
 import { TopTabInset } from '@/theme';
 
 import { AartiProgress } from './components/AartiProgress';
@@ -17,7 +19,6 @@ import { RitualRail } from './components/RitualRail';
 import { SanctumScene } from './components/SanctumScene';
 import { useAartiCount } from './hooks/use-aarti-count';
 import { useAarti } from './hooks/use-aarti';
-import { useAccountMenu } from './hooks/use-account-menu';
 import { useDeitySelection } from './hooks/use-deity-selection';
 import { useSanctumSound } from './hooks/use-sanctum-sound';
 import { panchangLine as todaysPanchangLine } from './lib/panchang-line';
@@ -32,11 +33,13 @@ export function PoojaScreen() {
   const [flowersOn, setFlowersOn] = useState(false);
   const panchangLine = useMemo(() => todaysPanchangLine(), []);
 
-  const { totalAartis, countCompleted } = useAartiCount();
+  const { countCompleted } = useAartiCount();
   const aarti = useAarti(stage, countCompleted);
   const { deity, selectDeity, deitySwipe, idolStyle } = useDeitySelection(aarti.resetAarti);
   const { musicOn, toggleMusic, playBell } = useSanctumSound(aarti.autoRunning, aarti.resetAarti);
-  const { initial, confirmLogout } = useAccountMenu();
+  const { user } = useAuth();
+  const router = useRouter();
+  const initial = user?.name?.trim()?.[0]?.toUpperCase() || 'अ';
 
   const toggleFlowers = useCallback(() => setFlowersOn((on) => !on), []);
   const flowersFalling = flowersOn || aarti.autoRunning;
@@ -62,8 +65,7 @@ export function PoojaScreen() {
         <PoojaAppBar
           initial={initial}
           title={deity.title}
-          totalAartis={totalAartis}
-          onAvatarPress={confirmLogout}
+          onAvatarPress={() => router.push('/profile')}
         />
 
         {/* Scrolling deity selector — changes the idol below */}

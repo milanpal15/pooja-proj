@@ -21,8 +21,6 @@ type Props = {
   needsEmail: boolean;
   email: string;
   onEmail: (v: string) => void;
-  bio: string;
-  onBio: (v: string) => void;
   errorField: ProfileField | null;
   error: string;
   busy: boolean;
@@ -71,13 +69,6 @@ export function ProfileForm(p: Props) {
         </Type>
       )}
 
-      <Field
-        label={t('bio_label')}
-        value={p.bio}
-        onChangeText={p.onBio}
-        placeholder={t('ph_bio')}
-        multilineRows={3}
-      />
       {/* A failure that belongs to no single field — the save
           itself, or a dropped session — still has to be said. */}
       {!!p.error && !p.errorField && (

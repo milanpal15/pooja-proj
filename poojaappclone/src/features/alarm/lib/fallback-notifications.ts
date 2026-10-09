@@ -20,7 +20,15 @@ export async function scheduleFallbackNotifications(
 ) {
   // Channels must exist before anything is scheduled into them.
   if (Platform.OS === 'android') await ensureToneChannels(N, tones);
-  await N.cancelAllScheduledNotificationsAsync();
+  /*
+   * Only this screen's own entries are cleared. `cancelAll…` also wiped the Live Darshan "remind me"
+   * notifications, which are scheduled by another feature; ours all carry `data.reminderId`.
+   */
+  const pending: { identifier: string; content?: { data?: Record<string, unknown> } }[] =
+    await N.getAllScheduledNotificationsAsync();
+  for (const n of pending) {
+    if (n.content?.data?.reminderId !== undefined) await N.cancelScheduledNotificationAsync(n.identifier);
+  }
 
   for (const def of resolveReminders(next, cycle)) {
     if (!next.enabled[def.id]) continue;

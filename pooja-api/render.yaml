@@ -86,6 +86,8 @@ services:
         sync: false
       - key: AGORA_APP_CERTIFICATE
         sync: false
+      - key: YOUTUBE_API_KEY
+        sync: false # live darshan: verifies YouTube streams are broadcasting
       # The dashboard's URL, e.g. https://pooja-admin.onrender.com — or just
       # the bare host, which the API turns into https:// itself (see
       # `allowedOrigins` in src/config/cors.js). A trailing slash is tolerated.
