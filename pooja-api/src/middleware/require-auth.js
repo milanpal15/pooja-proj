@@ -21,16 +21,19 @@ function decodeAudience(token) {
  * so blocking from the dashboard takes effect everywhere at once.
  */
 export async function requireAuth(req, res, next) {
+  // No credentials is 401 whatever the server's configuration: a stranger is a stranger even on a
+  // box with no Firebase key (CI boots exactly that way, and the smoke test relies on this).
+  const header = req.get('authorization') || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
+  if (!token) return res.status(401).json({ error: 'missing bearer token' });
+
+  // A token was presented but this server cannot verify it: say so rather than trust it.
   if (!firebaseReady()) {
     return res.status(503).json({
       error: 'auth unavailable',
       detail: `Firebase Admin is not configured on the server (${firebaseError()}).`,
     });
   }
-
-  const header = req.get('authorization') || '';
-  const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
-  if (!token) return res.status(401).json({ error: 'missing bearer token' });
 
   let decoded;
   try {
