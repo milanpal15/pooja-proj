@@ -32,6 +32,7 @@ export const darshan = {
   ld_unverified: 'लाइव स्थिति की पुष्टि नहीं हुई',
   ld_jai: 'जय',
   ld_jai_count: 'भक्तों ने इस आरती में जय कहा',
+  ld_jai_count_one: 'भक्त ने इस आरती में जय कहा',
   ld_chadhava: 'चढ़ावा चढ़ाएँ',
   ld_pooja: 'पूजा बुक करें',
   ld_navigate: 'रास्ता देखें',

@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 
+import { config } from '../../config/env.js';
 import { HttpError } from '../../lib/http-error.js';
 
 /**
@@ -16,7 +17,7 @@ import { HttpError } from '../../lib/http-error.js';
  * and tests can run the whole flow, and it is REFUSED in production even when
  * asked for by name: a mock that works there is free coins for everyone.
  */
-export function activeProvider(env = process.env) {
+export function activeProvider(env = config.paymentsEnv) {
   const prod = env.NODE_ENV === 'production';
   const hasKeys = !!(env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET);
   const want = (env.PAYMENTS_PROVIDER || '').toLowerCase();
@@ -34,7 +35,7 @@ export function requireProvider() {
 
 /** Create the order on Razorpay's side. Plain fetch + Basic auth — no SDK. */
 export async function createRazorpayOrder({ amountPaise, receipt, notes }) {
-  const { RAZORPAY_KEY_ID: id, RAZORPAY_KEY_SECRET: secret } = process.env;
+  const { keyId: id, keySecret: secret } = config.razorpay;
   const res = await fetch('https://api.razorpay.com/v1/orders', {
     method: 'POST',
     headers: {
@@ -46,6 +47,10 @@ export async function createRazorpayOrder({ amountPaise, receipt, notes }) {
   const body = await res.json().catch(() => ({}));
   if (!res.ok || !body.id) {
     console.error('✗ Razorpay order failed:', res.status, body?.error?.description || '');
+    // The key id is public (the phone receives it), so it is safe to print; for the secret only its length.
+    if (res.status === 401) {
+      console.error(`  key id "${id}" (${id.startsWith('rzp_test_') ? 'test' : id.startsWith('rzp_live_') ? 'live' : 'unrecognised'} mode), secret length ${secret.length} — a test key id needs the secret generated with it, in the same mode`);
+    }
     throw new HttpError(502, 'payments_failed', 'Could not start the payment. Please try again.');
   }
   return { razorpayOrderId: body.id, keyId: id };
@@ -62,14 +67,14 @@ export function safeEqual(a, b) {
 
 /** Checkout signature: HMAC-SHA256(`order_id|payment_id`, key secret). */
 export function checkoutSignatureOk({ razorpayOrderId, razorpayPaymentId, signature }) {
-  const secret = process.env.RAZORPAY_KEY_SECRET;
+  const secret = config.razorpay.keySecret;
   if (!secret || !razorpayOrderId || !razorpayPaymentId || !signature) return false;
   return safeEqual(hmacHex(secret, `${razorpayOrderId}|${razorpayPaymentId}`), signature);
 }
 
 /** Webhook signature: HMAC-SHA256(raw body, webhook secret). Must be the RAW bytes. */
 export function webhookSignatureOk(rawBody, signature) {
-  const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
+  const secret = config.razorpay.webhookSecret;
   if (!secret || !rawBody || !signature) return false;
   return safeEqual(hmacHex(secret, rawBody), signature);
 }

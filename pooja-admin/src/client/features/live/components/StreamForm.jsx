@@ -51,7 +51,7 @@ export function StreamForm({ draft, set, errors, lookups, stream, taken }) {
       <Block title="Stream source">
         <div className="lv-source">
           <Field label="Type" type="select" value={draft.sourceType} options={SOURCE_TYPES} onChange={(v) => set({ sourceType: v })} />
-          <Field label="Link" type="url" placeholder={draft.sourceType === 'hls' ? 'https://…/stream.m3u8' : 'https://youtube.com/watch?v=…'} value={draft.url} error={errors.url} onChange={(v) => set({ url: v })} />
+          <Field label="Link" type="url" placeholder="Paste the stream link" value={draft.url} error={errors.url} onChange={(v) => set(/\.(m3u8|mp4)(\?|#|$)/i.test(v.trim()) ? { url: v, sourceType: 'hls' } : { url: v })} />
         </div>
         <SourceCheck key={stream ? stream.id ?? stream._id : 'new'} sourceType={draft.sourceType} url={draft.url} savedCheckedAt={stream?.checkedAt} savedNote={stream?.verified === false ? stream?.probeNote : ''} />
         <div className="hs-upload">

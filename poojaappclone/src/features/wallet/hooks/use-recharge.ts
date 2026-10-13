@@ -3,11 +3,18 @@ import { useCallback, useState } from 'react';
 import { useToast } from '@/components/ui';
 import { useAuth } from '@/providers/auth';
 import { useLanguage } from '@/i18n';
-import { type CoinPack, createCoinOrder, isOffline, verifyCoinOrder } from '@/lib/api';
+import { ApiError, type CoinPack, createCoinOrder, isOffline, verifyCoinOrder } from '@/lib/api';
 import { fill, formatCoins } from '@/lib/format';
 import { useWallet } from '@/providers/wallet';
 
 import { collectPayment, PaymentsUnavailableError } from '../lib/razorpay';
+
+/** Why a purchase failed, for the toast's second line: the API's code, or the checkout SDK's own words. */
+function reasonOf(e: unknown): string | undefined {
+  if (e instanceof ApiError) return [e.code, e.message].filter(Boolean).join(': ') || `HTTP ${e.status}`;
+  const d = e as { description?: string; message?: string } | null;
+  return d?.description || d?.message || undefined;
+}
 
 export type RechargeStatus = 'idle' | 'creating' | 'paying' | 'verifying';
 
@@ -77,7 +84,9 @@ export function useRecharge() {
         } else if (isOffline(e)) {
           fail(t('offline_spend'));
         } else {
-          fail(t('payment_failed'));
+          const why = reasonOf(e);
+          setError(t('payment_failed'));
+          toast.error(t('payment_failed'), why ? { description: why } : undefined);
         }
         return false;
       } finally {

@@ -4,6 +4,7 @@
  * HLS: fetch the manifest. YouTube: the official Data API only — never the watch page — and with no
  * `YOUTUBE_API_KEY` the answer is "unknown" (`broadcasting: null`), which the dashboard flags as unverified.
  */
+import { config } from '../../config/env.js';
 import { youTubeId } from '../../lib/stream-url.js';
 import { LiveStream } from './live.model.js';
 
@@ -110,7 +111,7 @@ export async function probeYoutubeIds(ids, { apiKey, fetchImpl = fetch } = {}) {
 }
 
 export async function probeSource({ sourceType, url }, opts = {}) {
-  const apiKey = opts.apiKey ?? process.env.YOUTUBE_API_KEY;
+  const apiKey = opts.apiKey ?? config.youtubeApiKey;
   if (sourceType === 'youtube') {
     const id = youTubeId(url);
     if (!id) return { broadcasting: false, viewers: null, startedAt: null, probeNote: 'Not a YouTube link' };
@@ -126,7 +127,7 @@ export async function probeAll(opts = {}) {
   if (running) return 0;
   running = true;
   try {
-    const apiKey = opts.apiKey ?? process.env.YOUTUBE_API_KEY;
+    const apiKey = opts.apiKey ?? config.youtubeApiKey;
     const streams = await LiveStream.find({ enabled: true }).select('_id sourceType url').lean();
     const yt = streams.filter((s) => s.sourceType === 'youtube');
     const ytResults = await probeYoutubeIds([...new Set(yt.map((s) => youTubeId(s.url)).filter(Boolean))], { ...opts, apiKey });

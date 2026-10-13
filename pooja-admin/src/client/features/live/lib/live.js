@@ -109,6 +109,7 @@ export function linkProblem(type, url) {
   const u = String(url || '').trim();
   if (!u) return 'Add the stream link';
   if (!/^https:\/\//i.test(u)) return 'The link must start with https://';
+  if (type === 'youtube' && /\.(m3u8|mp4)(\?|#|$)/i.test(u)) return 'This looks like a direct HLS link. Set Type to HLS.';
   if (type === 'hls' && !/\.(m3u8|mp4)(\?|#|$)/i.test(u)) return 'An HLS link must end in .m3u8 or .mp4';
   return '';
 }

@@ -38,6 +38,9 @@ export function useStreamEditor({ streams, onSaved }) {
       else saved = await api.liveStreams.create({ ...body, order: Math.max(0, ...streams.map((s) => s.order ?? 0)) + 10 });
       toast.success(open.stream ? 'Stream saved' : 'Stream added');
       await onSaved();
+      // The API probes a new or changed link just after answering, so the first read can still say
+      // "not verified". Read again shortly after so the row settles without a manual reload.
+      setTimeout(() => { onSaved(); }, 3000);
       const stored = { ...(open.stream || {}), ...body, ...(saved && typeof saved === 'object' ? saved : {}) };
       const draft = draftFrom(stored);
       setOpen({ stream: stored, draft, base: JSON.stringify(draft) });

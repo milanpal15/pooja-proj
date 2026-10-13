@@ -1,3 +1,4 @@
+import { config } from '../../config/env.js';
 import { HttpError } from '../../lib/http-error.js';
 
 /**
@@ -42,7 +43,7 @@ function agoraProvider(appId, certificate) {
 }
 
 /** Resolve the provider for this environment, or throw `503 calls_unavailable`. */
-export function getRtcProvider(env = process.env) {
+export function getRtcProvider(env = config.rtcEnv) {
   const prod = env.NODE_ENV === 'production';
   const haveAgora = !!(env.AGORA_APP_ID && env.AGORA_APP_CERTIFICATE);
   const chosen = (env.RTC_PROVIDER || (haveAgora ? 'agora' : prod ? '' : 'mock')).toLowerCase();

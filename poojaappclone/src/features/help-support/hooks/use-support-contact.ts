@@ -6,7 +6,7 @@ import {
   SUPPORT_HOURS_EN,
   SUPPORT_HOURS_HI,
   SUPPORT_PHONE,
-} from '@/constants/support';
+} from '@/constants/config';
 import { useContent } from '@/providers/content';
 import { useLanguage } from '@/i18n';
 
@@ -17,7 +17,7 @@ export function useSupportContact() {
   const { settingText } = useContent();
 
   /*
-   * Dashboard first, then the env fallback from `constants/support.ts`.
+   * Dashboard first, then the env fallback from `constants/config.ts`.
    * Both empty means the channel is hidden rather than dialling a
    * placeholder — the app used to ship `support@shrimandir.devotee`, a TLD
    * that does not exist, and a vanity number somebody else may own.

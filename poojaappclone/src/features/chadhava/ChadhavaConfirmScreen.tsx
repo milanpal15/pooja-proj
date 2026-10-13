@@ -31,7 +31,11 @@ export function ChadhavaConfirmScreen() {
             onChange={() => router.back()}
             onPlaced={() => {
               toast.success(t('cs_placed'));
-              router.dismissTo({ pathname: '/my-bookings', params: { tab: 'chadhava' } });
+              // Clear the whole listing → confirm stack first. Leaving the listing underneath meant
+              // "back" from My bookings showed the old selection and a Continue bar, as if nothing
+              // had been ordered, and invited ordering it a second time.
+              router.dismissAll();
+              router.push({ pathname: '/my-bookings', params: { tab: 'chadhava' } });
             }}
           />
         ) : null}

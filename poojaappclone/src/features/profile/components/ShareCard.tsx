@@ -2,7 +2,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Pressable, Share, StyleSheet, View } from 'react-native';
 
 import { Type } from '@/components/ui';
-import { STORE_URL } from '@/constants/app-links';
+import { STORE_URL } from '@/constants/config';
 import { useLanguage } from '@/i18n';
 import { Kumkum, Radius, Saffron, Space, useTheme } from '@/theme';
 

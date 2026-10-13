@@ -132,7 +132,7 @@ export function DarshanPlayerScreen() {
               label={saved ? t('ld_unsave') : t('ld_save')}
               size={44}
               variant="solid"
-              color={c.primary}
+              color={saved ? c.onAccentContainer : c.onPrimary}
               onPress={() => void toggleSave(stream.templeSlug)}
               style={saved ? { backgroundColor: c.accentContainer } : undefined}
             />

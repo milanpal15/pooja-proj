@@ -82,7 +82,7 @@ function YouTubeFeed({ id, height, label }: { id: string; height: number; label?
       function onYouTubeIframeAPIReady() {
         new YT.Player('p', {
           videoId: '${id}',
-          playerVars: { playsinline: 1, rel: 0, modestbranding: 1, autoplay: 1, mute: 1, origin: '${PAGE_ORIGIN}', enablejsapi: 1 },
+          playerVars: { playsinline: 1, rel: 0, modestbranding: 1, autoplay: 1, mute: 1, fs: 1, origin: '${PAGE_ORIGIN}', enablejsapi: 1 },
           events: {
             onReady: function (e) { post('ready'); e.target.playVideo(); },
             // 101 and 150 both mean "the owner disallows embedding".
@@ -142,6 +142,7 @@ function YouTubeFeed({ id, height, label }: { id: string; height: number; label?
         style={styles.web}
         originWhitelist={['*']}
         allowsInlineMediaPlayback
+        allowsFullscreenVideo
         mediaPlaybackRequiresUserAction={false}
         javaScriptEnabled
         domStorageEnabled

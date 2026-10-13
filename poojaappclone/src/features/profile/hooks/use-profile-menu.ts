@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { Linking } from 'react-native';
 
-import { STORE_URL } from '@/constants/app-links';
+import { STORE_URL } from '@/constants/config';
 import { useLanguage } from '@/i18n';
 import { useAuth } from '@/providers/auth';
 import { useTheme, useThemePreference } from '@/theme';

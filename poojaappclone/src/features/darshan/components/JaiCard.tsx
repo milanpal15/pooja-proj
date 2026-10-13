@@ -36,7 +36,7 @@ export function JaiCard({
       </Pressable>
       {n !== null && (
         <Type v="bodySm" tone="onSurfaceVariant" style={styles.text}>
-          {n} {t('ld_jai_count')}
+          {n} {t(count === 1 ? 'ld_jai_count_one' : 'ld_jai_count')}
         </Type>
       )}
     </View>

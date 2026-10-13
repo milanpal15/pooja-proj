@@ -18,9 +18,9 @@ import { fileURLToPath } from 'url';
  *     function (`ensureFirstOperator`, the health handler). They stay lazy so
  *     behaviour does not change for anything that sets env after import.
  *
- * Not here on purpose: `modules/*` (coins' payment providers, the RTC
- * provider) read env at call time and their tests mutate it between calls,
- * and `scripts/*` are standalone CLIs with their own `BASE`/`DAYS` knobs.
+ * The payment and call providers' settings are here too, as getters: they must be read at
+ * the moment of use (their tests change the environment between calls), so they are not
+ * frozen at import. `scripts/*` are standalone CLIs with their own `BASE` knobs and stay out.
  */
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -67,6 +67,33 @@ export const config = Object.freeze({
       return env.FIREBASE_SERVICE_ACCOUNT_PATH || env.GOOGLE_APPLICATION_CREDENTIALS;
     },
   },
+
+  /** Razorpay. Trimmed: a stray space or newline pasted into a host's dashboard breaks auth invisibly. */
+  razorpay: {
+    get keyId() { return (env.RAZORPAY_KEY_ID || '').trim(); },
+    get keySecret() { return (env.RAZORPAY_KEY_SECRET || '').trim(); },
+    get webhookSecret() { return (env.RAZORPAY_WEBHOOK_SECRET || '').trim(); },
+  },
+  /** What `modules/coins/providers.js` decides the live payment provider from. */
+  get paymentsEnv() {
+    return {
+      NODE_ENV: env.NODE_ENV,
+      PAYMENTS_PROVIDER: env.PAYMENTS_PROVIDER,
+      RAZORPAY_KEY_ID: this.razorpay.keyId,
+      RAZORPAY_KEY_SECRET: this.razorpay.keySecret,
+    };
+  },
+  /** What `modules/calls/rtc.provider.js` decides the audio provider from. */
+  get rtcEnv() {
+    return {
+      NODE_ENV: env.NODE_ENV,
+      RTC_PROVIDER: env.RTC_PROVIDER,
+      AGORA_APP_ID: (env.AGORA_APP_ID || '').trim(),
+      AGORA_APP_CERTIFICATE: (env.AGORA_APP_CERTIFICATE || '').trim(),
+    };
+  },
+  /** Optional: lets the Live Darshan probe verify YouTube streams and read viewer counts. */
+  get youtubeApiKey() { return (env.YOUTUBE_API_KEY || '').trim(); },
 
   // Read when the first operator is bootstrapped / when /api/health answers.
   get adminPassword() { return env.ADMIN_PASSWORD || ''; },

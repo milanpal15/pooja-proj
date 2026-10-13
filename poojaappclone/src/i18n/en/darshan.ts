@@ -32,6 +32,7 @@ export const darshan = {
   ld_unverified: 'Live status not verified',
   ld_jai: 'Jai',
   ld_jai_count: 'devotees said Jai during this aarti',
+  ld_jai_count_one: 'devotee said Jai during this aarti',
   ld_chadhava: 'Offer chadhava',
   ld_pooja: 'Book pooja',
   ld_navigate: 'Navigate',

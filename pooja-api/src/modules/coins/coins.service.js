@@ -1,3 +1,4 @@
+import { config } from '../../config/env.js';
 import { HttpError } from '../../lib/http-error.js';
 import { describePack, packProblem } from '../../lib/coin-pack.js';
 import { getNumberSetting } from '../../lib/settings.js';
@@ -146,7 +147,7 @@ export async function verifyOrder({ uid, orderId, body }) {
 
 /** Razorpay's server-to-server notice, for when the app never got to call verify. */
 export async function handleWebhook({ rawBody, signature, event }) {
-  if (!process.env.RAZORPAY_WEBHOOK_SECRET) throw new HttpError(503, 'webhook_unconfigured', 'Webhook secret is not set.');
+  if (!config.razorpay.webhookSecret) throw new HttpError(503, 'webhook_unconfigured', 'Webhook secret is not set.');
   if (!providers.webhookSignatureOk(rawBody, signature)) throw new HttpError(400, 'bad_signature', 'Bad signature.');
 
   const type = event?.event;
