@@ -17,9 +17,22 @@ import { Astrologer } from '../modules/astrologers/astrologer.model.js';
 import { hashPassword } from '../modules/operators/index.js';
 import { sign } from '../modules/operators/session.js';
 import { Wallet, WalletTxn } from '../modules/wallet/wallet.model.js';
+import { signServiceToken } from '../lib/service-jwt.js';
+import { startIdentityStub } from '../modules/test-kit.mjs';
 import { AREAS, ROLE_PERMISSIONS, can, permissionsFor } from './permissions.js';
 import { maskEmail, maskPhone, pseudonym } from './redact.js';
 import { areaFor } from './routes.js';
+
+/*
+ * IDENTITY_MODE=1 runs this same suite with IDENTITY_URL set (phase 2): operators authenticate with the admin BFF's signed
+ * service token instead of a cookie, devotee names come from an identity stand-in that answers from the local `users`
+ * collection, and the pieces that moved to identity / the admin BFF (cookie session, operator CRUD, the audit log) are
+ * skipped here - they are covered in backend/services/identity and backend/bff/admin.
+ */
+const IDENTITY_MODE = process.env.IDENTITY_MODE === '1';
+const SECRET = 'identity-mode-secret-1234567890'; // = what startIdentityStub() sets as INTERNAL_JWT_SECRET
+const moved = IDENTITY_MODE ? { skip: 'moved to the identity service / admin BFF' } : {};
+let identityStub;
 
 const OID = '000000000000000000000001';
 const dbUri = () => {
@@ -38,7 +51,8 @@ before(async () => {
   await mongoose.connect(dbUri());
   await mongoose.connection.dropDatabase();
   await Promise.all(Object.values(mongoose.models).map((m) => m.init()));
-  for (const role of ['admin', 'editor', 'viewer']) {
+  if (IDENTITY_MODE) identityStub = await startIdentityStub();
+  for (const role of IDENTITY_MODE ? [] : ['admin', 'editor', 'viewer']) {
     const o = await Operator.create({ username: `${role}1`, passwordHash: hashPassword('password-123'), role });
     ids[role] = String(o._id);
     cookies[role] = `pooja_admin=${encodeURIComponent(sign({ uid: String(o._id), role, exp: Date.now() + 3600_000 }))}`;
@@ -51,6 +65,7 @@ before(async () => {
 
 after(async () => {
   server.close();
+  identityStub?.close();
   await mongoose.connection.dropDatabase();
   await mongoose.disconnect();
 });
@@ -58,7 +73,13 @@ after(async () => {
 async function call(role, method, path, body) {
   const res = await fetch(`${base}/api${path}`, {
     method,
-    headers: { ...(body ? { 'content-type': 'application/json' } : {}), ...(role ? { cookie: cookies[role] } : {}) },
+    headers: {
+      ...(body ? { 'content-type': 'application/json' } : {}),
+      ...(role && !IDENTITY_MODE ? { cookie: cookies[role] } : {}),
+      ...(role && IDENTITY_MODE
+        ? { authorization: `Bearer ${signServiceToken({ iss: 'admin-bff', sub: `op-${role}`, role, perms: permissionsFor(role), ctx: { username: `${role}1` } }, { secret: SECRET })}` }
+        : {}),
+    },
     body: body ? JSON.stringify(body) : undefined,
   });
   const text = await res.text();
@@ -170,7 +191,7 @@ test('wallet lookup also needs devotees:view (a search by PII leaks PII)', async
   assert.equal((await call('admin', 'GET', '/admin/wallets?q=a')).status, 200);
 });
 
-test('session returns permissions, read fresh from the record', async () => {
+test('session returns permissions, read fresh from the record', moved, async () => {
   const s = await call('editor', 'GET', '/admin/session');
   assert.equal(s.body.role, 'editor');
   assert.deepEqual(s.body.permissions, permissionsFor('editor'));
@@ -399,8 +420,11 @@ describe('review text editing', () => {
     assert.equal(ok.body.review.edited, true);
     await new Promise((res) => setTimeout(res, 150));
     const e = await AuditLog.findOne({ path: `/api${path}` }).lean();
-    assert.ok(e, 'audit row exists');
-    assert.deepEqual([e.operator, e.method, e.area, e.targetId], ['admin1', 'PUT', 'orders', String(r._id)]);
+    if (IDENTITY_MODE) assert.equal(e, null, 'the admin BFF audits writes (into identity), not the monolith');
+    else {
+      assert.ok(e, 'audit row exists');
+      assert.deepEqual([e.operator, e.method, e.area, e.targetId], ['admin1', 'PUT', 'orders', String(r._id)]);
+    }
 
     const pub = await call(null, 'GET', '/poojas/rt-pooja/reviews');
     assert.equal(pub.status, 200);
@@ -413,7 +437,7 @@ describe('review text editing', () => {
 });
 
 /* -------------------------------------------------------------------- audit -- */
-describe('audit log', () => {
+describe('audit log', moved, () => {
   test('a successful write adds an entry; a 403 and a GET do not', async () => {
     await AuditLog.deleteMany({});
     const ok = await call('editor', 'PUT', '/horoscope/day/2026-02-02', { readings: [] });
@@ -451,7 +475,7 @@ describe('audit log', () => {
 });
 
 /* ---------------------------------------------------------- operator CRUD -- */
-describe('operators: three roles and lockout refusals', () => {
+describe('operators: three roles and lockout refusals', moved, () => {
   test('create accepts viewer, rejects unknown roles', async () => {
     const ok = await call('admin', 'POST', '/admin/operators', { username: 'newviewer', password: 'password-123', role: 'viewer' });
     assert.equal(ok.status, 201);

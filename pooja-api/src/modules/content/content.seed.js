@@ -1,4 +1,7 @@
 import { readFileSync } from 'fs';
+
+import { catalogEnabled } from '../../lib/catalog-client.js';
+import { engagementEnabled } from '../../lib/engagement-client.js';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -213,6 +216,13 @@ const HERO_SLIDES = [
 
 /** Seed default content only when a collection is empty. */
 export async function seedContent() {
+  // CATALOG_URL set (phase 3): the catalog service seeds every collection below; only the Settings upsert stays here
+  // (and only while the settings table is still the monolith's, i.e. ENGAGEMENT_URL unset).
+  if (!catalogEnabled()) await seedCatalogCollections();
+  await seedSettings();
+}
+
+async function seedCatalogCollections() {
   if ((await Deity.countDocuments()) === 0) await Deity.insertMany(DEITIES);
   else await backfillDeities();
   if ((await Aarti.countDocuments()) > 0) await backfillAartis();
@@ -228,12 +238,6 @@ export async function seedContent() {
   if ((await Knowledge.countDocuments()) === 0) await Knowledge.insertMany(BUNDLED.knowledge);
   if ((await HeroSlide.countDocuments()) === 0) await HeroSlide.insertMany(HERO_SLIDES);
 
-  // Settings are upserted per key, not seeded as a block, so a new key added
-  // in a later release reaches databases that already have the others.
-  for (const s of BUNDLED.settings) {
-    await Setting.updateOne({ key: s.key }, { $setOnInsert: s }, { upsert: true });
-  }
-
   // Backfill the palette/map fields onto temples that predate them — without
   // these a temple renders with no colours and no pin on the pilgrimage map.
   for (const t of BUNDLED.templePatch) {
@@ -241,5 +245,13 @@ export async function seedContent() {
       { slug: t.slug, accent: { $exists: false } },
       { $set: { ...t, slug: undefined } },
     ).catch(() => {});
+  }
+}
+
+async function seedSettings() {
+  // Settings are upserted per key, not seeded as a block, so a new key added
+  // in a later release reaches databases that already have the others.
+  for (const s of engagementEnabled() ? [] : BUNDLED.settings) {
+    await Setting.updateOne({ key: s.key }, { $setOnInsert: s }, { upsert: true });
   }
 }

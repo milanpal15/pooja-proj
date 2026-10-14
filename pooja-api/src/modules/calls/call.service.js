@@ -2,10 +2,10 @@ import mongoose from 'mongoose';
 
 import { HttpError } from '../../lib/http-error.js';
 import { getBoolSetting, getNumberSetting } from '../../lib/settings.js';
-import { User } from '../../models.js';
+import { userName } from '../../lib/user-directory.js';
 import { Astrologer, effectivePresence } from '../astrologers/astrologer.model.js';
 import { AstrologerEarning } from '../payouts/payout.model.js';
-import * as wallet from '../wallet/wallet.service.js';
+import * as wallet from '../../lib/wallet-ledger.js';
 import { CallSession } from './call.model.js';
 import { notifyIncomingCall } from './call.push.js';
 import { getRtcProvider, RTC_UID } from './rtc.provider.js';
@@ -40,7 +40,7 @@ export async function loadForParticipant(id, uid) {
 
 /* ----------------------------------------------------------- request -- */
 
-export async function requestCall({ devoteeUid, astrologerId, requestId, now = new Date() }) {
+export async function requestCall({ devoteeUid, astrologerId, requestId, devoteeName, now = new Date() }) {
   if (!requestId || typeof requestId !== 'string') throw new HttpError(400, 'no_request_id', 'A requestId is required.');
   if (!(await getBoolSetting('callsEnabled', true))) throw new HttpError(503, 'calls_disabled', 'Astrologer calls are switched off for now.');
   getRtcProvider(); // 503 calls_unavailable before anything is promised to the devotee
@@ -63,13 +63,13 @@ export async function requestCall({ devoteeUid, astrologerId, requestId, now = n
     throw new HttpError(402, 'insufficient_coins', 'Not enough coins to start this call.', { needed, balance, shortfall: needed - balance });
   }
 
-  const devotee = await User.findOne({ uid: devoteeUid }).select('name').lean();
+  const devoteeNameNow = await userName(devoteeUid, devoteeName);
   const _id = new mongoose.Types.ObjectId();
   try {
     const call = await CallSession.create({
       _id,
       devoteeUid,
-      devoteeName: devotee?.name || '',
+      devoteeName: devoteeNameNow,
       astrologerId: a._id,
       astrologerUid: a.uid,
       astrologerName: a.name,
@@ -82,7 +82,7 @@ export async function requestCall({ devoteeUid, astrologerId, requestId, now = n
       rtcChannel: `call-${_id}`,
       devoteeLive: true,
     });
-    notifyIncomingCall(a.uid, firstName(devotee?.name)); // best effort, never awaited
+    notifyIncomingCall(a.uid, firstName(devoteeNameNow)); // best effort, never awaited
     return call;
   } catch (e) {
     if (e?.code !== 11000) throw e;
@@ -141,14 +141,17 @@ export async function billNextMinute(call, now = new Date()) {
 /** Give back what a call that never really connected had charged, and void its earnings. */
 async function refundConnectFailure(call) {
   for (let n = 1; n <= call.minutesBilled; n++) {
-    await wallet.refund({
+    // Durable + quiet: the call is already over, so a wallet that cannot answer right now must not stop the rest of the clean-up;
+    // the refund is queued under the same key and re-sent until the wallet takes it (WALLET_URL set).
+    await wallet.refundDurably({
       uid: call.devoteeUid,
       amount: call.ratePerMinSnapshot,
       refType: 'call',
       refId: call._id,
       idempotencyKey: `call:${call._id}:refund:${n}`,
+      ofKey: `call:${call._id}:min:${n}`, // the minute's debit this reverses: the wallet service checks it exists and is this devotee's
       note: 'Call did not connect',
-    });
+    }, { quiet: true });
   }
   await AstrologerEarning.updateMany({ callId: call._id, voidedAt: { $exists: false } }, { $set: { voidedAt: new Date() } });
   await CallSession.updateOne({ _id: call._id }, { $set: { coinsRefunded: call.minutesBilled * call.ratePerMinSnapshot } });
@@ -208,7 +211,16 @@ export async function acceptCall(call, now = new Date()) {
     throw new HttpError(409, 'call_ended', 'This call is no longer waiting for an answer.', { endReason: fresh.endReason });
   }
 
-  const billed = await billNextMinute(won, now);
+  let billed;
+  try {
+    billed = await billNextMinute(won, now);
+  } catch (e) {
+    // The wallet service cannot say whether minute 1 was charged (WALLET_URL set). Do NOT end the call on a guess and do NOT
+    // pretend it was billed: leave it connected with `nextBillAt` = now, and the billing ticker asks again with the SAME key
+    // (`call:<id>:min:1`), which is idempotent. It is charged once, as soon as the wallet answers.
+    if (!wallet.isUnavailable(e)) throw e;
+    billed = { call: won };
+  }
   if (billed.outOfCoins) {
     // Balance fell below one minute between request and answer. Nothing was charged.
     return (await finishCall(won._id, ['connected'], 'out_of_coins', now)) ?? (await CallSession.findById(won._id));
@@ -279,21 +291,25 @@ export async function goodwillRefund(id, { coins, reason, requestId, operator })
   if (!reserved) {
     const call = await CallSession.findById(id);
     if (!call) throw notFound();
-    if (call.refunds.some((r) => r.requestId === rid)) return { call, balance: await wallet.getBalance(call.devoteeUid), duplicate: true };
+    if (call.refunds.some((r) => r.requestId === rid)) return { call, balance: await wallet.displayBalance(call.devoteeUid), duplicate: true };
     throw new HttpError(400, 'refund_exceeds_charge', 'That is more than this call charged.', { charged: call.coinsCharged, refunded: call.coinsRefunded });
   }
   try {
-    const out = await wallet.refund({
+    // Durable: if the wallet cannot answer, the refund is queued under its key and will still be paid, so the reservation must NOT be
+    // released on that error (the operator's retry with the same requestId then sees it as already reserved).
+    const out = await wallet.refundDurably({
       uid: reserved.devoteeUid,
       amount: n,
       refType: 'call',
       refId: reserved._id,
       idempotencyKey: `call:${reserved._id}:goodwill:${rid}`,
+      reason: entry.reason, // no single debit stands behind a goodwill refund: the explicit reason is the wallet's one exemption from `ofKey`
       note: entry.reason,
       createdBy: operator,
     });
     return { call: reserved, balance: out.balance };
   } catch (e) {
+    if (wallet.isUnavailable(e)) throw e;
     await CallSession.updateOne({ _id: id }, { $inc: { coinsRefunded: -n }, $pull: { refunds: { requestId: rid } } });
     throw e;
   }
@@ -342,10 +358,13 @@ export async function toView(call, { viewerUid, now = new Date() } = {}) {
     const toNext = Math.max(0, Math.ceil((new Date(call.nextBillAt).getTime() - now.getTime()) / 1000));
     view.secondsToNextCharge = toNext;
     // How long the devotee can still talk: until the first charge that cannot be paid.
-    const balance = await wallet.getBalance(call.devoteeUid);
-    const secondsLeft = toNext + 60 * Math.floor(balance / rate);
-    view.lowBalance = secondsLeft <= 60;
-    if (isDevotee) view.balance = balance;
+    // Display only: a wallet that cannot answer (WALLET_URL set) leaves the balance out and `lowBalance` false - never a made-up 0.
+    const balance = await wallet.displayBalance(call.devoteeUid);
+    if (balance !== undefined) {
+      const secondsLeft = toNext + 60 * Math.floor(balance / rate);
+      view.lowBalance = secondsLeft <= 60;
+      if (isDevotee) view.balance = balance;
+    }
     if (isDevotee || isAstrologer) {
       try {
         view.rtc = await getRtcProvider().issue({ channel: call.rtcChannel, uid: isDevotee ? RTC_UID.devotee : RTC_UID.astrologer });
@@ -354,7 +373,8 @@ export async function toView(call, { viewerUid, now = new Date() } = {}) {
       }
     }
   } else if (isDevotee) {
-    view.balance = await wallet.getBalance(call.devoteeUid);
+    const balance = await wallet.displayBalance(call.devoteeUid);
+    if (balance !== undefined) view.balance = balance;
   }
   return view;
 }

@@ -3,6 +3,8 @@ import http from 'node:http';
 import express from 'express';
 import mongoose from 'mongoose';
 
+import { startIdentityStub } from './test-kit.mjs';
+
 /**
  * Shared test plumbing: a real Express app mounting the real module routers
  * behind a FAKE `requireAuth` (never used by product code), on a throwaway
@@ -26,6 +28,8 @@ export const fakeAuth = (req, res, next) => {
 };
 
 export async function startApp(dbName, moduleNamespaces) {
+  // IDENTITY_MODE=1 (phase 2): user facts come from an identity stand-in that reads the local `users` the suite seeds.
+  const identityStub = process.env.IDENTITY_MODE === '1' ? await startIdentityStub() : null;
   await mongoose.connect(dbUri(dbName));
   await mongoose.connection.dropDatabase();
   await Promise.all(Object.values(mongoose.models).map((m) => m.init()));
@@ -63,6 +67,7 @@ export async function startApp(dbName, moduleNamespaces) {
   };
   const close = async () => {
     await new Promise((ok) => server.close(ok));
+    identityStub?.close();
     await mongoose.connection.dropDatabase();
     await mongoose.disconnect();
   };

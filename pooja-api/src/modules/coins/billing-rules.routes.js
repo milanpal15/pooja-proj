@@ -1,4 +1,5 @@
 import { HttpError } from '../../lib/http-error.js';
+import { engagementEnabled, upsertSettings } from '../../lib/engagement-client.js';
 import { ensureSetting, getBoolSetting, getNumberSetting } from '../../lib/settings.js';
 import { Setting } from '../../models.js';
 
@@ -54,6 +55,19 @@ export function billingRulesRoutes(admin) {
     // Validate everything before writing anything: no half-applied change.
     const next = {};
     for (const key of Object.keys(RULES)) if (body[key] !== undefined) next[key] = check(key, body[key]);
+    if (engagementEnabled()) {
+      // The table lives in the engagement service; it re-checks `money:edit` from the caller's claims.
+      const op = req.operator;
+      const items = Object.entries(next).map(([key, v]) => ({ key, value: String(v), label: RULES[key].label, desc: RULES[key].desc }));
+      if (items.length) {
+        try {
+          await upsertSettings(items, { sub: op?.username, role: op?.role, perms: op?.permissions });
+        } catch (e) {
+          return res.status(e.status && e.status < 500 ? e.status : 502).json(e.body ?? { error: 'Settings are unavailable right now.', code: 'engagement_unavailable' });
+        }
+      }
+      return res.json(await readRules());
+    }
     for (const [key, v] of Object.entries(next)) {
       await ensureSetting(key, v, RULES[key].label, RULES[key].desc);
       await Setting.updateOne({ key }, { $set: { value: String(v) } });

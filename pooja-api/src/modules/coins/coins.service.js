@@ -2,7 +2,7 @@ import { config } from '../../config/env.js';
 import { HttpError } from '../../lib/http-error.js';
 import { describePack, packProblem } from '../../lib/coin-pack.js';
 import { getNumberSetting } from '../../lib/settings.js';
-import { User } from '../../models.js';
+import { whoByUid } from '../../lib/user-directory.js';
 import { Wallet, WalletTxn } from '../wallet/wallet.model.js';
 import * as wallet from '../wallet/wallet.service.js';
 import { CoinOrder, CoinPack } from './coins.model.js';
@@ -168,8 +168,7 @@ export async function handleWebhook({ rawBody, signature, event }) {
 
 export async function listOrders(limit = 50) {
   const rows = await CoinOrder.find().sort({ createdAt: -1 }).limit(Math.min(Number(limit) || 50, 200)).lean();
-  const users = await User.find({ uid: { $in: [...new Set(rows.map((r) => r.uid))] } }).select('uid name contact').lean();
-  const who = new Map(users.map((u) => [u.uid, u.name || u.contact]));
+  const who = await whoByUid(rows.map((r) => r.uid));
   return rows.map((o) => ({
     id: String(o._id), uid: o.uid, who: who.get(o.uid) || o.uid, coins: o.coins, price: o.price,
     status: o.status, provider: o.provider, at: o.createdAt,

@@ -4,6 +4,8 @@ import { hasPermission, permissionsFor } from '../access/permissions.js';
 import { Operator } from '../models.js';
 import { authRequired } from '../modules/operators/operators.service.js';
 import { sessionOf } from '../modules/operators/session.js';
+import { identityEnabled } from '../lib/identity-client.js';
+import { OPERATOR_ISSUER, trustedClaims } from '../lib/trusted-claims.js';
 
 /**
  * The gate in front of the dashboard, and who is allowed through which part.
@@ -64,6 +66,8 @@ const forbid = (res, needs) => res.status(403).json({ error: FORBIDDEN, code: 'f
 export async function requireAdmin(req, res, next) {
   if (PUBLIC.some((r) => r.method === req.method && r.path.test(req.path))) return next();
 
+  if (identityEnabled()) return requireTrustedOperator(req, res, next);
+
   // No operators at all means a local dev database nobody has set up; the
   // warning on boot covers it.
   //
@@ -91,6 +95,31 @@ export async function requireAdmin(req, res, next) {
 
   const permissions = permissionsFor(operator.role);
   req.operator = { id: String(operator._id), username: operator.username, role: operator.role, permissions };
+  req.can = (perm) => hasPermission(permissions, perm);
+
+  const { area, level, also } = areaFor(req.method, req.path);
+  const needs = `${area}:${level}`;
+  if (!req.can(needs)) return forbid(res, needs);
+  if (also && !req.can(also)) return forbid(res, also);
+  next();
+}
+
+/**
+ * IDENTITY_URL set: the admin BFF owns the session cookie, checks the operator against identity on every request
+ * (role and `active` come from the record, never the cookie) and signs { sub: operatorId, role, perms, ctx.username }
+ * into a service token. The monolith trusts only that, only from `admin-bff`, and STILL applies the area gate
+ * (defence in depth: a BFF bug or a forged-but-valid token for the wrong role cannot widen access here).
+ */
+function requireTrustedOperator(req, res, next) {
+  const claims = trustedClaims(req, OPERATOR_ISSUER);
+  // The BFF could not establish the operator for a reason that is NOT "not signed in": never answer 401 (the dashboard would
+  // sign the operator out) and never open.
+  if (claims?.ctx?.authError === 'unavailable') return res.status(503).json({ error: 'identity_unavailable', code: 'identity_unavailable' });
+  if (claims?.ctx?.authError === 'no_operators') return res.status(503).json({ error: 'The dashboard is locked: no active operator exists.', code: 'no_operators' });
+  if (!claims?.sub || !Array.isArray(claims.perms)) return res.status(401).json({ error: 'Sign in required' });
+
+  const permissions = claims.perms;
+  req.operator = { id: String(claims.sub), username: claims.ctx?.username ?? String(claims.sub), role: claims.role, permissions };
   req.can = (perm) => hasPermission(permissions, perm);
 
   const { area, level, also } = areaFor(req.method, req.path);

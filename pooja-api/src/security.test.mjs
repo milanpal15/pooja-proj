@@ -32,6 +32,13 @@ const { hashPassword } = await import('./modules/operators/passwords.js');
 const { PUBLIC, requireAdmin } = await import('./middleware/access.js');
 const { Operator, User, Visitor } = await import('./models.js');
 
+/*
+ * With IDENTITY_URL set (phase 2) the cookie session, the login throttle, the operator rows and policy acceptance moved to
+ * the admin BFF / identity service (their suites: backend/bff/admin, backend/services/identity), and the monolith's gate
+ * trusts a signed token instead (src/identity-mode.test.mjs). The cookie-driven blocks below only describe the legacy path.
+ */
+const moved = process.env.IDENTITY_URL ? { skip: 'moved to the admin BFF / identity service (phase 2)' } : {};
+
 let server;
 let base;
 let canAll = true;
@@ -81,7 +88,7 @@ const call = async (method, path, body, headers = {}) => {
   return { status: res.status, json, text, headers: res.headers };
 };
 
-describe('the gate never fails open in production', () => {
+describe('the gate never fails open in production', moved, () => {
   test('with no operator at all, admin routes answer 503 instead of opening', async () => {
     assert.equal(await Operator.countDocuments(), 0);
     const r = await call('GET', '/api/visitors');
@@ -124,7 +131,7 @@ describe('public ingest', () => {
   });
 });
 
-describe('policy acceptance', () => {
+describe('policy acceptance', moved, () => {
   test('is no longer anonymous, and an operator in the body updates nobody', async () => {
     await User.create({ uid: 'u-policy', contact: 'policy@example.com', name: 'P' });
     const r = await call('POST', '/api/policy/terms/accept', { contact: { $ne: null }, version: 9 });
@@ -134,7 +141,7 @@ describe('policy acceptance', () => {
   });
 });
 
-describe('admin login throttle', () => {
+describe('admin login throttle', moved, () => {
   before(async () => {
     await Operator.create({ username: 'throttle-admin', passwordHash: hashPassword('correct horse'), role: 'admin' });
   });
@@ -171,7 +178,7 @@ describe('admin login throttle', () => {
   });
 });
 
-describe('uploads', () => {
+describe('uploads', moved, () => {
   let cookie = '';
 
   // The real gate now requires an operator; an editor has `content:edit`, which
@@ -217,7 +224,7 @@ describe('uploads', () => {
   });
 });
 
-describe('visitors (was a 500 for everyone)', () => {
+describe('visitors (was a 500 for everyone)', moved, () => {
   const login = async (username, password) => {
     const r = await call('POST', '/api/admin/login', { username, password });
     assert.equal(r.status, 200, `login ${username}`);

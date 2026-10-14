@@ -18,8 +18,54 @@ import { config } from './config/env.js';
 import { connectDb } from './db/connect.js';
 import { seedDefaults } from './db/seed.js';
 import { markReady } from './lib/readiness.js';
+import { identityEnabled } from './lib/identity-client.js';
+import { engagementEnabled } from './lib/engagement-client.js';
+import { catalogEnabled } from './lib/catalog-client.js';
+import { callsEnabled } from './lib/calls-guard.js';
+import { ordersEnabled } from './lib/orders-guard.js';
+import { walletEnabled } from './lib/wallet-client.js';
 import { ensureFirstOperator } from './modules/operators/index.js';
 import { seedModules, startModuleJobs } from './modules/index.js';
+
+// WALLET_URL set: the billing rules the wallet service writes live in engagement, and this process reads them from there. Without it
+// the two would disagree about the coin rate, the call minimum and the refund cut-off - on a money path, so refuse to start.
+if (walletEnabled() && !engagementEnabled()) {
+  console.error('✗ WALLET_URL is set but ENGAGEMENT_URL is not: the wallet service keeps the billing rules in engagement. Set both, or neither.');
+  process.exit(1);
+}
+if (walletEnabled() && config.internalJwtSecret.length < 16) {
+  console.error('✗ WALLET_URL is set but INTERNAL_JWT_SECRET is missing or shorter than 16 characters.');
+  process.exit(1);
+}
+
+// ORDERS_URL set (phase 5): bookings, chadhava orders and reviews are the orders service's, which prices from catalog, spends through the wallet,
+// and is reached only through BFFs that authenticate the caller. The monolith stops serving them, so a half-configured stack would silently lose them.
+if (ordersEnabled()) {
+  const missing = [['CATALOG_URL', catalogEnabled()], ['WALLET_URL', walletEnabled()], ['IDENTITY_URL', identityEnabled()], ['ENGAGEMENT_URL', engagementEnabled()]].filter(([, on]) => !on).map(([n]) => n);
+  if (missing.length) {
+    console.error(`✗ ORDERS_URL is set but ${missing.join(', ')} ${missing.length > 1 ? 'are' : 'is'} not: the orders service needs all of them. Set them all, or unset ORDERS_URL.`);
+    process.exit(1);
+  }
+  if (config.internalJwtSecret.length < 16) {
+    console.error('✗ ORDERS_URL is set but INTERNAL_JWT_SECRET is missing or shorter than 16 characters.');
+    process.exit(1);
+  }
+}
+
+// CALLS_URL set (phase 6): astrologers, calls and payouts are the calls service's, which spends through the wallet, writes roles to identity and reads
+// its billing rules from engagement, and is reached only through BFFs that authenticate. The monolith stops serving them, so a half-configured stack
+// would silently lose them (and the astrologer claim identity asks at sign-in).
+if (callsEnabled()) {
+  const missing = [['WALLET_URL', walletEnabled()], ['IDENTITY_URL', identityEnabled()], ['ENGAGEMENT_URL', engagementEnabled()]].filter(([, on]) => !on).map(([n]) => n);
+  if (missing.length) {
+    console.error(`✗ CALLS_URL is set but ${missing.join(', ')} ${missing.length > 1 ? 'are' : 'is'} not: the calls service needs all of them. Set them all, or unset CALLS_URL.`);
+    process.exit(1);
+  }
+  if (config.internalJwtSecret.length < 16) {
+    console.error('✗ CALLS_URL is set but INTERNAL_JWT_SECRET is missing or shorter than 16 characters.');
+    process.exit(1);
+  }
+}
 
 const app = createApp();
 
@@ -76,7 +122,8 @@ async function startUp() {
   await step('seeded defaults', seedDefaults);
   // Operators live in the database, so the first one can only be created once connected.
   // (It exits the process itself in production when there is no way to sign in.)
-  await step('first operator checked', ensureFirstOperator);
+  // With IDENTITY_URL set the identity service owns operators (and creates the first admin itself).
+  if (!identityEnabled()) await step('first operator checked', ensureFirstOperator);
   await step('modules seeded', seedModules);
   startModuleJobs();
   markReady();

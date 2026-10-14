@@ -1,3 +1,5 @@
+import { catalogEnabled } from '../lib/catalog-client.js';
+import { identityEnabled } from '../lib/identity-client.js';
 import { seedPolicies } from '../modules/policies/index.js';
 import { backfillBookingFlag, seedContent } from '../modules/content/content.seed.js';
 import { seedFlags } from '../modules/flags/flags.seed.js';
@@ -10,7 +12,7 @@ import { seedFlags } from '../modules/flags/flags.seed.js';
  */
 export async function seedDefaults() {
   await seedFlags();
-  await seedContent();
-  await backfillBookingFlag();
-  await seedPolicies();
+  await seedContent(); // with CATALOG_URL set it seeds only the settings (the catalog service seeds the rest)
+  if (!catalogEnabled()) await backfillBookingFlag();
+  if (!identityEnabled()) await seedPolicies(); // identity seeds the default policy
 }

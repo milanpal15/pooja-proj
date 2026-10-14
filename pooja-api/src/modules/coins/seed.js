@@ -1,3 +1,4 @@
+import { engagementEnabled } from '../../lib/engagement-client.js';
 import { ensureSetting } from '../../lib/settings.js';
 import { Flag } from '../../models.js';
 import { CoinPack } from './coins.model.js';
@@ -23,13 +24,15 @@ export async function seedCoins() {
   await ensureSetting('chadhavaMinAmount', 1, 'Chadhava minimum amount (coins)', 'Smallest offering amount.');
   await ensureSetting('bookingCancelHours', 0, 'Booking refund cut-off (hours)', 'Hours before the seva day after which a cancellation is not refunded. 0 = until the seva date.');
 
-  // Deployments seeded before coins existed still carry the old flag text.
+  // Deployments seeded before coins existed still carry the old flag text (engagement does this itself when it owns flags).
+  if (!engagementEnabled()) {
   await Flag.updateOne({ key: 'payments', label: 'Payments' }, { $set: { label: 'Coin purchases', desc: 'Buying coins with Razorpay' } });
   await Flag.updateOne(
     { key: 'astrologerCalls' },
     { $setOnInsert: { key: 'astrologerCalls', label: 'Astrologer Calls', desc: 'Talk to an astrologer', enabled: true } },
     { upsert: true },
   );
+  }
 
   if ((await CoinPack.countDocuments()) === 0) {
     await CoinPack.insertMany(

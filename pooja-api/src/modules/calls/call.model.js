@@ -46,9 +46,25 @@ const callSchema = new Schema(
   },
   { timestamps: true },
 );
-callSchema.index({ devoteeLive: 1 }, { unique: true, partialFilterExpression: { devoteeLive: true } });
+// One live call PER DEVOTEE. (This used to be `{ devoteeLive: 1 }` alone: every live call carries the same value, `true`, so it
+// allowed ONE live call on the whole platform and refused every second devotee with `already_in_call`.)
+callSchema.index({ devoteeUid: 1, devoteeLive: 1 }, { unique: true, partialFilterExpression: { devoteeLive: true } });
 callSchema.index({ astrologerLive: 1, astrologerId: 1 }, { unique: true, partialFilterExpression: { astrologerLive: true } });
 callSchema.index({ devoteeUid: 1, requestId: 1 }, { unique: true, partialFilterExpression: { requestId: { $type: 'string' } } });
 callSchema.index({ astrologerId: 1, rating: 1 });
 
 export const CallSession = model('CallSession', callSchema);
+
+/**
+ * Databases created before the fix still carry the old platform-wide unique index, and Mongoose never drops an index it no longer
+ * declares. Drop it once; "not found" is the normal case afterwards. Safe to run on every boot.
+ */
+export async function dropStaleDevoteeLiveIndex() {
+  try {
+    await CallSession.collection.dropIndex('devoteeLive_1');
+    return true;
+  } catch (e) {
+    if (e?.codeName === 'IndexNotFound' || e?.code === 27 || e?.code === 26 || /not found|ns not found/i.test(e?.message ?? '')) return false;
+    throw e;
+  }
+}

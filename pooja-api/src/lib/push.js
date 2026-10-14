@@ -1,4 +1,6 @@
-import { User, Visitor } from '../models.js';
+import { Visitor } from '../models.js';
+import { deviceIdOf } from './user-directory.js';
+import { engagementEnabled, getPushToken } from './engagement-client.js';
 
 /**
  * Tell one devotee something happened (a booking moved on). Best effort by
@@ -8,14 +10,16 @@ import { User, Visitor } from '../models.js';
  */
 export function notifyDevotee(uid, { title, body, data = {} }) {
   (async () => {
-    const user = await User.findOne({ uid }).select('deviceId').lean();
-    if (!user?.deviceId) return;
-    const v = await Visitor.findOne({ deviceId: user.deviceId, pushToken: { $ne: null } }).select('pushToken').lean();
-    if (!v?.pushToken?.startsWith?.('ExponentPushToken')) return;
+    const deviceId = await deviceIdOf(uid);
+    if (!deviceId) return;
+    const pushToken = engagementEnabled()
+      ? await getPushToken(deviceId)
+      : (await Visitor.findOne({ deviceId, pushToken: { $ne: null } }).select('pushToken').lean())?.pushToken;
+    if (!pushToken?.startsWith?.('ExponentPushToken')) return;
     await fetch('https://exp.host/--/api/v2/push/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to: v.pushToken, title, body, data }),
+      body: JSON.stringify({ to: pushToken, title, body, data }),
       signal: AbortSignal.timeout(5000),
     });
   })().catch(() => {});

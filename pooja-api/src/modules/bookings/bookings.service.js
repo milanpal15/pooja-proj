@@ -1,12 +1,15 @@
 import crypto from 'node:crypto';
 import mongoose from 'mongoose';
 
+import { catalogEnabled, poojaForBooking } from '../../lib/catalog-client.js';
 import { HttpError } from '../../lib/http-error.js';
 import { dayStart, validDate } from '../../lib/ist.js';
 import { notifyDevotee } from '../../lib/push.js';
-import { Booking, Pooja, PoojaReview, Temple, User } from '../../models.js';
+import { whoByUid, userName } from '../../lib/user-directory.js';
+import { Booking, Pooja, PoojaReview, Temple } from '../../models.js';
 import { enabledPackages, isBookable } from '../poojas/pooja.service.js';
-import * as wallet from '../wallet/wallet.service.js';
+import * as wallet from '../../lib/wallet-ledger.js';
+import { registerCompleter } from '../../lib/wallet-saga.js';
 
 export { validDate };
 
@@ -113,9 +116,16 @@ export async function createBooking(uid, body) {
   }
   // A retry of a request that already succeeded returns that booking, untouched.
   const prior = await Booking.findOne({ uid, requestId });
-  if (prior) return { booking: bookingView(prior), balance: await wallet.getBalance(uid), created: false };
+  if (prior) return { booking: bookingView(prior), balance: await wallet.displayBalance(uid), created: false };
 
-  const pooja = typeof poojaSlug === 'string' ? await Pooja.findOne({ slug: poojaSlug, enabled: true }).lean() : null;
+  // CATALOG_URL set: the pooja, its packages' prices, cut-off and temple come from the catalog service's authoritative
+  // snapshot, read fresh for THIS purchase (never cached; catalog unavailable = 503, not a guessed price).
+  let pooja = null;
+  let temple = null;
+  if (typeof poojaSlug === 'string') {
+    if (catalogEnabled()) ({ pooja = null, temple = null } = (await poojaForBooking(poojaSlug)) ?? {});
+    else pooja = await Pooja.findOne({ slug: poojaSlug, enabled: true }).lean();
+  }
   if (!pooja || (pooja.publishAt && new Date(pooja.publishAt) > new Date())) throw new HttpError(404, 'not_found', 'That pooja is not available.');
   const pkg = enabledPackages(pooja).find((k) => k.key === packageKey);
   if (!pkg) throw new HttpError(404, 'not_found', 'That package is not available.');
@@ -130,21 +140,34 @@ export async function createBooking(uid, body) {
   const prasadCoins = prasad ? pooja.prasadFeeCoins ?? 0 : 0;
   const total = packageCoins + prasadCoins;
 
-  const temple = pooja.templeSlug ? await Temple.findOne({ slug: pooja.templeSlug }).lean() : null;
-  const d = await wallet.debit({
-    uid, amount: total, type: 'booking_debit', refType: 'booking', idempotencyKey: `booking:${uid}:${requestId}`,
-    note: `${pooja.title} - ${pkg.name || pkg.key}`,
-  });
-
-  const now = new Date();
-  const fields = {
+  if (!catalogEnabled()) temple = pooja.templeSlug ? await Temple.findOne({ slug: pooja.templeSlug }).lean() : null;
+  // Everything the booking is made from except the ledger row it is paid by: with WALLET_URL set this is kept in a durable intent
+  // BEFORE the money moves, so an answer lost in transit can still be turned into this booking (lib/wallet-saga.js).
+  const base = {
     uid, requestId, kind: 'pooja', poojaSlug: pooja.slug, poojaTitle: pooja.title, poojaTitleHi: pooja.titleHi,
     templeSlug: pooja.templeSlug, templeName: temple?.name || '', place: pooja.place || temple?.location || '',
     poojaDate: pooja.poojaDate ?? null, packageKey: pkg.key, packageName: pkg.name, packageNameHi: pkg.nameHi, persons: pkg.persons,
-    names, prasad, address, packageCoins, prasadCoins, totalCoins: total, walletTxnId: String(d.txn._id),
-    status: 'booked', statusHistory: [{ status: 'booked', at: now }], cancelBy: cancelDeadline(pooja),
+    names, prasad, address, packageCoins, prasadCoins, totalCoins: total, cancelBy: cancelDeadline(pooja),
     devoteeName: names[0].name, gotra: names[0].gotra,
   };
+  const key = `booking:${uid}:${requestId}`;
+  const d = await wallet.debitForOrder({ kind: 'booking', requestId, payload: base }, {
+    uid, amount: total, type: 'booking_debit', refType: 'booking', idempotencyKey: key,
+    note: `${pooja.title} - ${pkg.name || pkg.key}`,
+  });
+  const out = await saveBooking(base, d);
+  await wallet.settled(key);
+  return out;
+}
+
+/**
+ * Write the booking a posted debit paid for. Used by the request itself AND by the wallet-mode sweeper (which only has the intent), so it
+ * must be safe to run twice: the booking is unique on (uid, requestId), and the loser of a race returns the winner.
+ * If the write fails for any other reason the coins go back - the reverse order could leave a booking nobody paid for.
+ */
+async function saveBooking(base, d, now = new Date()) {
+  const { uid, requestId, totalCoins: total } = base;
+  const fields = { ...base, walletTxnId: String(d.txn._id), status: 'booked', statusHistory: [{ status: 'booked', at: now }] };
 
   for (let attempt = 0; ; attempt++) {
     try {
@@ -158,12 +181,20 @@ export async function createBooking(uid, body) {
       }
       if (e?.code === 11000 && e.keyPattern?.bookingRef && attempt < 5) continue;
       await wallet
-        .refund({ uid, amount: total, refType: 'booking', refId: requestId, idempotencyKey: `booking:${uid}:${requestId}:failed`, note: 'Booking could not be saved' })
+        .refundDurably(
+          { uid, amount: total, refType: 'booking', refId: requestId, idempotencyKey: `booking:${uid}:${requestId}:failed`, ofKey: `booking:${uid}:${requestId}`, note: 'Booking could not be saved' },
+          { closes: `booking:${uid}:${requestId}`, quiet: true },
+        )
         .catch((re) => console.error('✗ REFUND FAILED after booking write failure', requestId, re.message));
       throw e;
     }
   }
 }
+
+// WALLET_URL set: the sweeper turns a debit whose answer was lost into the booking it paid for.
+registerCompleter('booking', async (intent, txn) => {
+  await saveBooking(intent.payload, { txn: { _id: txn._id }, balance: txn.balanceAfter });
+});
 
 /**
  * Cancel while still `booked` and before `cancelBy`, refunding the coins. Safe to repeat.
@@ -187,15 +218,15 @@ export async function cancelBooking(uid, id, now = new Date()) {
     if (b.status !== 'cancelled') throw new HttpError(409, 'cannot_cancel', 'This booking can no longer be cancelled.');
   }
 
-  const r = await wallet.refund({
-    uid, amount: b.totalCoins, refType: 'booking', refId: String(b._id), idempotencyKey: `booking:${b._id}:refund`,
+  const r = await wallet.refundDurably({
+    uid, amount: b.totalCoins, refType: 'booking', refId: String(b._id), idempotencyKey: `booking:${b._id}:refund`, ofKey: b.requestId ? `booking:${uid}:${b.requestId}` : undefined,
     note: `Cancelled ${b.poojaTitle}`,
   });
   return { booking: bookingView(b, now), balance: r.balance };
 }
 
 /** Review a performed booking, once. The moderated copy goes to PoojaReview. */
-export async function reviewBooking(uid, id, body) {
+export async function reviewBooking(uid, id, body, { name } = {}) {
   const rating = body?.rating;
   const text = body?.text === undefined || body?.text === null ? '' : body.text;
   if (!Number.isInteger(rating) || rating < 1 || rating > 5) throw new HttpError(400, 'invalid_review', 'Rating must be a whole number from 1 to 5.');
@@ -205,8 +236,7 @@ export async function reviewBooking(uid, id, body) {
   if (!b) throw new HttpError(404, 'not_found', 'Booking not found.');
   if (b.status !== 'performed' || b.review?.rating) throw new HttpError(409, 'not_reviewable', 'This booking cannot be reviewed.');
 
-  const user = await User.findOne({ uid }).select('name').lean();
-  const first = String(user?.name || b.names?.[0]?.name || '').trim().split(/\s+/)[0] || 'Devotee';
+  const first = String((await userName(uid, name)) || b.names?.[0]?.name || '').trim().split(/\s+/)[0] || 'Devotee';
   try {
     await PoojaReview.create({
       bookingId: String(b._id), bookingRef: b.bookingRef, uid, poojaSlug: b.poojaSlug, poojaTitle: b.poojaTitle,
@@ -225,8 +255,7 @@ export async function reviewBooking(uid, id, body) {
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const whoMap = async (rows) => {
-  const users = await User.find({ uid: { $in: [...new Set(rows.map((r) => r.uid))] } }).select('uid name contact').lean();
-  return new Map(users.map((u) => [u.uid, u.name || u.contact]));
+  return whoByUid(rows.map((r) => r.uid));
 };
 
 /**

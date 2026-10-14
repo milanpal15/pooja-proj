@@ -45,7 +45,7 @@ test('an empty or non-Bearer header is still 401', async () => {
   assert.equal((await run({ authorization: 'Bearer ' })).status, 401);
 });
 
-test('a token the server cannot verify is 503, and is never trusted', async () => {
+test('a token the server cannot verify is 503, and is never trusted', { skip: process.env.IDENTITY_URL && 'IDENTITY_URL set: the mobile BFF verifies Firebase tokens (src/identity-mode.test.mjs)' }, async () => {
   const r = await run({ authorization: 'Bearer some.jwt.token' });
   assert.equal(r.status, 503);
   assert.equal(r.nexted, false);

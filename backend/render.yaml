@@ -1,0 +1,410 @@
+# Blueprint: the microservices stack (6 domain services + 2 BFFs).  (The monolith has its own, in pooja-api/; the dashboard in pooja-admin/.)
+#
+# Render looks for `render.yaml` at the REPO ROOT by default and this is not there. Set **Blueprint Path** to
+# `backend/render.yaml` when you create the Blueprint. `rootDir` below is relative to the REPO ROOT.
+#
+# ── Why ONE blueprint for the whole stack (not one per service like pooja-api / pooja-admin) ──────────────
+# The two existing blueprints are split because the dashboard is a static site that must sometimes be deleted and recreated
+# (a service's TYPE cannot change) and that must never put the API at risk. These eight are all Node services with one lifecycle,
+# and they have to be wired to each other: `fromService` references only resolve INSIDE one blueprint, and a reference to a
+# service in another blueprint is exactly the sync-time failure pooja-api/render.yaml warns about. One file = every internal
+# address is wired by Render, with nothing to type and nothing to get wrong. The monolith stays in its own blueprint (it is the
+# rollback, and it must not be touched by a sync of this file); the BFFs reach it through a typed MONOLITH_URL.
+#
+# ── Nothing deploys itself ────────────────────────────────────────────────────────────────────────────────
+# `autoDeploy: false` everywhere: CI deploys (RENDER_DEPLOY_HOOK_<SERVICE> secrets, only from a green main, only when the
+# repo variable DEPLOY_MICROSERVICES is 'true'). See .github/workflows/ci.yml and docs/MICROSERVICES_CUTOVER.md.
+#
+# ── Who is reachable from the internet ────────────────────────────────────────────────────────────────────
+# Only the two BFFs (`type: web`). The six domain services are PRIVATE SERVICES (`type: pserv`): they get no public URL and
+# are reachable only from your other Render services in the same workspace AND region (keep every service, and the monolith,
+# in `singapore`). Private services have no free plan, hence `plan: starter` on every service below.
+#   * Want the free plan anyway? A free service must be `type: web` (publicly reachable). Then the ONLY control is the bearer
+#     token: every route needs a service JWT signed with INTERNAL_JWT_SECRET (HS256, 60 s), checked against ALLOWED_ISSUERS,
+#     and each route family accepts only its own caller. That is real, but it is one shared secret away from the whole internal
+#     API, with no network boundary behind it. docs/MICROSERVICES_CUTOVER.md says exactly which lines to change.
+#
+# ── Cost / cold starts ────────────────────────────────────────────────────────────────────────────────────
+# A free web service sleeps after 15 minutes idle and takes ~30-60 s to wake. In this stack one devotee request is 1-3 internal
+# hops, so a cold stack chains wake-ups (BFF -> identity -> engagement ...) and the first request times out. The BFFs
+# (the public edge), identity (on the path of EVERY authenticated request), wallet (money; the Razorpay webhook must be answered
+# within Razorpay's retry window) and catalog (every screen's content) must never sleep: that is why they are not on the free
+# plan. The others follow for the sake of private networking (pserv has no free tier). `plan: starter` is a lower bound; raise a
+# service whose memory (catalog buffers uploads, MAX_UPLOAD_MB) or CPU runs hot.
+#
+# ── Internal URLs ─────────────────────────────────────────────────────────────────────────────────────────
+# `fromService ... property: hostport` hands over a BARE `name:10000`, not a URL. Every service's config.js normalises that
+# (`serviceUrl` in @bhakti/common: no dot / localhost / IPv4 -> http://, a public host name -> https://), so nothing is
+# prefixed by hand. Where a value is typed instead (MONOLITH_URL), enter it as `https://pooja-api.onrender.com`.
+#
+# ── Shared secrets: set once, in the environment group below ─────────────────────────────────────────────
+# INTERNAL_JWT_SECRET (Render generates it) and ADMIN_SESSION_SECRET (YOU type it) are the SAME value on every service in this
+# file, the monolith and (for ADMIN_SESSION_SECRET) the wallet/orders/calls pseudonyms. They live in the `bhakti-shared`
+# group; the monolith's blueprint cannot reference a group from this one, so copy both values into pooja-api once.
+
+envVarGroups:
+  - name: bhakti-shared
+    envVars:
+      # Signs and verifies every internal call (>= 16 chars; any service or BFF with a different value answers 401 to the rest).
+      - key: INTERNAL_JWT_SECRET
+        generateValue: true
+      # Signs the operator cookie (admin BFF) and derives the devotee pseudonyms ("Devotee ••4821") in wallet / orders / calls.
+      # Type the monolith's CURRENT ADMIN_SESSION_SECRET here (Render -> pooja-api -> Environment) so operators stay signed in
+      # across the cutover and the pseudonyms do not change. Unset or < 16 chars = random per boot (everyone signed out on every restart).
+      - key: ADMIN_SESSION_SECRET
+        sync: false
+
+services:
+  # ── bhakti-engagement ───────────────────────────────────────────────────────────────────────────────────
+  # engagement: flags, analytics, announcements, settings (db `engagement`). A leaf: calls no other service.
+  # Optional (defaults in services/engagement/.env.example): ALLOWED_ISSUERS, EXPO_PUSH_URL.
+  - type: pserv
+    name: bhakti-engagement
+    runtime: node
+    plan: starter
+    region: singapore
+    rootDir: backend
+    buildCommand: npm ci --omit=dev --ignore-scripts
+    startCommand: node services/engagement/src/server.js
+    autoDeploy: false
+    envVars:
+      - fromGroup: bhakti-shared
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 20.19.4
+      # The Atlas SERVER uri, no database name (the service picks its own, DB_NAME). e.g. mongodb+srv://USER:PASSWORD@CLUSTER.mongodb.net/?retryWrites=true&w=majority
+      - key: MONGODB_URI
+        sync: false
+      - key: DB_NAME
+        value: engagement
+
+  # ── bhakti-identity ─────────────────────────────────────────────────────────────────────────────────────
+  # identity: devotee accounts + auth sync, operators/roles/audit log, policies (db `identity`). On the path of EVERY authenticated request (block check).
+  - type: pserv
+    name: bhakti-identity
+    runtime: node
+    plan: starter
+    region: singapore
+    rootDir: backend
+    buildCommand: npm ci --omit=dev --ignore-scripts
+    startCommand: node services/identity/src/server.js
+    autoDeploy: false
+    envVars:
+      - fromGroup: bhakti-shared
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 20.19.4
+      # The Atlas SERVER uri, no database name (the service picks its own, DB_NAME). e.g. mongodb+srv://USER:PASSWORD@CLUSTER.mongodb.net/?retryWrites=true&w=majority
+      - key: MONGODB_URI
+        sync: false
+      - key: DB_NAME
+        value: identity
+      # The astrologer invite claim at sign-in. Unset it (and on every BFF + the monolith) to roll astrologers back into the monolith - then MONOLITH_URL below is asked instead.
+      - key: CALLS_URL
+        fromService:
+          type: pserv
+          name: bhakti-calls
+          property: hostport
+      # Only used while CALLS_URL is unset (rollback). Type https://pooja-api.onrender.com or leave it blank.
+      - key: MONOLITH_URL
+        sync: false
+      - key: ADMIN_USERNAME
+        value: admin
+      # Creates the first admin ONLY on an EMPTY operators collection; production refuses to start with no operator and no password. Once split-db has copied the real operators it creates nothing, but keep it set so a wiped operators collection can never leave production unable to start.
+      - key: ADMIN_PASSWORD
+        sync: false
+      # The whole service-account JSON on one line. Identity ONLY holds this (revoke tokens on block, delete the Firebase account). Unset = both skipped with a warning.
+      - key: FIREBASE_SERVICE_ACCOUNT
+        sync: false
+
+  # ── bhakti-catalog ──────────────────────────────────────────────────────────────────────────────────────
+  # catalog: content, Home, live darshan, pooja + chadhava definitions, panchang, horoscope, GridFS media (db `catalog`). Optional: LIVE_PROBE, UPLOAD_DIR, ALLOWED_ISSUERS.
+  - type: pserv
+    name: bhakti-catalog
+    runtime: node
+    plan: starter
+    region: singapore
+    rootDir: backend
+    buildCommand: npm ci --omit=dev --ignore-scripts
+    startCommand: node services/catalog/src/server.js
+    autoDeploy: false
+    envVars:
+      - fromGroup: bhakti-shared
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 20.19.4
+      # The Atlas SERVER uri, no database name (the service picks its own, DB_NAME). e.g. mongodb+srv://USER:PASSWORD@CLUSTER.mongodb.net/?retryWrites=true&w=majority
+      - key: MONGODB_URI
+        sync: false
+      - key: DB_NAME
+        value: catalog
+      - key: ENGAGEMENT_URL
+        fromService:
+          type: pserv
+          name: bhakti-engagement
+          property: hostport
+      # Booking counts + rating aggregates (GET /internal/orders/pooja-stats). Unreachable = count 0 / rating hidden, never an error.
+      - key: ORDERS_URL
+        fromService:
+          type: pserv
+          name: bhakti-orders
+          property: hostport
+      # Uploads are buffered in memory on their way to GridFS: a memory ceiling as much as a policy.
+      - key: MAX_UPLOAD_MB
+        value: 25
+      # Live darshan: verifies YouTube streams are broadcasting. Optional.
+      - key: YOUTUBE_API_KEY
+        sync: false
+
+  # ── bhakti-wallet ───────────────────────────────────────────────────────────────────────────────────────
+  # wallet: coin balances + the append-only ledger, coin packs, coin purchases (Razorpay), the payment webhook (db `wallet`). The ONLY code that changes a balance.
+  # Do NOT set PAYMENTS_PROVIDER to mock: production refuses it. Optional: PAYMENTS_PROVIDER=razorpay, RECONCILE_EVERY_MS, ALLOWED_ISSUERS.
+  - type: pserv
+    name: bhakti-wallet
+    runtime: node
+    plan: starter
+    region: singapore
+    rootDir: backend
+    buildCommand: npm ci --omit=dev --ignore-scripts
+    startCommand: node services/wallet/src/server.js
+    autoDeploy: false
+    envVars:
+      - fromGroup: bhakti-shared
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 20.19.4
+      # The Atlas SERVER uri, no database name (the service picks its own, DB_NAME). e.g. mongodb+srv://USER:PASSWORD@CLUSTER.mongodb.net/?retryWrites=true&w=majority
+      - key: MONGODB_URI
+        sync: false
+      - key: DB_NAME
+        value: wallet
+      - key: ENGAGEMENT_URL
+        fromService:
+          type: pserv
+          name: bhakti-engagement
+          property: hostport
+      - key: IDENTITY_URL
+        fromService:
+          type: pserv
+          name: bhakti-identity
+          property: hostport
+      # Buying coins. With none of the Razorpay values set the service stays up and answers purchases 503 - it never falls back to the mock provider in production. docs/PAYMENTS_SETUP.md
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      # The SAME secret already typed into Razorpay's webhook settings. The webhook URL stays https://<mobile-bff>/api/webhooks/razorpay.
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+
+  # ── bhakti-orders ───────────────────────────────────────────────────────────────────────────────────────
+  # orders: pooja bookings, chadhava orders, reviews + the money saga over the wallet (db `orders`).
+  # Optional (defaults match the old monolith): SWEEP_EVERY_MS, INTENT_MIN_AGE_MS, INTENT_GRACE_MS, INTENT_RETENTION_DAYS, PRUNE_EVERY_MS, WALLET_TIMEOUT_MS, SERVICE_TIMEOUT_MS, EXPO_PUSH_URL.
+  - type: pserv
+    name: bhakti-orders
+    runtime: node
+    plan: starter
+    region: singapore
+    rootDir: backend
+    buildCommand: npm ci --omit=dev --ignore-scripts
+    startCommand: node services/orders/src/server.js
+    autoDeploy: false
+    envVars:
+      - fromGroup: bhakti-shared
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 20.19.4
+      # The Atlas SERVER uri, no database name (the service picks its own, DB_NAME). e.g. mongodb+srv://USER:PASSWORD@CLUSTER.mongodb.net/?retryWrites=true&w=majority
+      - key: MONGODB_URI
+        sync: false
+      - key: DB_NAME
+        value: orders
+      - key: WALLET_URL
+        fromService:
+          type: pserv
+          name: bhakti-wallet
+          property: hostport
+      - key: CATALOG_URL
+        fromService:
+          type: pserv
+          name: bhakti-catalog
+          property: hostport
+      - key: IDENTITY_URL
+        fromService:
+          type: pserv
+          name: bhakti-identity
+          property: hostport
+      - key: ENGAGEMENT_URL
+        fromService:
+          type: pserv
+          name: bhakti-engagement
+          property: hostport
+
+  # ── bhakti-calls ────────────────────────────────────────────────────────────────────────────────────────
+  # calls: astrologers, voice calls with per-minute billing over the wallet, earnings + payouts, the audio provider, the billing ticker (db `calls`).
+  # Run ONE instance while you have not load-tested two (the ticker is safe beside another instance, but it is the least-tested path). Optional: RTC_PROVIDER=agora, TICK_EVERY_MS, SILENCE_MS, SWEEP_EVERY_MS, INTENT_*, PRUNE_EVERY_MS, WALLET_TIMEOUT_MS, WALLET_DISPLAY_TIMEOUT_MS.
+  - type: pserv
+    name: bhakti-calls
+    runtime: node
+    plan: starter
+    region: singapore
+    rootDir: backend
+    buildCommand: npm ci --omit=dev --ignore-scripts
+    startCommand: node services/calls/src/server.js
+    autoDeploy: false
+    envVars:
+      - fromGroup: bhakti-shared
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 20.19.4
+      # The Atlas SERVER uri, no database name (the service picks its own, DB_NAME). e.g. mongodb+srv://USER:PASSWORD@CLUSTER.mongodb.net/?retryWrites=true&w=majority
+      - key: MONGODB_URI
+        sync: false
+      - key: DB_NAME
+        value: calls
+      - key: WALLET_URL
+        fromService:
+          type: pserv
+          name: bhakti-wallet
+          property: hostport
+      - key: IDENTITY_URL
+        fromService:
+          type: pserv
+          name: bhakti-identity
+          property: hostport
+      - key: ENGAGEMENT_URL
+        fromService:
+          type: pserv
+          name: bhakti-engagement
+          property: hostport
+      # Astrologer calls (Agora) now live HERE, no longer on the monolith. With neither set, calls answer 503 calls_unavailable; the mock provider is refused in production. docs/CALLS_SETUP.md
+      - key: AGORA_APP_ID
+        sync: false
+      - key: AGORA_APP_CERTIFICATE
+        sync: false
+
+  # ── bhakti-mobile-bff ───────────────────────────────────────────────────────────────────────────────────
+  # mobile-bff: the phone app's only door (PUBLIC). Verifies Firebase tokens, asks identity "blocked?" per request, composes /api/content.
+  # Razorpay's webhook URL: https://<this service's host>/api/webhooks/razorpay (streamed to the wallet byte for byte).
+  # The app's EXPO_PUBLIC_ADMIN_API is this service's URL (a rebuild of the app, not a reload). Optional: ORDERS_TIMEOUT_MS, CALLS_TIMEOUT_MS, SERVICE_TIMEOUT_MS, PROXY_TIMEOUT_MS.
+  - type: web
+    name: bhakti-mobile-bff
+    runtime: node
+    plan: starter
+    region: singapore
+    rootDir: backend
+    buildCommand: npm ci --omit=dev --ignore-scripts
+    startCommand: node bff/mobile/src/server.js
+    healthCheckPath: /api/health
+    autoDeploy: false
+    envVars:
+      - fromGroup: bhakti-shared
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 20.19.4
+      # The monolith (pooja-api) kept as the shell/rollback; its /api/health is the BFF's readiness probe. Type https://pooja-api.onrender.com.
+      - key: MONOLITH_URL
+        sync: false
+      - key: ENGAGEMENT_URL
+        fromService:
+          type: pserv
+          name: bhakti-engagement
+          property: hostport
+      - key: IDENTITY_URL
+        fromService:
+          type: pserv
+          name: bhakti-identity
+          property: hostport
+      - key: CATALOG_URL
+        fromService:
+          type: pserv
+          name: bhakti-catalog
+          property: hostport
+      - key: WALLET_URL
+        fromService:
+          type: pserv
+          name: bhakti-wallet
+          property: hostport
+      - key: ORDERS_URL
+        fromService:
+          type: pserv
+          name: bhakti-orders
+          property: hostport
+      - key: CALLS_URL
+        fromService:
+          type: pserv
+          name: bhakti-calls
+          property: hostport
+      # Verifying a Firebase ID token needs ONLY the project id (no secret). Must be the SAME project as poojaappclone/google-services.json.
+      - key: FIREBASE_PROJECT_ID
+        value: pooja-app-aa462
+      # The dashboard URL (host or https://host). The native app does not use CORS; leaving it unset logs a "* in production" warning at boot, nothing more.
+      - key: CORS_ORIGIN
+        sync: false
+
+  # ── bhakti-admin-bff ────────────────────────────────────────────────────────────────────────────────────
+  # admin-bff: the dashboard's only door (PUBLIC). Owns the operator session cookie, the role/area gate, the audit trail.
+  # The dashboard's VITE_API_BASE is this service's URL (a rebuild of the dashboard). It holds NO Firebase key, deliberately.
+  # Optional: ORDERS_TIMEOUT_MS, CALLS_TIMEOUT_MS, SERVICE_TIMEOUT_MS, PROXY_TIMEOUT_MS.
+  - type: web
+    name: bhakti-admin-bff
+    runtime: node
+    plan: starter
+    region: singapore
+    rootDir: backend
+    buildCommand: npm ci --omit=dev --ignore-scripts
+    startCommand: node bff/admin/src/server.js
+    healthCheckPath: /api/health
+    autoDeploy: false
+    envVars:
+      - fromGroup: bhakti-shared
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 20.19.4
+      # The monolith (pooja-api) kept as the shell/rollback; its /api/health is the BFF's readiness probe. Type https://pooja-api.onrender.com.
+      - key: MONOLITH_URL
+        sync: false
+      - key: ENGAGEMENT_URL
+        fromService:
+          type: pserv
+          name: bhakti-engagement
+          property: hostport
+      - key: IDENTITY_URL
+        fromService:
+          type: pserv
+          name: bhakti-identity
+          property: hostport
+      - key: CATALOG_URL
+        fromService:
+          type: pserv
+          name: bhakti-catalog
+          property: hostport
+      - key: WALLET_URL
+        fromService:
+          type: pserv
+          name: bhakti-wallet
+          property: hostport
+      - key: ORDERS_URL
+        fromService:
+          type: pserv
+          name: bhakti-orders
+          property: hostport
+      - key: CALLS_URL
+        fromService:
+          type: pserv
+          name: bhakti-calls
+          property: hostport
+      # The dashboard's exact URL (e.g. https://pooja-admin.onrender.com or the bare host). NEVER * - the session is a cookie.
+      - key: CORS_ORIGIN
+        sync: false
+      # The dashboard is its own site, so the cookie is cross-site; Strict would be silently never sent. None forces Secure (Render terminates HTTPS).
+      - key: SESSION_SAMESITE
+        value: None

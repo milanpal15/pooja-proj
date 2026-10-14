@@ -1,5 +1,5 @@
 import { getNumberSetting } from '../../lib/settings.js';
-import * as wallet from '../wallet/wallet.service.js';
+import * as wallet from '../../lib/wallet-ledger.js';
 import { CallSession } from './call.model.js';
 import { billNextMinute, finishCall } from './call.service.js';
 
@@ -69,8 +69,15 @@ export async function tick(now = new Date(), { silenceMs = SILENCE_MS, since = s
 
   const due = await CallSession.find({ status: 'connected', nextBillAt: { $lte: now } }).select('_id').lean();
   for (const c of due) {
-    await processConnected(c._id, now, { silenceMs, since });
-    out.billedCalls++;
+    try {
+      await processConnected(c._id, now, { silenceMs, since });
+      out.billedCalls++;
+    } catch (e) {
+      // WALLET_URL set and the wallet cannot answer: this minute stays due (nextBillAt unchanged) and is retried with the SAME debit key
+      // on the next tick - idempotent, so charged once when the wallet is back. The other calls and the silence checks carry on.
+      if (!wallet.isUnavailable(e)) throw e;
+      out.walletUnavailable = (out.walletUnavailable ?? 0) + 1;
+    }
   }
 
   // Silence also matters between billing instants, so look at every connected call.

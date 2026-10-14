@@ -90,6 +90,23 @@ defaults):
 
 ---
 
+## The microservices backend (`backend/`)
+
+`pooja-api/` above is the working production system. `backend/` is its replacement, split into six services behind two
+gateways (BFFs) that keep the same `/api` contract. It runs locally with one command and is deployed with its own
+Blueprint; nothing about the instructions above changes until you cut over.
+
+```bash
+cd backend && npm install
+MONGODB_URI=mongodb://127.0.0.1:27017 npm run dev:all   # all six services + the monolith shell + mobile-bff :4010 + admin-bff :4020
+TEST_MONGODB_URI=mongodb://127.0.0.1:27017/x npm test   # the workspace's suites (needs a local mongod)
+```
+
+Architecture: [`docs/MICROSERVICES.md`](docs/MICROSERVICES.md). Going live (data copy, Blueprint, rollback):
+[`docs/MICROSERVICES_CUTOVER.md`](docs/MICROSERVICES_CUTOVER.md).
+
+---
+
 ## Connecting the app to the backend
 
 The phone must be able to reach your Mac. **If a flag or content change doesn't
@@ -141,7 +158,14 @@ pooja-api/
     modules/                      # one folder per feature: model, routes, service, tests
       content/ media/ operators/ users/ auth/ flags/ analytics/ ...
       wallet/ coins/ bookings/ chadhava/ astrologers/ calls/ payouts/
-  scripts/                        # smoke.mjs, media-check.mjs, migrate-media.mjs, seed-demo.mjs
+  scripts/                        # smoke.mjs, media-check.mjs, migrate-media.mjs
+
+backend/                          # the microservices stack (docs/MICROSERVICES.md); the monolith above is kept as the rollback
+  packages/common/                # @bhakti/common: service JWT, HTTP client, gateway kit
+  services/{engagement,identity,catalog,wallet,orders,calls}/   # one Express + Mongoose service each, its own database
+  bff/{mobile,admin}/             # the only public edge: the phone app's and the dashboard's gateways
+  tools/                          # dev-all.mjs (local stack), stack.sh (blueprint-style boot), split-db.mjs (data copy)
+  render.yaml                     # the Render Blueprint for all eight (docs/MICROSERVICES_CUTOVER.md)
 
 pooja-admin/
   src/client/

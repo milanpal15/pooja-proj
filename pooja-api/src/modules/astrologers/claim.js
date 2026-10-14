@@ -14,6 +14,25 @@ import { Astrologer } from './astrologer.model.js';
  * `User.role` is brought in line either way, so it can never drift.
  */
 export async function claimAstrologer(decoded, user) {
+  const active = await claimActiveAstrologer(decoded);
+  const role = active ? 'astrologer' : 'devotee';
+  const $set = {};
+  if ((user.role || 'devotee') !== role) $set.role = role;
+  if (active && !user.name?.trim()) $set.name = active.name;
+
+  if (Object.keys($set).length) {
+    user = (await User.findOneAndUpdate({ _id: user._id }, { $set }, { new: true })) ?? user;
+  }
+  return { user, astrologer: active };
+}
+
+/**
+ * The Astrologer half of the claim, with no User involved: match (and atomically take) the invite for the
+ * verified identifiers in `decoded`, and return the astrologer row if the account is currently ACTIVE one.
+ * Used directly by the identity service's call (POST /internal/astrologers/claim), which then applies the
+ * role/name to ITS users collection.
+ */
+export async function claimActiveAstrologer(decoded) {
   let mine = await Astrologer.findOne({ uid: decoded.uid });
 
   if (!mine) {
@@ -34,14 +53,5 @@ export async function claimAstrologer(decoded, user) {
     await Astrologer.updateOne({ _id: mine._id }, { $set: { lastSignInAt: new Date() } });
   }
 
-  const active = mine && mine.status === 'active' ? mine : null;
-  const role = active ? 'astrologer' : 'devotee';
-  const $set = {};
-  if ((user.role || 'devotee') !== role) $set.role = role;
-  if (active && !user.name?.trim()) $set.name = active.name;
-
-  if (Object.keys($set).length) {
-    user = (await User.findOneAndUpdate({ _id: user._id }, { $set }, { new: true })) ?? user;
-  }
-  return { user, astrologer: active };
+  return mine && mine.status === 'active' ? mine : null;
 }

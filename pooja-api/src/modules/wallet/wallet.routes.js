@@ -1,6 +1,6 @@
 import { redactWho } from '../../access/redact.js';
 import { asyncRouter } from '../../lib/async-handler.js';
-import { User } from '../../models.js';
+import { searchDevotees, whoByUid } from '../../lib/user-directory.js';
 import { HttpError, httpErrorHandler } from '../../lib/http-error.js';
 import * as wallet from './wallet.service.js';
 import { Wallet, WalletTxn } from './wallet.model.js';
@@ -43,8 +43,7 @@ export function walletRouters({ requireAuth }) {
     const q = String(req.query.q ?? '').trim();
     let users = [];
     if (q) {
-      const rx = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-      users = await User.find({ $or: [{ name: rx }, { contact: rx }, { email: rx }, { phone: rx }] }).limit(20).lean();
+      users = await searchDevotees(q, { sub: req.operator?.id, role: req.operator?.role, perms: req.operator?.permissions });
     }
     const uids = users.map((u) => u.uid).filter(Boolean);
     const wallets = uids.length ? await Wallet.find({ uid: { $in: uids } }).lean() : [];
@@ -59,8 +58,7 @@ export function walletRouters({ requireAuth }) {
     if (req.query.type) q.type = String(req.query.type);
     if (req.query.uid) q.uid = String(req.query.uid);
     const rows = await WalletTxn.find(q).sort({ createdAt: -1 }).limit(Math.min(Number(req.query.limit) || 50, 200)).lean();
-    const users = await User.find({ uid: { $in: [...new Set(rows.map((r) => r.uid))] } }).select('uid name contact').lean();
-    const who = new Map(users.map((u) => [u.uid, u.name || u.contact]));
+    const who = await whoByUid(rows.map((r) => r.uid));
     res.json({
       transactions: redactWho(rows.map((t) => ({
         id: String(t._id),

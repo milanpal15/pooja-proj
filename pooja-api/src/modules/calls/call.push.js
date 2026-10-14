@@ -1,4 +1,6 @@
-import { User, Visitor } from '../../models.js';
+import { Visitor } from '../../models.js';
+import { deviceIdOf } from '../../lib/user-directory.js';
+import { engagementEnabled, getPushToken } from '../../lib/engagement-client.js';
 
 /**
  * Tell an astrologer a call is ringing. Best effort by design: the astrologer's
@@ -7,15 +9,17 @@ import { User, Visitor } from '../../models.js';
  */
 export function notifyIncomingCall(astrologerUid, devoteeFirstName) {
   (async () => {
-    const user = await User.findOne({ uid: astrologerUid }).select('deviceId').lean();
-    if (!user?.deviceId) return;
-    const v = await Visitor.findOne({ deviceId: user.deviceId, pushToken: { $ne: null } }).select('pushToken').lean();
-    if (!v?.pushToken?.startsWith?.('ExponentPushToken')) return;
+    const deviceId = await deviceIdOf(astrologerUid);
+    if (!deviceId) return;
+    const pushToken = engagementEnabled()
+      ? await getPushToken(deviceId)
+      : (await Visitor.findOne({ deviceId, pushToken: { $ne: null } }).select('pushToken').lean())?.pushToken;
+    if (!pushToken?.startsWith?.('ExponentPushToken')) return;
     await fetch('https://exp.host/--/api/v2/push/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        to: v.pushToken,
+        to: pushToken,
         title: 'Incoming call',
         body: devoteeFirstName ? `${devoteeFirstName} is calling` : 'A devotee is calling',
         data: { type: 'incoming_call' },

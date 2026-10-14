@@ -18,7 +18,7 @@ export function bookingsRouters({ requireAuth }) {
 
   devotee.post('/bookings/:id/cancel', requireAuth, async (req, res) => res.json(await svc.cancelBooking(req.token.uid, req.params.id)));
   devotee.post('/bookings/:id/review', requireAuth, async (req, res) => {
-    res.status(201).json({ booking: await svc.reviewBooking(req.token.uid, req.params.id, req.body) });
+    res.status(201).json({ booking: await svc.reviewBooking(req.token.uid, req.params.id, req.body, { name: req.user?.name }) });
   });
 
   // Area `orders`: everyone with the dashboard may read; changing a status or hiding a review needs `orders:edit`.

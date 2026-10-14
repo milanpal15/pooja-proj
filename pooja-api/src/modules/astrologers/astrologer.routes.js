@@ -2,7 +2,7 @@ import { redactAstrologerRows } from '../../access/redact.js';
 import { asyncRouter } from '../../lib/async-handler.js';
 import { HttpError, httpErrorHandler } from '../../lib/http-error.js';
 import { getNumberSetting } from '../../lib/settings.js';
-import { User } from '../../models.js';
+import { setUserRole } from '../../lib/user-directory.js';
 import { CallSession } from '../calls/call.model.js';
 import { AstrologerEarning } from '../payouts/payout.model.js';
 import * as callService from '../calls/call.service.js';
@@ -159,7 +159,7 @@ export function astrologerRouters({ requireAuth }) {
   admin.post('/admin/astrologers/:id/reactivate', async (req, res) => {
     const a = await load(req.params.id);
     await Astrologer.updateOne({ _id: a._id }, { $set: { status: a.uid ? 'active' : 'invited', presence: 'offline' } });
-    if (a.uid) await User.updateOne({ uid: a.uid }, { $set: { role: 'astrologer' } });
+    if (a.uid) await setUserRole(a.uid, 'astrologer');
     res.json({ astrologer: await svc.adminRow(a._id) });
   });
 

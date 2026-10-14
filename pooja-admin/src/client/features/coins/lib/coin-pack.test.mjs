@@ -1,7 +1,7 @@
 // Proves the dashboard's copy of coin-pack.js behaves exactly like the API's.
 // Run: PATH=/opt/homebrew/bin:$PATH node --test features/coins/lib/coin-pack.test.mjs  (from src/client)
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
@@ -11,6 +11,18 @@ import * as api from '../../../../../../pooja-api/src/lib/coin-pack.js';
 test('the copy differs from the API file only by its header comment', () => {
   const strip = (p) => readFileSync(fileURLToPath(p), 'utf8').replace(/^(\/\/.*\n)+\n/, '');
   assert.equal(strip(new URL('./coin-pack.js', import.meta.url)), strip(new URL('../../../../../../pooja-api/src/lib/coin-pack.js', import.meta.url)));
+});
+
+// The wallet service (backend/services/wallet) carries the third copy; it must stay byte-for-byte what the API has.
+const walletCopy = new URL('../../../../../../backend/services/wallet/src/lib/coin-pack.js', import.meta.url);
+test('the wallet service\'s copy is the API file byte for byte, and behaves identically', { skip: !existsSync(fileURLToPath(walletCopy)) && 'backend/ not checked out next to pooja-admin/' }, async () => {
+  const strip = (p) => readFileSync(fileURLToPath(p), 'utf8').replace(/^(\/\/.*\n)+\n/, '');
+  assert.equal(strip(walletCopy), strip(new URL('../../../../../../pooja-api/src/lib/coin-pack.js', import.meta.url)));
+  const wallet = await import(walletCopy.href);
+  for (const c of cases) {
+    assert.deepEqual(wallet.describePack(c), api.describePack(c));
+    assert.equal(wallet.packProblem(c), api.packProblem(c));
+  }
 });
 
 const cases = [

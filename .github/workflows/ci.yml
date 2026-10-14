@@ -87,6 +87,15 @@ jobs:
       - name: Deploy script is valid shell
         run: bash -n scripts/render-deploy-hook.sh
 
+      # The microservices stack is ONE Blueprint (backend/render.yaml): fromService only resolves inside a file. This proves the
+      # things that have gone wrong before - a service missing a REQUIRED variable from its own config.js, a fromService pointing
+      # nowhere, autoDeploy left on, a mock provider or a wildcard CORS origin in production.
+      - name: Microservices Blueprint - parse and cross-check against the services' config.js
+        run: ruby scripts/check-render-stack.rb
+
+      - name: Stack scripts are valid shell
+        run: bash -n backend/tools/stack.sh
+
   # ─────────────────────────────────────────────────────────────── api ──
   api:
     name: API — build, boot, prove the gate
@@ -233,6 +242,161 @@ jobs:
         working-directory: poojaappclone
         run: node --test --test-concurrency=1 $(find src -name '*.test.mjs' | sort)
 
+  # ────────────────────────────────────────────────────────── backend ──
+  # The microservices workspace (backend/): the shared package, six services, two BFFs, the DB-split tool. Everything the
+  # suites need from the monolith (the parity tests import its sources) is installed too. One file at a time: the suites share a
+  # database and some drop it (`npm test` in backend/ already passes the files explicitly, because `node --test <dir>` finds
+  # nothing on newer Node versions).
+  backend:
+    name: Backend - lockfile, install, tests
+    runs-on: ubuntu-latest
+
+    services:
+      mongo:
+        image: mongo:7
+        ports: ['27017:27017']
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ping:1}).ok'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            pooja-api/package-lock.json
+
+      # `npm ci` already refuses a lockfile that disagrees with a package.json; the dry run says so BEFORE anything is installed,
+      # in one line, which is the cheap place to find out that a workspace's dependency was added without `npm install`.
+      - name: Lockfile is in step with every workspace package.json
+        working-directory: backend
+        run: npm ci --dry-run
+
+      - name: Install (backend workspace)
+        working-directory: backend
+        run: npm ci
+
+      - name: Install (monolith, for the parity tests)
+        working-directory: pooja-api
+        run: npm ci
+
+      - name: Tests
+        working-directory: backend
+        env:
+          TEST_MONGODB_URI: mongodb://127.0.0.1:27017/bhakti_ci_backend_tests
+        run: npm test
+
+  # ───────────────────────────────────────────────────────────── stack ──
+  # Boots the WHOLE new stack as separate processes with the start commands of backend/render.yaml (see backend/tools/stack.sh),
+  # every *_URL set, the monolith left as the shell the BFFs probe, then runs the gate smoke test through BOTH BFFs.
+  # No Firebase is needed: smoke.mjs sends no devotee token (it asserts every token-only route answers 401 and every public route
+  # 200), and the admin BFF signs in with the first admin that identity creates from ADMIN_PASSWORD. What this does NOT cover:
+  # an authenticated devotee call (it needs a real Firebase ID token) - the backend job's suites cover those paths with a fixture verifier.
+  # The mock payment and audio providers are used; the second boot repeats it with NODE_ENV=production to prove the production
+  # configuration (mock refused, cookie SameSite=None, CORS pinned) still boots and is still shut.
+  stack:
+    name: Stack - boot all services, smoke through both BFFs
+    runs-on: ubuntu-latest
+
+    services:
+      mongo:
+        image: mongo:7
+        ports: ['27017:27017']
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ping:1}).ok'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      MONGO_BASE: mongodb://127.0.0.1:27017
+      BASE_PORT: '4300'
+      STACK_DIR: /tmp/bhakti-stack
+      # NOT a job-level ADMIN_PASSWORD: the mobile BFF smoke must run WITHOUT it (it has no operator routes, so the sign-in
+      # section would 404). It is given to the two boot steps and to the admin-BFF smoke steps only.
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            pooja-api/package-lock.json
+
+      - name: Install (backend workspace)
+        working-directory: backend
+        run: npm ci --omit=dev --ignore-scripts # the same install Render runs
+
+      - name: Install (monolith)
+        working-directory: pooja-api
+        run: npm ci
+
+      - name: Boot the stack (development configuration)
+        env:
+          ADMIN_PASSWORD: ci-only-password
+        run: backend/tools/stack.sh start
+
+      - name: Smoke - through the mobile BFF (public open, devotee routes 401, admin shut)
+        working-directory: pooja-api
+        env:
+          BASE: http://127.0.0.1:4310
+        run: node scripts/smoke.mjs
+
+      - name: Smoke - through the admin BFF (sign-in, roles, audit)
+        working-directory: pooja-api
+        env:
+          BASE: http://127.0.0.1:4311
+          ADMIN_PASSWORD: ci-only-password
+        run: node scripts/smoke.mjs
+
+      - name: Media round trip through the admin BFF into the catalog's GridFS
+        working-directory: pooja-api
+        env:
+          BASE: http://127.0.0.1:4311
+          ADMIN_PASSWORD: ci-only-password
+        run: node scripts/media-check.mjs
+
+      - name: Stop the stack
+        if: always()
+        run: backend/tools/stack.sh stop
+
+      # Fresh databases (DB_PREFIX): the first admin is created only on an EMPTY operators collection. Own log directory.
+      - name: Boot the stack (NODE_ENV=production)
+        env:
+          ADMIN_PASSWORD: ci-only-password
+          STACK_NODE_ENV: production
+          DB_PREFIX: prod_
+          STACK_DIR: /tmp/bhakti-stack-prod
+        run: backend/tools/stack.sh start
+
+      - name: Smoke - production configuration, mobile BFF
+        working-directory: pooja-api
+        env:
+          BASE: http://127.0.0.1:4310
+        run: node scripts/smoke.mjs
+
+      - name: Smoke - production configuration, admin BFF
+        working-directory: pooja-api
+        env:
+          BASE: http://127.0.0.1:4311
+          ADMIN_PASSWORD: ci-only-password
+        run: node scripts/smoke.mjs
+
+      - name: Stack logs
+        if: always()
+        run: |
+          STACK_DIR=/tmp/bhakti-stack-prod backend/tools/stack.sh stop || true
+          for f in /tmp/bhakti-stack/*.log /tmp/bhakti-stack-prod/*.log; do echo "=== $f"; tail -n 40 "$f"; done
+
   # ──────────────────────────────────────────────────────────── deploy ──
   deploy:
     name: Deploy to Render
@@ -322,5 +486,127 @@ jobs:
         env:
           BASE: ${{ vars.DEPLOY_URL }}
           # Optional. Set it to also exercise sign-in against production.
+          ADMIN_PASSWORD: ${{ secrets.SMOKE_ADMIN_PASSWORD }}
+        run: node scripts/smoke.mjs
+
+  # ──────────────────────────────────────── deploy: the microservices ──
+  # OPT-IN. Runs only when the repository VARIABLE DEPLOY_MICROSERVICES is 'true'; until then the job is skipped and the
+  # monolith deploy above is the only thing that ships, unchanged. Turn it on only after docs/MICROSERVICES_CUTOVER.md steps 1-3
+  # (the Blueprint is synced and the data copied) - a deploy hook for a service that does not exist fails the job.
+  #
+  # Order: the monolith first (the `deploy` job - it is the rollback, and the BFFs probe it), then the six private services, then
+  # the two BFFs. Deploy hooks return as soon as the deploy is QUEUED, so the order is a request, not a guarantee; what is checked is
+  # the outcome: both BFFs report THIS commit on /api/health, /health/deps answers 200 (which means every service answered its
+  # own /health), `degraded` is empty, and the gate smoke test passes through both BFFs. The six services are private - there is no
+  # URL a runner could poll for their commit; /health/deps is how a stale or dead one shows.
+  #
+  # Secrets:   RENDER_DEPLOY_HOOK_<ENGAGEMENT|IDENTITY|CATALOG|WALLET|ORDERS|CALLS|MOBILE_BFF|ADMIN_BFF>, SMOKE_ADMIN_PASSWORD (optional)
+  # Variables: DEPLOY_MICROSERVICES ('true'), MOBILE_BFF_URL, ADMIN_BFF_URL
+  deploy-microservices:
+    name: Deploy the microservices to Render (opt-in)
+    needs: [blueprints, dashboard, api, app, backend, stack, deploy]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && vars.DEPLOY_MICROSERVICES == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ vars.MOBILE_BFF_URL }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check it is configured
+        env:
+          HOOK_ENGAGEMENT: ${{ secrets.RENDER_DEPLOY_HOOK_ENGAGEMENT }}
+          HOOK_IDENTITY: ${{ secrets.RENDER_DEPLOY_HOOK_IDENTITY }}
+          HOOK_CATALOG: ${{ secrets.RENDER_DEPLOY_HOOK_CATALOG }}
+          HOOK_WALLET: ${{ secrets.RENDER_DEPLOY_HOOK_WALLET }}
+          HOOK_ORDERS: ${{ secrets.RENDER_DEPLOY_HOOK_ORDERS }}
+          HOOK_CALLS: ${{ secrets.RENDER_DEPLOY_HOOK_CALLS }}
+          HOOK_MOBILE_BFF: ${{ secrets.RENDER_DEPLOY_HOOK_MOBILE_BFF }}
+          HOOK_ADMIN_BFF: ${{ secrets.RENDER_DEPLOY_HOOK_ADMIN_BFF }}
+          MOBILE_BFF_URL: ${{ vars.MOBILE_BFF_URL }}
+          ADMIN_BFF_URL: ${{ vars.ADMIN_BFF_URL }}
+        run: |
+          bad=0
+          for v in HOOK_ENGAGEMENT HOOK_IDENTITY HOOK_CATALOG HOOK_WALLET HOOK_ORDERS HOOK_CALLS HOOK_MOBILE_BFF HOOK_ADMIN_BFF; do
+            [ -n "${!v}" ] || { echo "::error::secret RENDER_DEPLOY_HOOK_${v#HOOK_} is not set. See docs/MICROSERVICES_CUTOVER.md."; bad=1; }
+          done
+          for v in MOBILE_BFF_URL ADMIN_BFF_URL; do
+            [ -n "${!v}" ] || { echo "::error::variable $v is not set. See docs/MICROSERVICES_CUTOVER.md."; bad=1; }
+          done
+          exit $bad
+
+      # Services before BFFs: a BFF that comes up first only reports `degraded` for a minute, but a service deployed after a BFF
+      # that already calls its new routes would answer 404 in between.
+      - name: Trigger the six services
+        env:
+          HOOK_ENGAGEMENT: ${{ secrets.RENDER_DEPLOY_HOOK_ENGAGEMENT }}
+          HOOK_IDENTITY: ${{ secrets.RENDER_DEPLOY_HOOK_IDENTITY }}
+          HOOK_CATALOG: ${{ secrets.RENDER_DEPLOY_HOOK_CATALOG }}
+          HOOK_WALLET: ${{ secrets.RENDER_DEPLOY_HOOK_WALLET }}
+          HOOK_ORDERS: ${{ secrets.RENDER_DEPLOY_HOOK_ORDERS }}
+          HOOK_CALLS: ${{ secrets.RENDER_DEPLOY_HOOK_CALLS }}
+        run: |
+          ./scripts/render-deploy-hook.sh bhakti-engagement "$HOOK_ENGAGEMENT"
+          ./scripts/render-deploy-hook.sh bhakti-identity "$HOOK_IDENTITY"
+          ./scripts/render-deploy-hook.sh bhakti-catalog "$HOOK_CATALOG"
+          ./scripts/render-deploy-hook.sh bhakti-wallet "$HOOK_WALLET"
+          ./scripts/render-deploy-hook.sh bhakti-orders "$HOOK_ORDERS"
+          ./scripts/render-deploy-hook.sh bhakti-calls "$HOOK_CALLS"
+
+      - name: Trigger the two BFFs
+        env:
+          HOOK_MOBILE_BFF: ${{ secrets.RENDER_DEPLOY_HOOK_MOBILE_BFF }}
+          HOOK_ADMIN_BFF: ${{ secrets.RENDER_DEPLOY_HOOK_ADMIN_BFF }}
+        run: |
+          ./scripts/render-deploy-hook.sh bhakti-mobile-bff "$HOOK_MOBILE_BFF"
+          ./scripts/render-deploy-hook.sh bhakti-admin-bff "$HOOK_ADMIN_BFF"
+
+      # Polls for THIS commit, not for "is it up": the old container keeps serving while a new one builds. Same rule as the monolith job.
+      - name: Wait for this commit to be live on both BFFs
+        env:
+          WANT: ${{ github.sha }}
+          URLS: ${{ vars.MOBILE_BFF_URL }} ${{ vars.ADMIN_BFF_URL }}
+        run: |
+          for URL in $URLS; do
+            echo "waiting for $WANT at $URL"
+            ok=0
+            for i in $(seq 1 90); do   # 90 x 10 s = 15 min
+              GOT=$(curl -fsS --max-time 20 "$URL/api/health" 2>/dev/null | sed -n 's/.*"commit":"\([^"]*\)".*/\1/p')
+              if [ "$GOT" = "$WANT" ]; then echo "  live after $((i*10))s"; ok=1; break; fi
+              echo "  [$i] serving ${GOT:-unknown}"
+              sleep 10
+            done
+            [ "$ok" = 1 ] || { echo "::error::$WANT did not go live at $URL within 15 minutes"; exit 1; }
+          done
+
+      # Every service answered its own /health through the BFF's probe, and none is degraded. A service that failed to deploy
+      # (or still serves an old build that cannot talk to the new BFF) shows up here.
+      - name: Every service is reachable from both BFFs
+        env:
+          URLS: ${{ vars.MOBILE_BFF_URL }} ${{ vars.ADMIN_BFF_URL }}
+        run: |
+          for URL in $URLS; do
+            ok=0
+            for i in $(seq 1 60); do   # up to 10 min: a cold service wakes in ~1 minute
+              CODE=$(curl -s -o /tmp/deps.json -w '%{http_code}' --max-time 30 "$URL/health/deps" || echo 000)
+              BODY=$(curl -fsS --max-time 30 "$URL/api/health" 2>/dev/null || true)
+              case "$BODY" in *degraded*) DEG=1 ;; *) DEG=0 ;; esac
+              if [ "$CODE" = 200 ] && [ "$DEG" = 0 ]; then echo "$URL: all services answered"; ok=1; break; fi
+              echo "  [$i] $URL deps=$CODE degraded=$DEG"; sleep 10
+            done
+            [ "$ok" = 1 ] || { echo "::error::$URL still has an unreachable service"; cat /tmp/deps.json; exit 1; }
+          done
+
+      - name: Smoke test - mobile BFF
+        working-directory: pooja-api
+        env:
+          BASE: ${{ vars.MOBILE_BFF_URL }}
+        run: node scripts/smoke.mjs
+
+      - name: Smoke test - admin BFF
+        working-directory: pooja-api
+        env:
+          BASE: ${{ vars.ADMIN_BFF_URL }}
           ADMIN_PASSWORD: ${{ secrets.SMOKE_ADMIN_PASSWORD }}
         run: node scripts/smoke.mjs

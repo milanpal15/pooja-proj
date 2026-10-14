@@ -1,12 +1,15 @@
 import crypto from 'node:crypto';
 import mongoose from 'mongoose';
 
+import { catalogEnabled, chadhavaForOrder } from '../../lib/catalog-client.js';
 import { HttpError } from '../../lib/http-error.js';
 import { notifyDevotee } from '../../lib/push.js';
 import { getNumberSetting } from '../../lib/settings.js';
 import { inWindow } from '../../lib/window.js';
-import { Temple, User } from '../../models.js';
-import * as wallet from '../wallet/wallet.service.js';
+import { whoByUid } from '../../lib/user-directory.js';
+import { Temple } from '../../models.js';
+import * as wallet from '../../lib/wallet-ledger.js';
+import { registerCompleter } from '../../lib/wallet-saga.js';
 import { ChadhavaCategory, ChadhavaListing, ChadhavaOrder, Offering } from './chadhava.model.js';
 
 const iso = (d) => (d ? new Date(d).toISOString() : null);
@@ -118,9 +121,16 @@ export async function placeOrder(uid, body) {
     throw new HttpError(400, 'bad_request_id', 'A request id is required.');
   }
   const prior = await ChadhavaOrder.findOne({ uid, requestId });
-  if (prior) return { order: orderView(prior), balance: await wallet.getBalance(uid), created: false };
+  if (prior) return { order: orderView(prior), balance: await wallet.displayBalance(uid), created: false };
 
-  const listing = typeof listingSlug === 'string' ? await ChadhavaListing.findOne({ slug: listingSlug, enabled: true }).lean() : null;
+  // CATALOG_URL set: the listing's offerings, prices and window come from the catalog service's authoritative snapshot,
+  // read fresh for THIS purchase (never cached; catalog unavailable = 503, not a guessed price).
+  let listing = null;
+  let temple = null;
+  if (typeof listingSlug === 'string') {
+    if (catalogEnabled()) ({ listing = null, temple = null } = (await chadhavaForOrder(listingSlug)) ?? {});
+    else listing = await ChadhavaListing.findOne({ slug: listingSlug, enabled: true }).lean();
+  }
   if (!listing) throw new HttpError(404, 'not_found', 'That chadhava is not available.');
   if (!inWindow(listing)) throw new HttpError(409, 'listing_closed', 'This chadhava is not open right now.');
 
@@ -133,17 +143,31 @@ export async function placeOrder(uid, body) {
     items.push({ key, title: o.title, qty, coins: o.coins });
   }
   const total = items.reduce((s, i) => s + i.coins * i.qty, 0);
-  const temple = listing.templeSlug ? await Temple.findOne({ slug: listing.templeSlug }).select('name').lean() : null;
+  if (!catalogEnabled()) temple = listing.templeSlug ? await Temple.findOne({ slug: listing.templeSlug }).select('name').lean() : null;
 
-  const d = await wallet.debit({
-    uid, amount: total, type: 'chadhava_debit', refType: 'chadhava', idempotencyKey: `chadhava:${uid}:${requestId}`, note: `Chadhava - ${listing.title}`,
-  });
-
-  const fields = {
+  // Everything the order is made from except the ledger row it is paid by: with WALLET_URL set it is kept in a durable intent BEFORE
+  // the money moves, so an answer lost in transit can still be turned into this order (lib/wallet-saga.js).
+  const base = {
     uid, requestId, listingSlug: listing.slug, listingTitle: listing.title, listingTitleHi: listing.titleHi,
-    templeSlug: listing.templeSlug, templeName: temple?.name || '', items, totalCoins: total, status: 'booked',
-    cancelBy: listing.endsAt ?? null, walletTxnId: String(d.txn._id),
+    templeSlug: listing.templeSlug, templeName: temple?.name || '', items, totalCoins: total,
+    cancelBy: listing.endsAt ?? null,
   };
+  const key = `chadhava:${uid}:${requestId}`;
+  const d = await wallet.debitForOrder({ kind: 'chadhava', requestId, payload: base }, {
+    uid, amount: total, type: 'chadhava_debit', refType: 'chadhava', idempotencyKey: key, note: `Chadhava - ${listing.title}`,
+  });
+  const out = await saveOrder(base, d);
+  await wallet.settled(key);
+  return out;
+}
+
+/**
+ * Write the order a posted debit paid for. Used by the request itself AND by the wallet-mode sweeper (which only has the intent), so it
+ * must be safe to run twice: the order is unique on (uid, requestId). Any other failure gives the coins back.
+ */
+async function saveOrder(base, d) {
+  const { uid, requestId, totalCoins: total } = base;
+  const fields = { ...base, status: 'booked', walletTxnId: String(d.txn._id) };
   for (let attempt = 0; ; attempt++) {
     try {
       const doc = await ChadhavaOrder.create({ ...fields, ref: newRef() });
@@ -155,12 +179,20 @@ export async function placeOrder(uid, body) {
       }
       if (e?.code === 11000 && e.keyPattern?.ref && attempt < 5) continue;
       await wallet
-        .refund({ uid, amount: total, refType: 'chadhava', refId: requestId, idempotencyKey: `chadhava:${uid}:${requestId}:failed`, note: 'Chadhava could not be saved' })
+        .refundDurably(
+          { uid, amount: total, refType: 'chadhava', refId: requestId, idempotencyKey: `chadhava:${uid}:${requestId}:failed`, ofKey: `chadhava:${uid}:${requestId}`, note: 'Chadhava could not be saved' },
+          { closes: `chadhava:${uid}:${requestId}`, quiet: true },
+        )
         .catch((re) => console.error('✗ REFUND FAILED after chadhava write failure', requestId, re.message));
       throw e;
     }
   }
 }
+
+// WALLET_URL set: the sweeper turns a debit whose answer was lost into the order it paid for.
+registerCompleter('chadhava', async (intent, txn) => {
+  await saveOrder(intent.payload, { txn: { _id: txn._id }, balance: txn.balanceAfter });
+});
 
 export async function listForDevotee(uid) {
   const rows = await ChadhavaOrder.find({ uid }).sort({ createdAt: -1 }).lean();
@@ -177,8 +209,8 @@ export async function cancelOrder(uid, id, now = new Date()) {
     o = flagged ?? (await ChadhavaOrder.findById(o._id));
     if (o.status !== 'cancelled') throw new HttpError(409, 'cannot_cancel', 'This order can no longer be cancelled.');
   }
-  const r = await wallet.refund({
-    uid, amount: o.totalCoins, refType: 'chadhava', refId: String(o._id), idempotencyKey: `chadhava:${o._id}:refund`, note: `Cancelled ${o.listingTitle}`,
+  const r = await wallet.refundDurably({
+    uid, amount: o.totalCoins, refType: 'chadhava', refId: String(o._id), idempotencyKey: `chadhava:${o._id}:refund`, ofKey: o.requestId ? `chadhava:${uid}:${o.requestId}` : undefined, note: `Cancelled ${o.listingTitle}`,
   });
   return { order: orderView(o, now), balance: r.balance };
 }
@@ -187,8 +219,7 @@ export async function cancelOrder(uid, id, now = new Date()) {
 
 export async function listOrdersForAdmin(limit = 100) {
   const rows = await ChadhavaOrder.find().sort({ createdAt: -1 }).limit(Math.min(Number(limit) || 100, 500)).lean();
-  const users = await User.find({ uid: { $in: [...new Set(rows.map((r) => r.uid))] } }).select('uid name contact').lean();
-  const who = new Map(users.map((u) => [u.uid, u.name || u.contact]));
+  const who = await whoByUid(rows.map((r) => r.uid));
   return rows.map((o) => ({ ...orderView(o), uid: o.uid, who: who.get(o.uid) || o.uid, templeName: o.templeName || '', at: o.createdAt }));
 }
 

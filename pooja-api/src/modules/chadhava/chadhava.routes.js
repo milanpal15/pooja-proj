@@ -1,5 +1,7 @@
 import { redactWho } from '../../access/redact.js';
 import { asyncRouter } from '../../lib/async-handler.js';
+import { routeUnlessCatalog as owned, unlessCatalog } from '../../lib/catalog-guard.js';
+import { routeUnlessOrders as ordersOwn } from '../../lib/orders-guard.js';
 import { HttpError, httpErrorHandler } from '../../lib/http-error.js';
 import { crud } from '../content/crud.factory.js';
 import { ChadhavaCategory, ChadhavaListing, Offering } from './chadhava.model.js';
@@ -26,25 +28,25 @@ export function chadhavaRouters({ requireAuth }) {
   const devotee = asyncRouter();
   const admin = asyncRouter();
 
-  pub.get('/chadhava/offerings', async (_req, res) => res.json(await svc.catalogue()));
+  pub.get('/chadhava/offerings', owned, async (_req, res) => res.json(await svc.catalogue()));
 
-  pub.get('/chadhava/listings', async (req, res) => res.json(await svc.listListings(req.query)));
-  pub.get('/chadhava/listings/:slug', async (req, res) => res.json({ listing: await svc.listingDetail(req.params.slug) }));
+  pub.get('/chadhava/listings', owned, async (req, res) => res.json(await svc.listListings(req.query)));
+  pub.get('/chadhava/listings/:slug', owned, async (req, res) => res.json({ listing: await svc.listingDetail(req.params.slug) }));
 
   // The free-amount chadhava is gone; old app builds get a clear answer rather than a 404.
-  devotee.post('/chadhava', (_req, res) => res.status(410).json({ error: 'This chadhava is no longer offered. Please update the app.', code: 'gone' }));
+  devotee.post('/chadhava', ordersOwn, (_req, res) => res.status(410).json({ error: 'This chadhava is no longer offered. Please update the app.', code: 'gone' }));
 
-  devotee.post('/chadhava/orders', requireAuth, async (req, res) => {
+  devotee.post('/chadhava/orders', ordersOwn, requireAuth, async (req, res) => {
     const out = await svc.placeOrder(req.token.uid, req.body);
     res.status(out.created ? 201 : 200).json({ order: out.order, balance: out.balance });
   });
-  devotee.get('/chadhava/orders', requireAuth, async (req, res) => res.json({ orders: await svc.listForDevotee(req.token.uid) }));
-  devotee.post('/chadhava/orders/:id/cancel', requireAuth, async (req, res) => res.json(await svc.cancelOrder(req.token.uid, req.params.id)));
+  devotee.get('/chadhava/orders', ordersOwn, requireAuth, async (req, res) => res.json({ orders: await svc.listForDevotee(req.token.uid) }));
+  devotee.post('/chadhava/orders/:id/cancel', ordersOwn, requireAuth, async (req, res) => res.json(await svc.cancelOrder(req.token.uid, req.params.id)));
 
   // The catalogue is area `content` (editors may edit it); the order list is area `orders`.
-  admin.get('/admin/offerings', async (_req, res) => res.json(await Offering.find().sort({ order: 1, createdAt: 1 }).lean()));
+  admin.get('/admin/offerings', owned, async (_req, res) => res.json(await Offering.find().sort({ order: 1, createdAt: 1 }).lean()));
 
-  admin.post('/admin/offerings', async (req, res) => {
+  admin.post('/admin/offerings', owned, async (req, res) => {
     const data = clean(req.body);
     try {
       res.status(201).json(await Offering.create(data));
@@ -54,7 +56,7 @@ export function chadhavaRouters({ requireAuth }) {
     }
   });
 
-  admin.put('/admin/offerings/:id', async (req, res) => {
+  admin.put('/admin/offerings/:id', owned, async (req, res) => {
     const existing = /^[0-9a-f]{24}$/i.test(req.params.id) ? await Offering.findById(req.params.id).lean() : null;
     if (!existing) throw new HttpError(404, 'offering_not_found', 'Offering not found.');
     const data = clean(req.body, existing);
@@ -67,17 +69,19 @@ export function chadhavaRouters({ requireAuth }) {
     }
   });
 
-  admin.delete('/admin/offerings/:id', async (req, res) => {
+  admin.delete('/admin/offerings/:id', owned, async (req, res) => {
     if (/^[0-9a-f]{24}$/i.test(req.params.id)) await Offering.findByIdAndDelete(req.params.id);
     res.json({ ok: true });
   });
 
+  // CATALOG_URL set (phase 3): the public listings, the catalogue, and these definition routes live in the catalog service and
+  // answer 404 here (`owned`); the orders (devotee + admin) answer 404 here once ORDERS_URL is set (phase 5, `ordersOwn`).
   // Listings and categories are area `content` (generic CRUD with validation); orders are area `orders`.
-  admin.use('/admin/chadhava-listings', crud('ChadhavaListing', ChadhavaListing, undefined, { prepare: prepareListing }));
-  admin.use('/admin/chadhava-categories', crud('ChadhavaCategory', ChadhavaCategory, undefined, { prepare: prepareCategory }));
+  admin.use('/admin/chadhava-listings', unlessCatalog(crud('ChadhavaListing', ChadhavaListing, undefined, { prepare: prepareListing })));
+  admin.use('/admin/chadhava-categories', unlessCatalog(crud('ChadhavaCategory', ChadhavaCategory, undefined, { prepare: prepareCategory })));
 
-  admin.get('/admin/chadhava-orders', async (req, res) => res.json({ orders: redactWho(await svc.listOrdersForAdmin(req.query.limit), req) }));
-  admin.put('/admin/chadhava-orders/:id/status', async (req, res) => res.json({ order: await svc.markOffered(req.params.id, req.body?.status) }));
+  admin.get('/admin/chadhava-orders', ordersOwn, async (req, res) => res.json({ orders: redactWho(await svc.listOrdersForAdmin(req.query.limit), req) }));
+  admin.put('/admin/chadhava-orders/:id/status', ordersOwn, async (req, res) => res.json({ order: await svc.markOffered(req.params.id, req.body?.status) }));
 
   pub.use(httpErrorHandler);
   devotee.use(httpErrorHandler);

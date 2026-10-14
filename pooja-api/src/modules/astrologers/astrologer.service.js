@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 
 import { HttpError } from '../../lib/http-error.js';
 import { getNumberSetting } from '../../lib/settings.js';
-import { User } from '../../models.js';
+import { setUserRole } from '../../lib/user-directory.js';
 import { CallSession } from '../calls/call.model.js';
 import * as callService from '../calls/call.service.js';
 import { Astrologer, effectivePresence } from './astrologer.model.js';
@@ -162,5 +162,5 @@ export async function revokeRole(a) {
   await Astrologer.updateOne({ _id: a._id }, { $set: { presence: 'offline' } });
   // The minute already charged stands; the call just stops being billed.
   await callService.endLiveCallsOf(a._id);
-  if (a.uid) await User.updateOne({ uid: a.uid }, { $set: { role: 'devotee' } });
+  if (a.uid) await setUserRole(a.uid, 'devotee');
 }

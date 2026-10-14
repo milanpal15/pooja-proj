@@ -8,6 +8,7 @@ pooja proj/
 ├── poojaappclone/     Expo / React Native app (the phone app)
 ├── pooja-api/         The backend — Express + Mongoose over MongoDB
 ├── pooja-admin/       Admin dashboard — a React/Vite static site on that API
+├── backend/           The microservices replacement for pooja-api (6 services + 2 BFFs); pooja-api stays as the rollback
 ├── docs/              FIREBASE_SETUP.md (auth setup — read before debugging sign-in)
 └── CLAUDE.md          includes this file via @AGENTS.md
 ```
@@ -203,6 +204,26 @@ origin — `api.js` has no absolute base URL any more.
 - **`npm run build` runs `scripts/check-deps.mjs` first**: `ui/` and `lib/` may not import
   `features/` or `app/`, `features/` may not import `app/`, and one feature may reach
   another only through its `index.js`.
+
+### 2b. The microservices stack — `backend/` (docs/MICROSERVICES.md, docs/MICROSERVICES_CUTOVER.md)
+
+An npm-workspaces project (`backend/package-lock.json` is the one lockfile): `packages/common` (`@bhakti/common`),
+`services/{engagement,identity,catalog,wallet,orders,calls}` (each its own database on the same cluster) and
+`bff/{mobile,admin}` (the only public edge; same `/api` contract as `pooja-api`). Each service reads its environment in
+ONE `src/config.js`, lists every variable in `.env.example`, and starts with `node <dir>/src/server.js`. With every `*_URL`
+set the monolith is a shell (only `GET /api/health`, which the BFFs probe) — **keep `pooja-api/`**, it is the rollback.
+```bash
+cd backend && npm install
+npm run dev:all                                   # local stack (reads pooja-api/.env for the monolith)
+tools/stack.sh start|status|stop                  # blueprint-style boot, no .env read; MONGO_BASE, BASE_PORT, STACK_NODE_ENV
+TEST_MONGODB_URI=mongodb://127.0.0.1:27141/x npm test          # needs a local mongod; pooja-api deps installed (parity tests)
+ruby scripts/check-render-stack.rb                # backend/render.yaml vs each config.js
+```
+`backend/render.yaml` is ONE Blueprint (set **Blueprint Path** to `backend/render.yaml`): fromService only resolves inside a file.
+The six services are private (`pserv`, paid); the BFFs are public. Internal URLs arrive as a bare `host:port` from Render and
+`serviceUrl()` in `@bhakti/common` adds the scheme. CI: `backend` and `stack` jobs always; `deploy-microservices` only when the repo
+variable `DEPLOY_MICROSERVICES` is `true` (secrets `RENDER_DEPLOY_HOOK_<SERVICE>`). One list of money-moving settings:
+`MONEY_SETTING_KEYS` in `@bhakti/common` (parity-tested against the wallet's and the monolith's rules).
 
 ## 3. How the two connect (READ THIS before debugging "flags/content don't apply")
 

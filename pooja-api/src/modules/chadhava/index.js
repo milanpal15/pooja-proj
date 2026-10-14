@@ -1,4 +1,5 @@
 /** chadhava module — listings, categories and paid orders. See docs/POOJA_AND_HOME.md §4. */
+import { catalogEnabled } from '../../lib/catalog-client.js';
 import { chadhavaRouters } from './chadhava.routes.js';
 import { Offering } from './chadhava.model.js';
 
@@ -8,6 +9,7 @@ export const routers = (deps) => chadhavaRouters(deps);
 
 /** Seed the three starter offerings only into an empty catalogue, so a deleted one stays deleted. */
 export async function seed() {
+  if (catalogEnabled()) return; // the catalog service owns the catalogue and seeds it
   if ((await Offering.countDocuments()) > 0) return;
   await Offering.insertMany([
     { key: 'flowers', name: 'Flowers', nameHi: 'फूल', coins: 11, order: 0 },

@@ -1,0 +1,20 @@
+{
+  "name": "@bhakti/common",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Service JWT, service HTTP client, express helpers, BFF proxy/CORS kit.",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "test": "node --test --test-concurrency=1 src/*.test.mjs src/operator/*.test.mjs"
+  },
+  "dependencies": {
+    "cors": "2.8.6",
+    "express": "4.22.3"
+  },
+  "engines": {
+    "node": ">=20.19.4"
+  }
+}

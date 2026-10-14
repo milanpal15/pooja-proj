@@ -1,3 +1,9 @@
+import { catalogEnabled } from '../lib/catalog-client.js';
+import { callsEnabled, unlessCalls } from '../lib/calls-guard.js';
+import { unlessCatalog } from '../lib/catalog-guard.js';
+import { unlessOrders } from '../lib/orders-guard.js';
+import { unlessWallet } from '../lib/wallet-guard.js';
+import { walletEnabled } from '../lib/wallet-client.js';
 import { requireAuth } from '../middleware/require-auth.js';
 import * as astrologers from './astrologers/index.js';
 import * as bookings from './bookings/index.js';
@@ -26,8 +32,27 @@ import * as wallet from './wallet/index.js';
  */
 const MODULES = { wallet, coins, home, live, poojas, bookings, chadhava, astrologers, calls, payouts };
 
+/** Phase 3: modules the catalog service owns outright (home, live). `poojas` and `chadhava` keep their order/review routes. */
+const CATALOG_OWNED = new Set(['home', 'live']);
+
+/** Phase 4: modules the wallet service owns outright (wallet, coins - including the Razorpay webhook and the billing rules). */
+const WALLET_OWNED = new Set(['wallet', 'coins']);
+
+/** Phase 5: the module the orders service owns outright (bookings). `chadhava` and `poojas` keep their catalog parts and guard their order / review routes themselves. */
+const ORDERS_OWNED = new Set(['bookings']);
+
+/** Phase 6: the modules the calls service owns outright (astrologers, calls, payouts - including the sign-in claim, the billing ticker and the audio provider). */
+const CALLS_OWNED = new Set(['astrologers', 'calls', 'payouts']);
+
 const built = Object.fromEntries(
-  Object.entries(MODULES).map(([name, m]) => [name, m.routers({ requireAuth })]),
+  Object.entries(MODULES).map(([name, m]) => {
+    const r = m.routers({ requireAuth });
+    if (CATALOG_OWNED.has(name)) for (const k of ['public', 'devotee', 'admin']) if (r[k]) r[k] = unlessCatalog(r[k]);
+    if (WALLET_OWNED.has(name)) for (const k of ['public', 'devotee', 'admin']) if (r[k]) r[k] = unlessWallet(r[k]);
+    if (ORDERS_OWNED.has(name)) for (const k of ['public', 'devotee', 'admin']) if (r[k]) r[k] = unlessOrders(r[k]);
+    if (CALLS_OWNED.has(name)) for (const k of ['public', 'devotee', 'admin']) if (r[k]) r[k] = unlessCalls(r[k]);
+    return [name, r];
+  }),
 );
 
 export function mountOpenModules(app) {
@@ -45,6 +70,9 @@ export function mountAdminModules(app) {
 export async function seedModules() {
   for (const [name, m] of Object.entries(MODULES)) {
     if (!m.seed) continue;
+    if (catalogEnabled() && ['home', 'live', 'poojas'].includes(name)) continue; // the catalog service seeds these
+    if (walletEnabled() && WALLET_OWNED.has(name)) continue; // the wallet service seeds its packs; engagement seeds the settings and flags
+    if (callsEnabled() && CALLS_OWNED.has(name)) continue; // the calls service owns its collections (the billing rules it used to seed live in engagement)
     const t = Date.now();
     try {
       await m.seed();
@@ -58,6 +86,7 @@ export async function seedModules() {
 /** Background jobs (billing ticker, reconcilers). Each module may export `start()`. */
 export function startModuleJobs() {
   for (const [name, m] of Object.entries(MODULES)) {
+    if (catalogEnabled() && name === 'live') continue; // the catalog service runs the live-stream probe
     try {
       m.start?.();
     } catch (e) {

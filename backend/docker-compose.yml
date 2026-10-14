@@ -1,0 +1,159 @@
+# Phase 6 stack: mongo + engagement + identity + catalog + wallet + orders + calls + the monolith + the two BFFs.
+# NOT VERIFIED: Docker is not installed on the machine this was written on. Treat as a starting point.
+#   cd backend && docker compose up --build
+# Phone/dashboard point at: mobile-bff http://localhost:4010, admin-bff http://localhost:4020.
+services:
+  mongo:
+    image: mongo:7
+    volumes: ["mongo-data:/data/db"]
+
+  engagement:
+    build: { context: ., dockerfile: services/engagement/Dockerfile }
+    environment:
+      PORT: "4030"
+      MONGODB_URI: mongodb://mongo:27017        # the service picks its own database: engagement
+      DB_NAME: engagement
+      INTERNAL_JWT_SECRET: ${INTERNAL_JWT_SECRET:-local-dev-internal-secret-change-me}
+    depends_on: [mongo]
+    # No published port: only the BFFs (and the monolith) call it, with a service JWT.
+
+  identity:
+    build: { context: ., dockerfile: services/identity/Dockerfile }
+    environment:
+      PORT: "4040"
+      MONGODB_URI: mongodb://mongo:27017        # the service picks its own database: identity (run tools/split-db.mjs --service identity BEFORE its first start on real data)
+      DB_NAME: identity
+      CALLS_URL: http://calls:4080              # the astrologer invite claim / lookup at sign-in; unset it (with the same line on the monolith and the BFFs) to roll astrologers back into the monolith
+      MONOLITH_URL: http://monolith:4100        # only asked about astrologers while CALLS_URL is unset
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-change-me-local}   # only creates the first admin on an EMPTY operators collection
+      INTERNAL_JWT_SECRET: ${INTERNAL_JWT_SECRET:-local-dev-internal-secret-change-me}
+      # Revoking a blocked devotee's tokens / deleting their Firebase account needs a service-account key, e.g. mount the file
+      # and set FIREBASE_SERVICE_ACCOUNT_PATH (left out: both are skipped with a warning).
+    depends_on: [mongo]
+    # No published port.
+
+  catalog:
+    build: { context: ., dockerfile: services/catalog/Dockerfile }
+    environment:
+      PORT: "4050"
+      MONGODB_URI: mongodb://mongo:27017        # the service picks its own database: catalog (GridFS media lives there too). Run tools/split-db.mjs --service catalog BEFORE its first start on real data
+      DB_NAME: catalog
+      ENGAGEMENT_URL: http://engagement:4030    # required: the settings table (prasad fee, chadhava fee/minimum)
+      ORDERS_URL: http://orders:4070            # booking counts + rating aggregates (GET /internal/orders/pooja-stats); unset = counts 0, ratings hidden (point it at the monolith if ORDERS_URL is unset there)
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-25}
+      YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
+      INTERNAL_JWT_SECRET: ${INTERNAL_JWT_SECRET:-local-dev-internal-secret-change-me}
+    depends_on: [mongo, engagement]
+    # No published port: only the BFFs (and the monolith, for the priced snapshot) call it, with a service JWT.
+
+  wallet:
+    build: { context: ., dockerfile: services/wallet/Dockerfile }
+    environment:
+      PORT: "4060"
+      MONGODB_URI: mongodb://mongo:27017        # the service picks its own database: wallet. Run tools/split-db.mjs --service wallet BEFORE its first start on real data
+      DB_NAME: wallet
+      ENGAGEMENT_URL: http://engagement:4030    # required: the coin rate and the billing rules
+      IDENTITY_URL: http://identity:4040        # required: names behind the admin wallet search
+      INTERNAL_JWT_SECRET: ${INTERNAL_JWT_SECRET:-local-dev-internal-secret-change-me}
+      ADMIN_SESSION_SECRET: ${ADMIN_SESSION_SECRET:-local-dev-session-secret}   # the SAME value as the admin BFF: devotee pseudonyms ("Devotee ••4821")
+      NODE_ENV: development                     # production REFUSES PAYMENTS_PROVIDER=mock
+      PAYMENTS_PROVIDER: ${PAYMENTS_PROVIDER:-mock}
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
+      RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-}   # the webhook URL given to Razorpay stays the MOBILE BFF's /api/webhooks/razorpay
+    depends_on: [mongo, engagement, identity]
+    # No published port: only the BFFs (and the monolith, to move coins) call it, with a service JWT.
+
+  orders:
+    build: { context: ., dockerfile: services/orders/Dockerfile }
+    environment:
+      PORT: "4070"
+      MONGODB_URI: mongodb://mongo:27017        # the service picks its own database: orders. Run tools/split-db.mjs --service orders BEFORE its first start on real data (and before ORDERS_URL is set on the monolith)
+      DB_NAME: orders
+      WALLET_URL: http://wallet:4060            # required: every debit and refund (fail closed)
+      CATALOG_URL: http://catalog:4050          # required: the priced snapshot of a purchase, read fresh each time
+      IDENTITY_URL: http://identity:4040        # required: names for reviews / the admin lists, the device a push goes to
+      ENGAGEMENT_URL: http://engagement:4030    # required: the push token of that device
+      ADMIN_SESSION_SECRET: ${ADMIN_SESSION_SECRET:-local-dev-session-secret}   # the SAME value as the admin BFF: devotee pseudonyms ("Devotee ••4821")
+      INTERNAL_JWT_SECRET: ${INTERNAL_JWT_SECRET:-local-dev-internal-secret-change-me}
+    depends_on: [mongo, engagement, identity, catalog, wallet]
+    # No published port: only the BFFs (and the catalog, for booking counts) call it, with a service JWT.
+
+  calls:
+    build: { context: ., dockerfile: services/calls/Dockerfile }
+    environment:
+      PORT: "4080"
+      MONGODB_URI: mongodb://mongo:27017        # the service picks its own database: calls. Run tools/split-db.mjs --service calls BEFORE its first start on real data (and before CALLS_URL is set on the monolith)
+      DB_NAME: calls
+      WALLET_URL: http://wallet:4060            # required: every minute's debit and every refund (fail closed)
+      IDENTITY_URL: http://identity:4040        # required: a devotee's name, the device a push goes to, the astrologer role written back to the user
+      ENGAGEMENT_URL: http://engagement:4030    # required: the billing rules (minMinutes, ringTimeoutSec, defaultSharePct, payoutPaisePerCoin, callsEnabled) and push tokens
+      ADMIN_SESSION_SECRET: ${ADMIN_SESSION_SECRET:-local-dev-session-secret}   # the SAME value as the admin BFF: devotee pseudonyms ("Devotee ••4821")
+      INTERNAL_JWT_SECRET: ${INTERNAL_JWT_SECRET:-local-dev-internal-secret-change-me}
+      NODE_ENV: development                     # production REFUSES RTC_PROVIDER=mock (and an unset provider with no Agora keys): calls then answer 503 calls_unavailable
+      RTC_PROVIDER: ${RTC_PROVIDER:-mock}
+      AGORA_APP_ID: ${AGORA_APP_ID:-}
+      AGORA_APP_CERTIFICATE: ${AGORA_APP_CERTIFICATE:-}
+    depends_on: [mongo, engagement, identity, wallet]
+    # No published port: only the BFFs (and identity, for the sign-in claim) call it, with a service JWT.
+
+  monolith:
+    build: { context: .., dockerfile: backend/docker/monolith.Dockerfile }
+    environment:
+      PORT: "4100"
+      NODE_ENV: development          # production refuses PAYMENTS_PROVIDER=mock
+      MONGODB_URI: mongodb://mongo:27017/bhakti
+      PAYMENTS_PROVIDER: mock          # ignored while WALLET_URL is set: the wallet service owns payments now
+      RTC_PROVIDER: mock               # ignored while CALLS_URL is set: the calls service owns the audio provider now
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-change-me-local}
+      ADMIN_SESSION_SECRET: ${ADMIN_SESSION_SECRET:-local-dev-session-secret}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      ENGAGEMENT_URL: http://engagement:4030   # unset this line to roll flags/settings/announcements back into the monolith
+      IDENTITY_URL: http://identity:4040       # unset this line to roll users/operators/policies + authentication back into the monolith
+      CATALOG_URL: http://catalog:4050         # unset this line to roll content/Home/live/poojas/chadhava listings/panchang/horoscope/media back into the monolith
+      WALLET_URL: http://wallet:4060           # unset this line to roll wallets/the coin ledger/coin packs/purchases back into the monolith (it then talks to Razorpay itself again)
+      ORDERS_URL: http://orders:4070           # unset this line to roll pooja bookings/chadhava orders/reviews (and their money saga) back into the monolith
+      CALLS_URL: http://calls:4080             # unset this line to roll astrologers/calls/payouts (and the billing ticker) back into the monolith
+      INTERNAL_JWT_SECRET: ${INTERNAL_JWT_SECRET:-local-dev-internal-secret-change-me}
+    depends_on: [mongo, engagement, identity, catalog, wallet, orders, calls]
+    # No published port: only the BFFs are reachable from outside.
+
+  mobile-bff:
+    build: { context: ., dockerfile: bff/mobile/Dockerfile }
+    environment:
+      PORT: "4010"
+      MONOLITH_URL: http://monolith:4100
+      ENGAGEMENT_URL: http://engagement:4030
+      IDENTITY_URL: http://identity:4040
+      CATALOG_URL: http://catalog:4050         # requires ENGAGEMENT_URL and IDENTITY_URL on this BFF
+      WALLET_URL: http://wallet:4060           # requires IDENTITY_URL on this BFF; serves /api/wallet*, /api/coins/packs and the Razorpay webhook
+      ORDERS_URL: http://orders:4070           # requires IDENTITY_URL on this BFF; serves /api/bookings*, /api/chadhava/orders*, POST /api/chadhava and /api/poojas/:slug/reviews
+      CALLS_URL: http://calls:4080             # requires IDENTITY_URL on this BFF; serves /api/astrologers*, /api/astrologer/me/* and /api/calls*
+      INTERNAL_JWT_SECRET: ${INTERNAL_JWT_SECRET:-local-dev-internal-secret-change-me}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      # Verifying Firebase ID tokens needs only the project id (no secret). Must be the SAME project as the app's google-services.json.
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-pooja-app-aa462}
+    ports: ["4010:4010"]
+    depends_on: [monolith, engagement, identity, catalog, wallet, orders, calls]
+
+  admin-bff:
+    build: { context: ., dockerfile: bff/admin/Dockerfile }
+    environment:
+      PORT: "4020"
+      MONOLITH_URL: http://monolith:4100
+      ENGAGEMENT_URL: http://engagement:4030
+      IDENTITY_URL: http://identity:4040
+      CATALOG_URL: http://catalog:4050
+      WALLET_URL: http://wallet:4060
+      ORDERS_URL: http://orders:4070
+      CALLS_URL: http://calls:4080
+      INTERNAL_JWT_SECRET: ${INTERNAL_JWT_SECRET:-local-dev-internal-secret-change-me}
+      ADMIN_SESSION_SECRET: ${ADMIN_SESSION_SECRET:-local-dev-session-secret}   # the BFF signs the operator cookie with it; the monolith derives devotee pseudonyms from the SAME value
+      SESSION_SAMESITE: ${SESSION_SAMESITE:-Strict}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+    ports: ["4020:4020"]
+    depends_on: [monolith, engagement, identity, catalog, wallet, orders, calls]
+
+volumes:
+  mongo-data:

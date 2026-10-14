@@ -16,7 +16,7 @@ export function callRouters({ requireAuth }) {
 
   devotee.post('/calls', requireAuth, async (req, res) => {
     const { astrologerId, requestId } = req.body ?? {};
-    const call = await calls.requestCall({ devoteeUid: req.token.uid, astrologerId, requestId });
+    const call = await calls.requestCall({ devoteeUid: req.token.uid, astrologerId, requestId, devoteeName: req.user?.name });
     res.status(201).json({ call: await calls.toView(call, { viewerUid: req.token.uid }) });
   });
 

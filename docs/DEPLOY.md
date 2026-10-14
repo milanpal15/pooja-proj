@@ -1,5 +1,10 @@
 # Deploying the admin dashboard
 
+> **Deploying the new microservices stack (`backend/`)?** That has its own Blueprint and runbook:
+> [`MICROSERVICES_CUTOVER.md`](MICROSERVICES_CUTOVER.md). Everything below remains valid for the monolith
+> (`pooja-api`) and the dashboard, which keep running — the monolith is also the rollback and, in the new stack, the BFFs'
+> readiness probe. The monolith's redeploy is also what ships the live-call index fix (one live call per devotee, not per platform).
+
 Written for: whoever is putting `pooja-admin` on the internet for the first
 time. Takes about 30 minutes, most of it waiting.
 
