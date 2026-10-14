@@ -47,6 +47,7 @@ export const homeV2 = {
   hv_astro_title: 'Talk to an Astrologer',
   hv_astro_sub: 'Kundli, marriage, career, dosh nivaran',
   hv_astro_call: 'Talk now',
+  hv_astro_all: 'See all astrologers',
   hv_astro_rate: 'From {n} coins per minute',
   hv_listen: 'Listen now',
   hv_collection: 'Collection',

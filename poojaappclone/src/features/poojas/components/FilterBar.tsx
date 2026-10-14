@@ -23,6 +23,9 @@ export function FilterBar({
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
+      // A horizontal ScrollView grows to fill free vertical space by default; with an empty result
+      // list that stretched every chip into a tall pill. Keep it as tall as its chips.
+      style={styles.scroll}
       contentContainerStyle={styles.row}
       keyboardShouldPersistTaps="handled">
       <Chip icon="filter" plain label={n ? `${t('ps_filter')} (${n})` : t('ps_filter')} selected={n > 0} onPress={onOpen} />
@@ -34,5 +37,6 @@ export function FilterBar({
 }
 
 const styles = StyleSheet.create({
+  scroll: { flexGrow: 0, flexShrink: 0 },
   row: { paddingHorizontal: Space.md, gap: Space.sm, paddingTop: Space.xs, paddingBottom: Space.sm + 4 },
 });

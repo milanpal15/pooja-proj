@@ -19,6 +19,8 @@ export const poojaSeva = {
   ps_every_day: 'प्रतिदिन',
   ps_empty_title: 'अभी कोई पूजा उपलब्ध नहीं',
   ps_empty_body: 'मंदिर द्वारा प्रकाशित होते ही नई पूजाएँ यहाँ दिखेंगी। फ़िल्टर हटाकर देखें।',
+  ps_no_match_title: 'कोई पूजा नहीं मिली',
+  ps_no_match_body: 'कोई और शब्द, या मंदिर, पर्व या स्थान का नाम आज़माएँ।',
   ps_temple_filter: '{name} की पूजाएँ दिख रही हैं',
   ps_temple_clear: 'सभी दिखाएँ',
 
@@ -113,6 +115,7 @@ export const poojaSeva = {
   ps_st_cancelled: 'रद्द',
   ps_st_cancelled_sub: 'कॉइन आपके वॉलेट में लौट गए',
   ps_cancel_note: '{when} तक आप मेरी बुकिंग से रद्द कर सकते हैं; कॉइन आपके वॉलेट में लौट जाएँगे।',
+  ps_cancel_note_open: 'पूजा संपन्न होने से पहले आप कभी भी मेरी बुकिंग से रद्द कर सकते हैं; कॉइन आपके वॉलेट में लौट जाएँगे।',
   ps_cancel_btn: 'बुकिंग रद्द करें',
   ps_cancel_title: 'यह बुकिंग रद्द करें?',
   ps_cancel_body: 'आपके {n} कॉइन वॉलेट में लौटा दिए जाएँगे।',

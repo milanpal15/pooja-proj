@@ -17,6 +17,7 @@ export function useRtc(creds: RtcCredentials | undefined | null) {
   const [speaker, setSpeakerState] = useState(false);
   const [joined, setJoined] = useState(false);
   const [problem, setProblem] = useState<RtcProblem>(null);
+  const [detail, setDetail] = useState<string>('');
   const client = useRef<RtcClient | null>(null);
 
   const channel = creds?.channel;
@@ -47,7 +48,10 @@ export function useRtc(creds: RtcCredentials | undefined | null) {
           setProblem(null);
         }
       } catch (e) {
-        if (!cancelled) setProblem((e as { kind?: RtcErrorKind }).kind ?? 'failed');
+        if (!cancelled) {
+          setProblem((e as { kind?: RtcErrorKind }).kind ?? 'failed');
+          setDetail(String((e as { message?: string } | null)?.message ?? e).slice(0, 200));
+        }
       }
     })();
 
@@ -68,5 +72,5 @@ export function useRtc(creds: RtcCredentials | undefined | null) {
     client.current?.setSpeaker(on);
   }, []);
 
-  return { joined, muted, speaker, problem, setMuted, setSpeaker };
+  return { joined, muted, speaker, problem, detail, setMuted, setSpeaker };
 }

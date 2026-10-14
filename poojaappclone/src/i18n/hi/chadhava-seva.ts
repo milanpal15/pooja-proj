@@ -7,6 +7,8 @@ export const chadhavaSeva = {
   cs_offer: 'चढ़ावा चढ़ाएँ',
   cs_empty_title: 'अभी कोई चढ़ावा उपलब्ध नहीं',
   cs_empty_body: 'मंदिर द्वारा खोले जाते ही भेंट यहाँ दिखेंगी। दूसरी श्रेणी देखें।',
+  cs_no_match_title: 'कोई चढ़ावा नहीं मिला',
+  cs_no_match_body: 'कोई और शब्द, या मंदिर या स्थान का नाम आज़माएँ।',
   cs_temple_filter: '{name} की भेंट दिख रही हैं',
   cs_temple_clear: 'सभी दिखाएँ',
   cs_window: '{a} से {b}',

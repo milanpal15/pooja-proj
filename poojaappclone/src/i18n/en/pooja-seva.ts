@@ -21,6 +21,8 @@ export const poojaSeva = {
   ps_every_day: 'Every day',
   ps_empty_title: 'No poojas right now',
   ps_empty_body: 'New poojas appear here as the temple publishes them. Try clearing the filters.',
+  ps_no_match_title: 'No poojas match',
+  ps_no_match_body: 'Try another word, or a temple, festival or place name.',
   ps_temple_filter: 'Showing poojas at {name}',
   ps_temple_clear: 'Show all',
 
@@ -118,6 +120,7 @@ export const poojaSeva = {
   ps_st_cancelled: 'Cancelled',
   ps_st_cancelled_sub: 'Coins returned to your wallet',
   ps_cancel_note: 'You can cancel from My Bookings until {when}; your coins return to your wallet.',
+  ps_cancel_note_open: 'You can cancel from My Bookings any time before the pooja is performed; your coins return to your wallet.',
   ps_cancel_btn: 'Cancel booking',
   ps_cancel_title: 'Cancel this booking?',
   ps_cancel_body: 'Your {n} coins will be returned to your wallet.',

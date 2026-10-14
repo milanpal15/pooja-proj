@@ -84,6 +84,14 @@
         {
           "ios": {
             "useFrameworks": "static"
+          },
+          "android": {
+            "useLegacyPackaging": true,
+            "packagingOptions": {
+              "exclude": [
+                "**/libagora_*_extension.so"
+              ]
+            }
           }
         }
       ],

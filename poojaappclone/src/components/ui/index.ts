@@ -11,6 +11,7 @@ export { BottomBar } from './bottom-bar';
 export { Button, type ButtonProps, type ButtonSize, type ButtonVariant, IconButton } from './button';
 export { ArchImage, Badge, Card, type CardProps, Chip, Divider, ListRow, SectionHeader } from './card';
 export { CircleButton } from './circle-button';
+export { ConfirmProvider, type ConfirmOptions, useConfirm } from './confirm-dialog';
 export { CoinDisc, Coins, type CoinsProps } from './coins';
 export { Field, type FieldProps } from './field';
 export { Icon, type IconName, type IconProps } from './icon';

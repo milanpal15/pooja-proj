@@ -63,7 +63,7 @@ export function DeityChips({
   };
 
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.row}>
       {item('', t('bp_top20'), 0)}
       {deities.map((d, i) => item(d, deityName(d), i + 1, deityArt(d)))}
     </ScrollView>

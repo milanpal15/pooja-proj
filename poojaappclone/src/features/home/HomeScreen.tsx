@@ -81,6 +81,12 @@ export function HomeScreen() {
           <SearchBar placeholder={t('hv_search')} onSubmit={(q) => go(searchPath(q))} />
         </View>
         <HomeSlider slides={slides} />
+        {/* Right under the slides: the way into the astrologer list (which includes offline astrologers). */}
+        {flags.astrologerCalls && (
+          <View style={styles.gutter}>
+            <AstrologerBlock list={astro.data} loading={astro.status === 'loading'} onOpen={() => go('/astrologers')} />
+          </View>
+        )}
         {deityList.length > 0 && (
           <DeityRow deities={deityList} art={deityArt} onPick={(id) => go(`/pooja?deity=${encodeURIComponent(id)}&ts=${Date.now()}`)} />
         )}
@@ -93,7 +99,6 @@ export function HomeScreen() {
           <TemplesNearYou here={here} onOpen={go} />
           <RashiRow onOpen={() => go('/horoscope')} />
           <ShelfSections hi={lang === 'hi'} />
-          {flags.astrologerCalls && <AstrologerBlock list={astro.data} loading={astro.status === 'loading'} onOpen={() => go('/astrologers')} />}
           <ListenBlock onOpen={() => go('/bhajan')} />
           <ShareCard />
         </View>

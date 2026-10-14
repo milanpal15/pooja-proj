@@ -35,7 +35,7 @@ export function CategoryChips({
   ];
   return (
     <View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.row}>
         {items.map((it, i) => (
           <Cat key={it.slug || 'all'} {...it} tone={TONES[i % TONES.length]} on={value === it.slug} onPress={() => onChange(it.slug)} />
         ))}

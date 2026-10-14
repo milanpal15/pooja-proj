@@ -1,7 +1,6 @@
 import { useCallback } from 'react';
-import { Alert } from 'react-native';
 
-import { useToast } from '@/components/ui';
+import { useConfirm, useToast } from '@/components/ui';
 import { type StringKey, useLanguage } from '@/i18n';
 import { cancelBooking, cancelChadhavaOrder } from '@/lib/api';
 import { fill, formatCoins } from '@/lib/format';
@@ -10,7 +9,7 @@ import { useWallet } from '@/providers/wallet';
 type Copy = { title: StringKey; body: StringKey; done: StringKey; failed: StringKey; action: StringKey };
 
 /**
- * Cancel with a confirm dialog (a real choice, so `Alert`, not a toast).
+ * Cancel with a themed confirm dialog (a real choice, so a dialog, not a toast).
  * The server decides eligibility (`canCancel`, the cut-off); a refusal is
  * reported, never second-guessed. The wallet is re-read afterwards because the
  * refund changed it.
@@ -22,30 +21,30 @@ function useCancel(
 ) {
   const { t } = useLanguage();
   const toast = useToast();
+  const confirm = useConfirm();
   const { refresh } = useWallet();
 
   return useCallback(
-    (id: string, coins: number) => {
-      Alert.alert(t(copy.title), fill(t(copy.body), { n: formatCoins(coins) }), [
-        { text: t('ps_keep'), style: 'cancel' },
-        {
-          text: t(copy.action),
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await run(id);
-              toast.success(t(copy.done));
-              refresh();
-              onDone();
-            } catch {
-              toast.error(t(copy.failed));
-              onDone(); // the server's view may differ from ours (cut-off passed) — reload it
-            }
-          },
-        },
-      ]);
+    async (id: string, coins: number) => {
+      const yes = await confirm({
+        title: t(copy.title),
+        message: fill(t(copy.body), { n: formatCoins(coins) }),
+        confirmLabel: t(copy.action),
+        cancelLabel: t('ps_keep'),
+        destructive: true,
+      });
+      if (!yes) return;
+      try {
+        await run(id);
+        toast.success(t(copy.done));
+        refresh();
+        onDone();
+      } catch {
+        toast.error(t(copy.failed));
+        onDone(); // the server's view may differ from ours (cut-off passed) — reload it
+      }
     },
-    [t, toast, refresh, run, copy, onDone],
+    [t, toast, confirm, refresh, run, copy, onDone],
   );
 }
 

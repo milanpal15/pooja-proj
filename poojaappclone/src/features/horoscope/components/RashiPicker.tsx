@@ -16,7 +16,7 @@ export function RashiPicker({
   onPick: (id: string) => void;
 }) {
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={styles.chips}>
       {RASHIS.map((r) => (
         <Chip
           key={r.id}

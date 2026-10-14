@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Linking, type ScrollView } from 'react-native';
+import { Linking, type ScrollView } from 'react-native';
 
-import { toast } from '@/components/ui';
+import { toast, useConfirm } from '@/components/ui';
 import { useContent } from '@/providers/content';
 import { useLanguage } from '@/i18n';
 
@@ -19,6 +19,7 @@ import { useReminders } from './use-reminders';
  */
 export function useAlarmScreen() {
   const { lang, t } = useLanguage();
+  const confirm = useConfirm();
   const hi = lang === 'hi';
 
   const store = useReminders();
@@ -30,52 +31,50 @@ export function useAlarmScreen() {
    * and the caller used to drop that on the floor — the switch simply did not
    * move and nothing said why. Android also stops showing its own dialog once
    * the devotee has declined, so the only way back is Settings; that makes
-   * this a real choice, which is why it is an Alert rather than a toast.
+   * this a real choice, which is why it is a dialog rather than a toast.
    */
   const attemptToggle = useCallback(
     async (id: ReminderId) => {
       if (await toggle(id)) return;
-      Alert.alert(t('reminders_blocked_title'), t('reminders_blocked_msg'), [
-        { text: t('cancel'), style: 'cancel' },
-        { text: t('open_settings'), onPress: () => void Linking.openSettings().catch(() => {}) },
-      ]);
+      const open = await confirm({
+        title: t('reminders_blocked_title'),
+        message: t('reminders_blocked_msg'),
+        confirmLabel: t('open_settings'),
+        cancelLabel: t('cancel'),
+      });
+      if (open) void Linking.openSettings().catch(() => {});
     },
-    [toggle, t],
+    [toggle, t, confirm],
   );
   const [editing, setEditing] = useState<ReminderId | null>(null);
   /** The add form, open or not. Null means closed. */
   const [adding, setAdding] = useState<AddDraft | null>(null);
 
   /*
-   * Deleting is a real choice with a real cost, so it is an Alert and not a
-   * toast — the one category the toast rewrite deliberately left to Alert.
+   * Deleting is a real choice with a real cost, so it is a confirm dialog and
+   * not a toast.
    */
   const confirmDelete = useCallback(
-    (id: ReminderId, title: string, custom: boolean) => {
-      Alert.alert(
-        hi ? 'रिमाइंडर हटाएँ?' : 'Delete this reminder?',
-        custom
+    async (id: ReminderId, title: string, custom: boolean) => {
+      const yes = await confirm({
+        title: hi ? 'रिमाइंडर हटाएँ?' : 'Delete this reminder?',
+        message: custom
           ? hi
             ? `"${title}" हटा दिया जाएगा।`
             : `"${title}" will be removed.`
           : hi
             ? `"${title}" हटा दिया जाएगा। आप इसे बाद में वापस ला सकते हैं।`
             : `"${title}" will be removed. You can restore the daily cycle later.`,
-        [
-          { text: hi ? 'रहने दें' : 'Cancel', style: 'cancel' },
-          {
-            text: hi ? 'हटाएँ' : 'Delete',
-            style: 'destructive',
-            onPress: () => {
-              setEditing(null);
-              void removeReminder(id);
-              toast.success(hi ? 'रिमाइंडर हटाया गया' : 'Reminder deleted');
-            },
-          },
-        ],
-      );
+        confirmLabel: hi ? 'हटाएँ' : 'Delete',
+        cancelLabel: hi ? 'रहने दें' : 'Cancel',
+        destructive: true,
+      });
+      if (!yes) return;
+      setEditing(null);
+      void removeReminder(id);
+      toast.success(hi ? 'रिमाइंडर हटाया गया' : 'Reminder deleted');
     },
-    [hi, removeReminder],
+    [hi, removeReminder, confirm],
   );
 
   const submitNew = useCallback(async () => {

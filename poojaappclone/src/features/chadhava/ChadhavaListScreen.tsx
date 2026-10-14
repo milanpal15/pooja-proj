@@ -62,8 +62,8 @@ export function ChadhavaListScreen() {
         hasData={!!m.data}
         onRetry={m.reload}
         empty={listings.length === 0}
-        emptyTitle={t('cs_empty_title')}
-        emptyBody={t('cs_empty_body')}
+        emptyTitle={t(needle ? 'cs_no_match_title' : 'cs_empty_title')}
+        emptyBody={t(needle ? 'cs_no_match_body' : 'cs_empty_body')}
         skeletonHeight={260}>
         <FlatList
           data={listings}

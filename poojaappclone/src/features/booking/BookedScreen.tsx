@@ -69,7 +69,7 @@ export function BookedScreen() {
               {b.canCancel && (
                 <View style={[styles.note, { backgroundColor: c.accentContainer }]}>
                   <Type v="labelMd" tone="onAccentContainer" style={{ fontWeight: '400', lineHeight: 18 }}>
-                    {fill(t('ps_cancel_note'), { when: formatStamp(b.cancelBy, lang) })}
+                    {b.cancelBy ? fill(t('ps_cancel_note'), { when: formatStamp(b.cancelBy, lang) }) : t('ps_cancel_note_open')}
                   </Type>
                 </View>
               )}

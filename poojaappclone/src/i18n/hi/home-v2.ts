@@ -47,6 +47,7 @@ export const homeV2 = {
   hv_astro_title: 'ज्योतिषी से बात करें',
   hv_astro_sub: 'कुंडली, विवाह, करियर, दोष निवारण',
   hv_astro_call: 'अभी बात करें',
+  hv_astro_all: 'सभी ज्योतिषी देखें',
   hv_astro_rate: '{n} कॉइन प्रति मिनट से',
   hv_listen: 'अभी सुनें',
   hv_collection: 'संग्रह',

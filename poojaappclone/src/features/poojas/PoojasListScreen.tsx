@@ -13,6 +13,7 @@ import { FilterBar } from './components/FilterBar';
 import { FilterSheet } from './components/FilterSheet';
 import { PoojaListCard } from './components/PoojaListCard';
 import { usePoojaList } from './hooks/use-pooja-list';
+import { activeCount } from './lib/filters';
 
 /**
  * Pooja Seva — everything bookable, filterable by festival / tithi / place.
@@ -32,6 +33,8 @@ export function PoojasListScreen() {
   const festival = options?.festivals.find((f) => f.slug === m.filters.festival);
   const templeName = options?.temples.find((x) => x.slug === temple)?.name ?? temple;
   const poojas = m.data?.poojas ?? [];
+  // Nothing matched what the devotee typed or picked: say that, not "nothing is published".
+  const narrowed = !!m.filters.q.trim() || activeCount(m.filters) > 0;
 
   return (
     <Screen tabBar={false} watermark>
@@ -74,8 +77,8 @@ export function PoojasListScreen() {
         hasData={!!m.data}
         onRetry={m.reload}
         empty={poojas.length === 0}
-        emptyTitle={t('ps_empty_title')}
-        emptyBody={t('ps_empty_body')}
+        emptyTitle={t(narrowed ? 'ps_no_match_title' : 'ps_empty_title')}
+        emptyBody={t(narrowed ? 'ps_no_match_body' : 'ps_empty_body')}
         skeletonHeight={300}>
         <FlatList
           data={poojas}

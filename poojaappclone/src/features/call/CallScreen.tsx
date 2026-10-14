@@ -1,9 +1,9 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, BackHandler, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, BackHandler, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Avatar, Button, Screen, Type, useToast } from '@/components/ui';
+import { Avatar, Button, Screen, Type, useConfirm, useToast } from '@/components/ui';
 import { assetUrl } from '@/providers/content';
 import { useLanguage } from '@/i18n';
 import { AddCoinsSheet, useWallet } from '@/features/wallet';
@@ -27,6 +27,7 @@ export function CallScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const toast = useToast();
+  const confirm = useConfirm();
   const { t } = useLanguage();
   const wallet = useWallet();
   const { call, phase, elapsed, offline, isAstrologer, cancel, end, retry } = useCallSession(id);
@@ -49,21 +50,25 @@ export function CallScreen() {
 
   // Voice problems are persistent facts of this call: say each once.
   const problem = rtc.problem;
+  const detail = rtc.detail;
   useEffect(() => {
-    if (problem === 'unavailable') toast.error(t('call_need_build'));
+    // The detail line is the SDK's own message: it says WHY, which "needs a new build" cannot.
+    const d = detail ? { description: detail } : undefined;
+    if (problem === 'unavailable') toast.error(t('call_need_build'), d);
     else if (problem === 'mic') toast.error(t('call_mic_denied'));
-    else if (problem === 'failed') toast.error(t('call_rtc_failed'));
-  }, [problem, toast, t]);
+    else if (problem === 'failed') toast.error(t('call_rtc_failed'), d);
+  }, [problem, detail, toast, t]);
 
-  const askEnd = () =>
-    Alert.alert(t('call_end_title'), t('call_end_msg'), [
-      { text: t('call_keep'), style: 'cancel' },
-      {
-        text: t('call_end_confirm'),
-        style: 'destructive',
-        onPress: () => end().catch(() => toast.error(t('call_err_offline'))),
-      },
-    ]);
+  const askEnd = async () => {
+    const yes = await confirm({
+      title: t('call_end_title'),
+      message: t('call_end_msg'),
+      confirmLabel: t('call_end_confirm'),
+      cancelLabel: t('call_keep'),
+      destructive: true,
+    });
+    if (yes) end().catch(() => toast.error(t('call_err_offline')));
+  };
 
   const doCancel = () => cancel().catch(() => toast.error(t('call_err_offline')));
 

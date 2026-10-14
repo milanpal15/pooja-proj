@@ -7,6 +7,8 @@ export const chadhavaSeva = {
   cs_offer: 'Make an offering',
   cs_empty_title: 'No chadhava right now',
   cs_empty_body: 'Offerings appear here when a temple opens them. Try another category.',
+  cs_no_match_title: 'No chadhava match',
+  cs_no_match_body: 'Try another word, or a temple or place name.',
   cs_temple_filter: 'Showing offerings at {name}',
   cs_temple_clear: 'Show all',
   cs_window: '{a} to {b}',

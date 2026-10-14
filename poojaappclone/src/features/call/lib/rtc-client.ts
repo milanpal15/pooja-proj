@@ -73,8 +73,11 @@ function loadAgora(): {
     const sdk = require('react-native-agora');
     if (!sdk?.createAgoraRtcEngine) throw new Error('react-native-agora has no engine export');
     return sdk;
-  } catch {
-    throw new RtcError('unavailable', 'react-native-agora is not installed in this build');
+  } catch (e) {
+    // Keep the real reason: "not installed" and "installed but its native part failed to load" look
+    // identical to a devotee but need very different fixes.
+    const why = String((e as { message?: string } | null)?.message ?? e).slice(0, 160);
+    throw new RtcError('unavailable', `react-native-agora could not be loaded: ${why}`);
   }
 }
 
