@@ -17,6 +17,7 @@ import { Radius, Sacred, Space } from '@/constants/sacred';
 import { ConfirmProvider, ToastProvider } from '@/components/ui';
 import { AstrologerShell } from '@/features/astrologer-mode';
 import { AuthGate } from '@/features/auth';
+import { usePushRegistration } from '@/hooks/use-push-registration';
 import { AdminProvider, useAdmin } from '@/providers/admin';
 import { AuthProvider, useAuth } from '@/providers/auth';
 import { ContentProvider } from '@/providers/content';
@@ -66,6 +67,7 @@ function RootGate() {
   // first frame renders in the system face and visibly re-flows a beat later.
   const fontsReady = useSacredFonts();
   const ready = !langLoading && !authLoading && fontsReady;
+  usePushRegistration({ uid: ready && user ? user.uid : null, astrologer: user?.role === 'astrologer' && !devoteeView });
 
   // Hide the native splash once prefs have loaded (this used to live in the
   // now-removed AnimatedSplashOverlay — without it the app hangs on the splash).

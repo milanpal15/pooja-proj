@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { StringKey } from '@/i18n';
 import { ApiError, type Gender, syncProfile, updateProfile } from '@/lib/api';
 import { firebaseSignOut, watchAuthState } from '@/lib/firebase-auth';
+import { setMyPresence } from '@/lib/api';
+import { unregisterForPush } from '@/lib/push';
 
 import { AuthContext } from './context';
 import { fromFirebase, profileComplete, toUser } from './profile';
@@ -20,6 +22,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Guards the async sync against a sign-out that lands mid-flight.
   const activeUid = useRef<string | null>(null);
+  // The signed-in role as of right now, for the sign-out callback (which is memoised and must not close over a stale user).
+  const roleRef = useRef<string | null>(null);
+  useEffect(() => {
+    roleRef.current = user?.role ?? null;
+  }, [user]);
 
   const cache = useCallback(async (u: User | null) => {
     if (u) await AsyncStorage.setItem(PROFILE_KEY, JSON.stringify(u)).catch(() => {});
@@ -48,6 +55,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const hardSignOut = useCallback(
     async (reason: StringKey | null) => {
+      // While the token still authenticates, and bounded: an astrologer signing out must not stay listed as callable (their phone is
+      // about to stop being reachable), and this phone must stop receiving this account's notifications.
+      if (roleRef.current === 'astrologer') {
+        await Promise.race([setMyPresence(false).catch(() => {}), new Promise<void>((r) => setTimeout(r, 2000))]);
+      }
+      await unregisterForPush();
       activeUid.current = null;
       setUser(null);
       setPendingProfile(null);
