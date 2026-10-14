@@ -122,10 +122,10 @@ EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=1234567890-abcdef.apps.googleusercontent.com
 **Project settings → Service accounts → Generate new private key.** Save it as:
 
 ```
-pooja-admin/server/firebase-service-account.json
+pooja-api/firebase-service-account.json
 ```
 
-Also gitignored. `pooja-admin/server/.env` already points at it:
+Also gitignored. `pooja-api/.env` already points at it:
 
 ```bash
 FIREBASE_SERVICE_ACCOUNT_PATH=./firebase-service-account.json
