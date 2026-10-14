@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 
-import { createCallsMount, createCatalogMount, createEngagementMount, createGatewayApp, createIdentityAdminMount, createLogger, createOrdersMount, createWalletMount } from '@bhakti/common';
+import { rejectFcmRegistration, createCallsMount, createCatalogMount, createEngagementMount, createGatewayApp, createIdentityAdminMount, createLogger, createOrdersMount, createWalletMount } from '@bhakti/common';
 
 /**
  * Dashboard gateway. Everything is streamed to the monolith, except:
@@ -59,6 +59,7 @@ export function createApp(config, { logger = createLogger('admin-bff'), fetchImp
     softDeps: Object.assign({}, ...mounts.map((m) => m.softDeps)),
     mount: mounts.length
       ? (app) => {
+          app.all('/api/push/register', rejectFcmRegistration()); // the phone's FCM registration is the mobile BFF's; only the old anonymous Expo POST passes
           engagement?.mount(app);
           catalog?.mount(app); // content, Home, live, poojas ... behind the area gate (before the identity gate and the monolith proxy)
           wallet?.mount(app); // wallet, coin packs, billing rules ... behind the area gate

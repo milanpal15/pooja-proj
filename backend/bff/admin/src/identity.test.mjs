@@ -444,6 +444,29 @@ describe('no operator exists', () => {
   });
 });
 
+describe('the phone\'s FCM push registration is not an admin-BFF route', () => {
+  test('POST (with a token) and DELETE /api/push/register are a plain 404 here: identity is never asked, nothing reaches the monolith', async () => {
+    const cookie = await as('root');
+    for (const [method, headers] of [['POST', { ...cookie, authorization: 'Bearer some-firebase-token' }], ['DELETE', {}], ['DELETE', cookie]]) {
+      monoSeen.length = 0;
+      idnCalls.length = 0;
+      engCalls.length = 0;
+      const r = await call(method, '/api/push/register', { headers, body: { token: 'fcm' } });
+      assert.equal(r.status, 404, `${method}`);
+      assert.deepEqual(r.body, { error: 'not found', code: 'not_found' });
+      assert.equal(idnCalls.filter((c) => c.path.includes('/push/')).length, 0);
+      assert.equal(engCalls.length + monoSeen.length, 0);
+    }
+  });
+
+  test('the pre-existing anonymous Expo registration (POST, no Authorization header) is untouched: still engagement\'s', async () => {
+    const r = await call('POST', '/api/push/register', { body: { deviceId: 'd', pushToken: 'ExponentPushToken[x]' } });
+    assert.equal(r.status, 200);
+    assert.equal(engCalls.at(-1).url, '/internal/engagement/push/register');
+    assert.equal(idnCalls.filter((c) => c.path.includes('/push/')).length, 0);
+  });
+});
+
 describe('IDENTITY_URL unset', () => {
   test('is exactly phase 1: no login/session handling here, requests (cookie included) go to the monolith untouched', async () => {
     const g = http.createServer(createApp(loadConfig({ MONOLITH_URL: `http://127.0.0.1:${mono.address().port}` }), { logger: quiet }));

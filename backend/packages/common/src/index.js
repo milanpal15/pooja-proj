@@ -10,7 +10,7 @@ export { createProxy, probeUpstream } from './proxy.js';
 export { createGatewayApp } from './gateway.js';
 export { DEFAULT_FLAGS_MAP, engagementPublicRouter } from './engagement-public.js';
 export { createEngagementMount } from './engagement-mount.js';
-export { STATUS_TTL_MS, createIdentityAdminMount, createIdentityMobileMount } from './identity-mount.js';
+export { STATUS_TTL_MS, createIdentityAdminMount, createIdentityMobileMount, rejectFcmRegistration } from './identity-mount.js';
 export { IDENTITY_ADMIN_ROUTES, identityAdminRouter } from './operator/identity-routes.js';
 export { IDENTITY_SESSION_TTL_MS, createOperatorSessions } from './operator/identity-session.js';
 export { PUBLIC, isPublic } from './operator/public-routes.js';

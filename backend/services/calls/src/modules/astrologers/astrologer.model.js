@@ -35,6 +35,11 @@ const astrologerSchema = new Schema(
     listed: { type: Boolean, default: true },
     presence: { type: String, enum: ['offline', 'online', 'busy'], default: 'offline' },
     lastSeenAt: Date,
+    /**
+     * True while this astrologer has a phone registered for push (identity's registry): they can be rung with the app closed, so a stale heartbeat does
+     * not make them uncallable (see `effectivePresence`). Refreshed when they go Online and on every heartbeat; kept as-is when identity cannot answer.
+     */
+    pushReachable: { type: Boolean, default: false },
     lastSignInAt: Date,
     /** A short lease taken while a payout is recorded, so two payouts (even from two instances) cannot both fit under one `due` (payout.service). */
     payoutLock: { id: String, until: Date },
@@ -47,11 +52,23 @@ astrologerSchema.index({ uid: 1 }, { unique: true, sparse: true });
 
 export const Astrologer = model('Astrologer', astrologerSchema);
 
-/** Heartbeats older than this mean "gone", whatever `presence` still says. */
+/** Heartbeats older than this mean "gone", whatever `presence` still says - unless the astrologer is push-reachable (below). */
 export const PRESENCE_FRESH_MS = 45_000;
 
+/**
+ * How long an astrologer who is Online AND has a push-registered phone stays callable after their app last checked in. The app only heartbeats
+ * while it is open, but the phone is woken by the notification, so the 45 s rule cannot be the rule for them. Bounded, so a phone that died or lost
+ * its network is not listed as available all day; opening the app refreshes it.
+ */
+export const PUSH_REACHABLE_MS = 4 * 60 * 60 * 1000;
+
+/** The ONE presence rule (public list, the call-request check, the astrologer's own view). Busy stays busy; a deliberate Offline always wins. */
 export function effectivePresence(a, now = Date.now()) {
   if (a.presence === 'busy') return 'busy';
-  if (a.presence === 'online' && a.lastSeenAt && now - new Date(a.lastSeenAt).getTime() < PRESENCE_FRESH_MS) return 'online';
+  if (a.presence === 'online' && a.lastSeenAt) {
+    const age = now - new Date(a.lastSeenAt).getTime();
+    if (age < PRESENCE_FRESH_MS) return 'online';
+    if (a.pushReachable && age < PUSH_REACHABLE_MS) return 'online';
+  }
   return 'offline';
 }

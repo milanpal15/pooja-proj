@@ -34,8 +34,8 @@ and catalog all read it.
 
 ```
 mobile-bff / admin-bff  →  every service
-orders   → wallet (debit/refund), catalog (pricing + temple/pooja/listing facts), identity (user name, push device), engagement (push token; no setting is read today)
-calls    → wallet (per-minute debit/credit), identity (user, astrologer claim), engagement (settings)
+orders   → wallet (debit/refund), catalog (pricing + temple/pooja/listing facts), identity (user name, push device, push/send), engagement (push token; no setting is read today)
+calls    → wallet (per-minute debit/credit), identity (user, astrologer claim, push/send + push/reachable), engagement (settings)
 wallet   → engagement (settings, flags), identity (blocked?)
 catalog  → orders (booking counts, review aggregates — read-only, cached), engagement (settings)
 identity → calls (astrologer invite lookup/claim)
@@ -366,7 +366,7 @@ unchanged.
    - **Deviations from the plan above**: (1) the ticker lives in the service with the money (the plan's "calls service debits per started minute" is unchanged; what moved is who runs the sweeper). (2) Goodwill refunds are per minute (above). (3) Settings fail closed. (4) The devotee index fix. (5) A blank
      name in the token falls back to the directory. (6) Public astrologer GETs are not served stale.
    - **Known limits**: a debit whose answer was lost, for a call that is then ended (`completed` / `failed`) before the ticker re-asks, is not recorded on the call row (identical to the monolith; the wallet row exists and is findable by key). The monolith's `User.role` copy of
-     `astrologer` is re-derived at sign-in, not rewritten on a missed best-effort write. Presence needs a heartbeat or a poll: the astrologer app only receives calls while foregrounded (unchanged, no push for ringing beyond the Expo notification).
+     `astrologer` is re-derived at sign-in, not rewritten on a missed best-effort write. Presence needs a heartbeat or a poll: the astrologer app only heartbeats while foregrounded - *except* for an astrologer with a push-registered phone, see **Push notifications** below.
 7. **Deployment, CI and the cutover runbook** (done) - and the monolith is **deliberately kept**.
    **STATUS: written and verified locally (plain Node, throwaway MongoDB); not run on Render, Docker, GitHub Actions or Atlas.**
    - `backend/render.yaml`: ONE Blueprint for all eight (the repo's other two are split by lifecycle - a static site that gets recreated; these eight are all Node
@@ -402,7 +402,7 @@ unchanged.
 
 ### What was verified, and what was not
 
-Verified (plain Node processes, throwaway `mongod`, never Atlas): the backend workspace suites (790 tests, 0 failing) and the monolith's (386, one file at a time); the whole stack booted with the
+Verified (plain Node processes, throwaway `mongod`, never Atlas): the backend workspace suites (824 tests, 0 failing, under Node 25 and Node 20.19.4) and the monolith's (386, one file at a time); the whole stack booted with the
 Blueprint's start commands (no `.env`, clean environment, every `*_URL` set, bare `host:port` addresses too) in development and in `NODE_ENV=production` configuration; `scripts/smoke.mjs` through the
 mobile BFF (89 PASS, no password) and the admin BFF (126 PASS, with the first admin from `ADMIN_PASSWORD`), 0 FAIL in both configurations; the media round trip through the admin BFF into
 catalog's GridFS; `/health/deps` all green; the workflow file with `actionlint` 1.7.12; `backend/render.yaml` parsed (Ruby YAML) and cross-checked by `check-render-stack.rb`.
@@ -435,3 +435,41 @@ corresponding monolith module.
 - **Webhook URL (Razorpay)** must keep pointing at the BFF; do not point it at the wallet service.
 - **Money (phase 7):** the Blueprint needs six private services (no free plan) and two BFFs: eight paid instances, plus the monolith, which stays. Atlas free is 512 MB for the original data AND the
   copy until the old collections are dropped. See `docs/MICROSERVICES_CUTOVER.md` for the free-plan variant and what it gives up (the network boundary).
+
+## 10. Push notifications (background push, Firebase Cloud Messaging)
+
+Goal: an astrologer whose app is in the background or closed gets an "Incoming call" notification and can still be called. Built in the **microservices only** (the
+monolith is untouched and has no FCM).
+
+```
+phone ──POST /api/push/register {token, platform}──► mobile-bff ──(signed sub = uid)──► identity  push registry (db identity, collection `pushdevices`)
+calls  ──POST push/send {uid, title, body, data, channelId, ttlSeconds, tag}──► identity ──► FCM ──► the phone(s)
+orders ──(same, channel `default`)──────────────────► identity
+calls  ──GET push/reachable?uid=──► identity          (is there a phone to push to?)
+```
+
+* **identity owns the registry and the FCM edge**, because it already holds the Firebase service account (nobody else gets it). `PushDevice {uid, token (unique), platform, lastSeenAt}`: one
+  account has several phones (at most 10, oldest dropped), one token belongs to ONE account (a shared phone's token moves to the next account that registers it; sign-out `DELETE` removes only
+  your own row). The account is the verified service-JWT `sub`, never the body. `POST /internal/identity/push/send` and `GET .../reachable` accept only the issuers `calls`, `orders`, `engagement`
+  (403 otherwise); register / unregister only `mobile-bff`. `send` never throws into its caller (always `{sent, devices}`), sends an Android **high-priority** message with a **notification
+  payload** (so the OS shows it with the app closed), string-only `data`, a TTL, a collapse tag and the Android channel id; a token FCM reports as unregistered / invalid is deleted.
+  These are service-to-service routes: they are in no dashboard route table or area map.
+* **mobile-bff**: `POST /api/push/register {token, platform}` -> 201 `{ok:true}`, 400 `{error, code:'bad_token'}` for a missing / blank / over-4096 token; `DELETE` -> 200. Both need the devotee /
+  astrologer auth edge (401 without a valid Firebase token). The path is **shared with the older anonymous Expo registration** (`{deviceId, pushToken}`, engagement; public in the monolith's
+  allowlist, so both BFFs serve it): a request with no `Authorization` header and a `deviceId` / `pushToken` body still goes to engagement exactly as before; anything else is the FCM contract.
+  The admin BFF answers 404 to the FCM contract (any DELETE, or anything with an `Authorization` header) and leaves the old anonymous POST alone.
+* **Incoming call** (calls -> identity `push/send`): title `Incoming call`, body `<first name> is calling` (else `A devotee is calling`), data `{type:'incoming_call', callId}`, channel
+  `incoming-calls`, TTL 30 s (a call that rang 30 s ago is already missed), collapse tag `incoming_call`. Fire-and-forget: it never delays or fails the call request, and the old Expo path still runs
+  beside it (harmless when no Expo token exists). **Booking status** pushes (orders) take the same road on channel `default`.
+* **The presence rule, and why.** The astrologer app only heartbeats while it is open, and presence used to read `offline` 45 s after the last heartbeat - so an astrologer who put the app
+  in the background simply could not be called, and a push would have had nobody to ring. `Astrologer.pushReachable` (calls db, default false) changes `effectivePresence`: *busy stays busy; a
+  deliberate offline always wins; `online` is online if the heartbeat is younger than 45 s, **or** if `pushReachable` and it is younger than 4 h* (`PUSH_REACHABLE_MS`). The flag is set from
+  identity's `reachable` when the astrologer goes Online and on **every heartbeat** (answer cached ~60 s per uid; if identity cannot answer, the previous value is kept, never flipped). The public
+  list, the call-request availability check and the astrologer's own `/astrologer/me` use the same function. The 4 h bound exists so a phone that died or lost its network is not listed as available
+  all day; opening the app refreshes it. `calls/src/parity.test.mjs` names `pushReachable` as the one deliberate difference from the monolith's astrologer model.
+* **Not done**: no full-screen ringing UI (the call arrives as a heads-up notification on the `incoming-calls` channel; the astrologer taps it to open the app, which then polls and shows the
+  existing incoming-call screen); default notification sound only (no looping ringtone); **iOS is not wired** (no APNs key / entitlement; `platform: 'ios'` is stored but nothing is verified);
+  no per-device mute; a devotee call placed to an astrologer whose phone is offline still rings for the usual ring timeout and is then missed. If an astrologer signs out of the app while Online without
+  going Offline first, they stay listed (up to 4 h) with no phone to ring until the next heartbeat re-reads the registry - the app should go Offline before sign-out.
+* **Verified**: with a fake FCM sender (identity, calls, orders and both BFFs under test; an end-to-end run on a throwaway stack). **Not verified**: real FCM delivery to a real phone.
+

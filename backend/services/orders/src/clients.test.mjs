@@ -87,6 +87,36 @@ describe('push', () => {
   });
 });
 
+describe('push through identity (FCM)', () => {
+  const mk = (handler) => {
+    const seen = [];
+    const identity = { deviceIdOf: async () => 'dev1' };
+    const push = createPush({ ...cfg, expoPushUrl: 'http://expo.test/send' }, { identity, logger: log(), fetchImpl: async (u, init) => { seen.push({ u: String(u), init }); return handler(String(u), init); } });
+    return { push, seen };
+  };
+  const tick = () => new Promise((r) => setTimeout(r, 30));
+
+  test('notifyDevotee posts the booking update to identity push/send as `orders`, on the default channel; the Expo path still runs beside it', async () => {
+    const { push, seen } = mk((u) => (u.includes('/push-token') ? res(200, { pushToken: 'ExponentPushToken[abc]' }) : res(200, { sent: 1, devices: 1 })));
+    assert.equal(push.notifyDevotee('u1', { title: 'Booking confirmed', body: 'Your pooja is booked', data: { type: 'booking', id: 'b1' } }), undefined);
+    await tick();
+    const fcm = seen.find((x) => /\/internal\/identity\/push\/send$/.test(x.u));
+    assert.ok(fcm, 'identity push/send was called');
+    assert.deepEqual(JSON.parse(fcm.init.body), { uid: 'u1', title: 'Booking confirmed', body: 'Your pooja is booked', data: { type: 'booking', id: 'b1' }, channelId: 'default' });
+    assert.equal(JSON.parse(Buffer.from(fcm.init.headers.authorization.split('.')[1], 'base64url')).iss, 'orders');
+    assert.ok(seen.some((x) => x.u === 'http://expo.test/send'), 'the legacy Expo path is unchanged');
+  });
+
+  test('identity push/send down or refusing never throws, never rejects, and does not stop the Expo path', async () => {
+    for (const fail of [() => { throw new Error('identity down'); }, () => res(403, { code: 'wrong_issuer' }), () => res(500, {})]) {
+      const { push, seen } = mk((u) => (/push\/send/.test(u) ? fail() : u.includes('/push-token') ? res(200, { pushToken: 'ExponentPushToken[abc]' }) : res(200, {})));
+      assert.equal(push.notifyDevotee('u1', { title: 'T', body: 'B' }), undefined);
+      await tick();
+      assert.ok(seen.some((x) => x.u === 'http://expo.test/send'));
+    }
+  });
+});
+
 describe('catalog client', () => {
   const snap = { pooja: { slug: 's', title: 'T', titleHi: null, templeSlug: null, publishAt: '2030-01-01T00:00:00.000Z', bookingClosesAt: null, packages: [{ key: 'k', name: null, nameHi: null, persons: 1, coins: 5 }] }, temple: null };
 

@@ -205,9 +205,36 @@ export function createIdentityMobileMount(config, { logger, fetchImpl, verifyIdT
     app.use(r);
   }
 
+  /**
+   * The phone's FCM registration token (background push): `POST /api/push/register {token, platform}` -> 201 {ok:true}, `DELETE /api/push/register {token}`
+   * -> 200 {ok:true}; a missing / blank / oversized token is identity's 400 {error, code:'bad_token'}, relayed unchanged. The account is the verified uid
+   * (signed `sub`), never anything in the body. Explicit paths only - the fail-closed list. The admin BFF does not serve these (see `rejectFcmRegistration`).
+   *
+   * The path is SHARED with a pre-existing anonymous route: the engagement service's Expo registration `POST /api/push/register {deviceId, pushToken}` (in the
+   * monolith's PUBLIC allowlist, served by both BFFs). Mounted BEFORE the engagement routes (see mobile app.js), this one lets that legacy call through
+   * untouched (`next('route')`: no Authorization header AND a body naming `deviceId` / `pushToken`); everything else is the FCM contract, which requires the
+   * devotee auth edge - so an unauthenticated `{token}` is a 401, never a quiet 400 from the legacy handler.
+   */
+  function mountPushRegister(app) {
+    const r = express.Router();
+    const legacyExpo = (req) => !req.headers.authorization && (typeof req.body?.deviceId === 'string' || typeof req.body?.pushToken === 'string');
+    const handler = (method) => async (req, res) => {
+      try {
+        const out = await client.request(method.toUpperCase(), `${NS}/push/register`, { reqId: req.id, as: asDevotee(req.deviceAuth), body: req.body ?? {}, full: true });
+        res.status(out.status).json(out.data);
+      } catch (e) {
+        relayError(res, e, logger);
+      }
+    };
+    r.post('/api/push/register', json, (req, _res, next) => (legacyExpo(req) ? next('route') : next()), deviceAuth, requireDevotee, handler('post'));
+    r.delete('/api/push/register', json, deviceAuth, requireDevotee, handler('delete'));
+    app.use(r);
+  }
+
   return {
     softDeps: { identity: () => probeUpstream(config.identityUrl, '/health') },
     mount,
+    mountPushRegister,
     /** The device auth edge for routes OTHER mounts serve (catalog's Jai): same answers as requireAuth, same signed claims. */
     devotee: { requireDevotee, asDevotee },
     /** For createGatewayApp: swap the end user's credentials for this BFF's signed token. */
@@ -360,5 +387,16 @@ export function createIdentityAdminMount(config, { logger, fetchImpl, now } = {}
         headers.authorization = `Bearer ${signServiceToken({ iss: 'admin-bff', sub: null, reqId: req.id, ctx: { authError: req.operatorAuthError } }, { secret })}`;
       }
     },
+  };
+}
+
+/**
+ * The admin BFF never serves the phone's FCM registration. The old anonymous Expo route on the same path stays (it is public in the monolith's
+ * allowlist, both BFFs serve it); the FCM contract - any DELETE, or any request carrying an Authorization header - is a plain 404 here.
+ */
+export function rejectFcmRegistration() {
+  return (req, res, next) => {
+    if (req.method === 'POST' && !req.headers.authorization) return next(); // the legacy anonymous Expo registration
+    res.status(404).json({ error: 'not found', code: 'not_found' });
   };
 }

@@ -106,6 +106,16 @@ Rules that have bitten before:
   (step 9). Never set `PAYMENTS_PROVIDER=mock`: production refuses it and purchases answer 503.
 * **Agora.** `AGORA_APP_ID` / `AGORA_APP_CERTIFICATE` move to the **calls** service. Neither set = calls answer
   503 `calls_unavailable`, never a fake connection.
+* **Push (Firebase Cloud Messaging).** No new variable: **identity** sends through the service account it already holds (`FIREBASE_SERVICE_ACCOUNT`), and its `ALLOWED_ISSUERS`
+  default now also lists `engagement` (the `push/send` allowlist is `calls`, `orders`, `engagement`; if you set `ALLOWED_ISSUERS` explicitly on identity, add `calls`/`orders` yourself). Owner steps, once
+  per Firebase project: (1) Google Cloud console for `pooja-app-aa462` -> APIs & Services -> enable **Firebase Cloud Messaging API (V1)** (Firebase console -> Project settings -> Cloud Messaging shows its
+  status; "Cloud Messaging API (Legacy)" is NOT what is used and may stay disabled). (2) The service account must hold a role that may send: the default `firebase-adminsdk-…` account has
+  *Firebase Admin SDK Administrator Service Agent* / Editor, which includes it; a custom account needs **Firebase Cloud Messaging API Admin** (`roles/firebasecloudmessaging.admin`). (3) The app build must be the one
+  that registers its token and creates the Android channels `incoming-calls` and `default`. **Verify with a test send** (identity logs `Firebase Admin ready (project "…")` at boot; no credentials = sends return
+  `{sent:0}` silently): sign in on the phone as the astrologer (the app POSTs `/api/push/register`), then from a machine that knows `INTERNAL_JWT_SECRET` mint a service token
+  `{iss:'calls', sub:null}` (`signServiceToken` in `@bhakti/common`) and `POST <identity>/internal/identity/push/send` with `{uid:'<astrologer firebase uid>', title:'Test', body:'Hello', channelId:'default'}`;
+  `{sent:1,devices:1}` and a notification on the phone with the app closed = done. `{sent:0,devices:1}` means FCM refused it (API not enabled / role missing: see identity's log line `push to … not delivered (…)`);
+  `devices:0` means that account has no registered token. See `docs/MICROSERVICES.md` section 10 for the design and the limits (no ringing UI, default sound, no iOS).
 * **Expo.** The backend reads no Expo credential; pushes go to Expo's public push API (`EXPO_PUSH_URL`, default
   already right). The only Expo-side change is the app rebuild with the new `EXPO_PUBLIC_ADMIN_API` (step 10).
 * **Internal URLs.** `fromService … property: hostport` delivers `bhakti-wallet:10000` (no scheme). Every service's

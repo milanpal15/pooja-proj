@@ -135,6 +135,7 @@ Tests: `cd services/identity && TEST_MONGODB_URI=... npm test`.
 | Operator cookie, login throttle (10/user, 40/client per 15 min -> 429, password <= 256) | **admin-bff** |
 | Credentials, operator CRUD, lockout refusals, audit log | identity; the admin BFF audits every successful operator write it lets through (its own routes and proxied ones) |
 | Area gate | admin-bff for the routes it serves (identity, engagement); the **monolith** for its own routes, from the signed `perms` (it also serves routes that are open to the app without a session, which a path-based BFF gate cannot know) |
+| Background push (FCM): the phone's token registry + the send edge | **identity** (`/internal/identity/push/{register,send,reachable}`; the BFF's `POST|DELETE /api/push/register`; `send`/`reachable` only for issuers `calls`, `orders`, `engagement`). Design, presence rule, limits: `docs/MICROSERVICES.md` section 10 |
 | Revoke refresh tokens on block, delete the Firebase account on delete | **identity** (the admin BFF never holds a key that can delete accounts) |
 | Astrologer invite claim at sign-in | identity -> the calls service's `POST /internal/calls/directory/astrologers/claim` when `CALLS_URL` is set (phase 6), else the monolith's `POST /internal/astrologers/claim` (issuer `identity` only either way) |
 | User names / device ids / wallet search / role writes inside the monolith | `lib/user-directory.js` -> `lib/identity-client.js` (5 s timeout, 15 s cache, degrade to "absent"; wallet search = clear 503). The astrologer role write is the calls service's best-effort `PUT /internal/identity/directory/users/:uid/role` (phase 6) |
@@ -231,7 +232,7 @@ Owns pooja bookings, chadhava ORDERS (the listings are catalog's) and pooja revi
 | Refunds | every refund carries `ofKey` = the debit it reverses; the wallet verifies it (exists, posted, same uid, <= the charge, not refunded already) - see `docs/MICROSERVICES.md` phase 5 for the exact list of codes and the one goodwill exemption |
 | Old intents | terminal ones are pruned after `INTENT_RETENTION_DAYS` (30); pending ones never |
 | History | bookings / orders copy titles, names and prices when bought; a later catalog edit never rewrites them |
-| Push | booking status / "chadhava offered": identity (device) -> engagement (token) -> Expo, best effort |
+| Push | booking status / "chadhava offered": identity `push/send` (FCM, channel `default`) AND identity (device) -> engagement (token) -> Expo, both best effort |
 
 **Cutover.** `node tools/split-db.mjs --source mongodb://.../bhakti --service orders --dry-run`, then without `--dry-run` (copies bookings, chadhava orders, reviews and the booking / chadhava saga intents - renamed
 `walletintents` -> `orderintents`, unfinished ones included), **then** start orders, then set the variable everywhere. The first sweep resolves the copied pending intents.

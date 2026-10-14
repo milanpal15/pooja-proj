@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 
 import { resolveRtcProvider } from './lib/rtc.js';
 import { createRedactor } from './lib/redact.js';
-import { effectivePresence, PRESENCE_FRESH_MS, Astrologer } from './modules/astrologers/astrologer.model.js';
+import { effectivePresence, PRESENCE_FRESH_MS, PUSH_REACHABLE_MS, Astrologer } from './modules/astrologers/astrologer.model.js';
 import { CallSession } from './modules/calls/call.model.js';
 import { AstrologerEarning, Payout } from './modules/payouts/payout.model.js';
 import { istBoundaries } from './modules/payouts/payout.service.js';
@@ -60,6 +60,7 @@ test('IST boundaries and the presence rule are the monolith\'s', { skip }, async
   }
   const model = await import(mono('modules/astrologers/astrologer.model.js'));
   assert.equal(PRESENCE_FRESH_MS, model.PRESENCE_FRESH_MS);
+  assert.equal(PUSH_REACHABLE_MS, 4 * 3600_000); // service-only; the monolith knows no push-reachable astrologers
   const now = Date.now();
   for (const a of [{ presence: 'busy' }, { presence: 'online', lastSeenAt: new Date(now - 10_000) }, { presence: 'online', lastSeenAt: new Date(now - 60_000) }, { presence: 'online' }, { presence: 'offline', lastSeenAt: new Date(now) }]) {
     assert.equal(effectivePresence(a, now), model.effectivePresence(a, now), JSON.stringify(a));
@@ -70,8 +71,8 @@ test('the four collections have the monolith\'s fields (so a copied row reads as
   const [A, C, P] = await Promise.all([import(mono('modules/astrologers/astrologer.model.js')), import(mono('modules/calls/call.model.js')), import(mono('modules/payouts/payout.model.js'))]);
   const paths = (m) => Object.keys(m.schema.paths).sort();
   const without = (list, ...gone) => list.filter((p) => !gone.includes(p));
-  // astrologers: the service adds only the payout lease
-  assert.deepEqual(without(paths(Astrologer), 'payoutLock.id', 'payoutLock.until'), paths(A.Astrologer));
+  // astrologers: the service adds only the payout lease and `pushReachable` (background push; the monolith intentionally stays unchanged)
+  assert.deepEqual(without(paths(Astrologer), 'payoutLock.id', 'payoutLock.until', 'pushReachable'), paths(A.Astrologer));
   // callsessions: the service adds only the minutes a goodwill refund reversed
   assert.deepEqual(without(paths(CallSession), 'refunds.parts'), paths(C.CallSession));
   assert.deepEqual(paths(AstrologerEarning), paths(P.AstrologerEarning));

@@ -66,6 +66,11 @@ before(async () => {
     const m = /^\/internal\/identity\/users\/([^/]+)\/status$/.exec(u.pathname);
     if (idnMode === 'badtoken' && !m) return json(401, { error: 'bad', code: 'bad_signature' });
     if (m) return json(200, statusAnswer(m[1]));
+    if (u.pathname === '/internal/identity/push/register') {
+      const t = body?.token;
+      if (typeof t !== 'string' || !t.trim() || t.length > 4096) return json(400, { error: 'A push token is required.', code: 'bad_token' });
+      return req.method === 'POST' ? json(201, { ok: true }) : json(200, { ok: true });
+    }
     if (u.pathname === '/internal/identity/auth/me') return json(404, { error: 'profile not found — call /auth/sync first' });
     if (u.pathname === '/internal/identity/policy/terms') return json(200, { key: 'terms', version: 2 });
     json(200, { identity: true, method: req.method, path: u.pathname, body });
@@ -94,7 +99,8 @@ async function call(method, path, { token, headers = {}, body, at = base } = {})
 }
 
 describe('requireAuth semantics, now at the edge (same statuses and bodies as pooja-api/src/middleware/require-auth.js)', () => {
-  const routes = [['GET', '/api/auth/me'], ['POST', '/api/auth/sync'], ['PUT', '/api/auth/me'], ['GET', '/api/auth/saved-temples'], ['PUT', '/api/auth/saved-temples'], ['POST', '/api/policy/terms/accept']];
+  const routes = [['GET', '/api/auth/me'], ['POST', '/api/auth/sync'], ['PUT', '/api/auth/me'], ['GET', '/api/auth/saved-temples'], ['PUT', '/api/auth/saved-temples'], ['POST', '/api/policy/terms/accept'],
+    ['POST', '/api/push/register'], ['DELETE', '/api/push/register']];
 
   test('no token -> 401 "missing bearer token" on every BFF-served authenticated route; identity is never called', async () => {
     for (const [m, p] of routes) {
@@ -222,6 +228,71 @@ describe('served from identity', () => {
     await call('POST', '/api/auth/sync', { token: 'good-astro', body: {} });
     const c = idnCalls.find((x) => x.path === '/internal/identity/auth/sync');
     assert.deepEqual([c.claims.role, c.claims.ctx.role, c.claims.ctx.name], ['astrologer', 'astrologer', 'Name of astro']);
+  });
+});
+
+describe('push registration (FCM token) is served from identity', () => {
+  test('POST /api/push/register -> 201 {ok:true}; the account is the verified uid (signed sub), never the body', async () => {
+    const r = await call('POST', '/api/push/register', { token: 'good-astro', body: { token: 'fcm-token-1', platform: 'android', uid: 'evil' } });
+    assert.deepEqual([r.status, r.body], [201, { ok: true }]);
+    const c = idnCalls.find((x) => x.path === '/internal/identity/push/register');
+    assert.deepEqual([c.method, c.claims.iss, c.claims.sub, c.claims.role], ['POST', 'mobile-bff', 'astro', 'astrologer']);
+    assert.equal(c.body.token, 'fcm-token-1');
+    assert.equal(monoSeen.length, 0, 'the monolith is not involved');
+  });
+
+  test('DELETE /api/push/register -> 200 {ok:true}', async () => {
+    const r = await call('DELETE', '/api/push/register', { token: 'good-u1', body: { token: 'fcm-token-1' } });
+    assert.deepEqual([r.status, r.body], [200, { ok: true }]);
+    const c = idnCalls.find((x) => x.path === '/internal/identity/push/register');
+    assert.deepEqual([c.method, c.claims.sub, c.body], ['DELETE', 'u1', { token: 'fcm-token-1' }]);
+  });
+
+  test('a missing, blank or oversized token is 400 {error, code:"bad_token"} (identity\'s answer, relayed) on both verbs', async () => {
+    for (const method of ['POST', 'DELETE']) {
+      for (const body of [{}, { token: '   ' }, { token: 'x'.repeat(4097) }, { token: 5 }]) {
+        const r = await call(method, '/api/push/register', { token: 'good-u1', body });
+        assert.equal(r.status, 400, `${method} ${JSON.stringify(body).slice(0, 30)}`);
+        assert.equal(r.body.code, 'bad_token');
+        assert.equal(typeof r.body.error, 'string');
+      }
+    }
+  });
+
+  test('a blocked devotee is refused 403 and an invalid token 401; identity is not asked to register anything', async () => {
+    assert.equal((await call('POST', '/api/push/register', { token: 'good-blocked', body: { token: 't' } })).status, 403);
+    assert.equal((await call('POST', '/api/push/register', { token: 'junk', body: { token: 't' } })).status, 401);
+    assert.equal(idnCalls.filter((c) => c.path.endsWith('/push/register')).length, 0);
+  });
+
+  test('identity down is a clear 503 (never a fake success)', async () => {
+    idnMode = 'down';
+    const r = await call('POST', '/api/push/register', { token: 'good-u9', body: { token: 't' } });
+    assert.equal(r.status, 503);
+  });
+
+  test('the path is shared with engagement\'s anonymous Expo registration: with engagement mounted too, {deviceId, pushToken} without a bearer is still ITS call, and an unauthenticated {token} is a 401', async () => {
+    const engSeen = [];
+    const eng = await listen((req, res, body, json) => {
+      if (req.url === '/health') return json(200, {});
+      engSeen.push({ url: req.url, body });
+      json(200, { ok: true, engagement: true });
+    });
+    const g = await gateway({ ENGAGEMENT_URL: `http://127.0.0.1:${eng.address().port}` });
+    try {
+      const legacy = await call('POST', '/api/push/register', { at: g.base, body: { deviceId: 'd1', pushToken: 'ExponentPushToken[x]' } });
+      assert.deepEqual([legacy.status, engSeen.at(-1).url, engSeen.at(-1).body.deviceId], [200, '/internal/engagement/push/register', 'd1']);
+      const anon = await call('POST', '/api/push/register', { at: g.base, body: { token: 'fcm-token' } });
+      assert.deepEqual([anon.status, anon.body], [401, { error: 'missing bearer token' }]);
+      const authed = await call('POST', '/api/push/register', { at: g.base, token: 'good-u1', body: { token: 'fcm-token' } });
+      assert.equal(authed.status, 201);
+      assert.equal(engSeen.length, 1, 'engagement saw only the legacy call');
+      assert.equal(idnCalls.filter((c) => c.path === '/internal/identity/push/register').length, 1);
+    } finally {
+      g.close();
+      eng.closeAllConnections?.();
+      eng.close();
+    }
   });
 });
 

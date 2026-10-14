@@ -12,6 +12,8 @@
 # Ports (BASE_PORT + n): engagement 2, identity 3, catalog 4, wallet 5, orders 6, calls 7, monolith 8, mobile-bff 10, admin-bff 11.
 # STACK_DIR (default /tmp/bhakti-stack) holds the logs and pids. NODE_ENV is development unless STACK_NODE_ENV=production
 # (then the mock payment/audio providers are refused, exactly as on Render, and the BFFs get the production cookie/CORS shape).
+# FIREBASE_SERVICE_ACCOUNT_PATH=/path/key.json gives the identity service the Firebase Admin key (real push delivery, account block/delete); without it
+# identity runs unconfigured and push sends answer {sent:0}. Use a THROWAWAY Mongo with it: the key is real.
 # BARE_URLS=1 passes every internal address as a bare host:port (what Render's fromService delivers) to prove the services add the scheme.
 # MONGO_BASE must be a throwaway server: every service creates its own database on it, and the monolith one named `bhakti_shell` (both prefixed by DB_PREFIX if set).
 set -euo pipefail
@@ -62,7 +64,7 @@ cmd_start() {
 
   # The six services (identity's first start creates the first admin from ADMIN_PASSWORD), in dependency order (docs/MICROSERVICES_CUTOVER.md): leaf first, then who needs whom.
   start engagement "$BACKEND" services/engagement/src/server.js PORT="$ENG" MONGODB_URI="$MONGO_BASE" DB_NAME="${DB_PREFIX}engagement"
-  start identity   "$BACKEND" services/identity/src/server.js   PORT="$IDN" MONGODB_URI="$MONGO_BASE" DB_NAME="${DB_PREFIX}identity" CALLS_URL="$(u "$CAL")" MONOLITH_URL="$(u "$MON")" ADMIN_USERNAME=admin ADMIN_PASSWORD="$ADMIN_PASSWORD"
+  start identity   "$BACKEND" services/identity/src/server.js   PORT="$IDN" MONGODB_URI="$MONGO_BASE" DB_NAME="${DB_PREFIX}identity" CALLS_URL="$(u "$CAL")" MONOLITH_URL="$(u "$MON")" ADMIN_USERNAME=admin ADMIN_PASSWORD="$ADMIN_PASSWORD" ${FIREBASE_SERVICE_ACCOUNT_PATH:+FIREBASE_SERVICE_ACCOUNT_PATH="$FIREBASE_SERVICE_ACCOUNT_PATH"}
   start catalog    "$BACKEND" services/catalog/src/server.js     PORT="$CAT" MONGODB_URI="$MONGO_BASE" DB_NAME="${DB_PREFIX}catalog" ENGAGEMENT_URL="$(u "$ENG")" ORDERS_URL="$(u "$ORD")" LIVE_PROBE=0
   start wallet     "$BACKEND" services/wallet/src/server.js      PORT="$WAL" MONGODB_URI="$MONGO_BASE" DB_NAME="${DB_PREFIX}wallet" ENGAGEMENT_URL="$(u "$ENG")" IDENTITY_URL="$(u "$IDN")" ADMIN_SESSION_SECRET="$ADMIN_SESSION_SECRET"
   start orders     "$BACKEND" services/orders/src/server.js      PORT="$ORD" MONGODB_URI="$MONGO_BASE" DB_NAME="${DB_PREFIX}orders" WALLET_URL="$(u "$WAL")" CATALOG_URL="$(u "$CAT")" IDENTITY_URL="$(u "$IDN")" ENGAGEMENT_URL="$(u "$ENG")" ADMIN_SESSION_SECRET="$ADMIN_SESSION_SECRET"

@@ -2,21 +2,25 @@ import express from 'express';
 import { accessLog, createLogger, errorHandler, health, requestId, requireServiceAuth } from '@bhakti/common';
 
 import { createAstrologerClient } from './lib/astrologer-client.js';
+import { createFcmSender } from './lib/fcm.js';
 import { createFirebase } from './lib/firebase.js';
 import { HttpError } from './lib/http-error.js';
+import { createPushService } from './lib/push.js';
 import { authRoutes } from './routes/auth.js';
 import { directoryRoutes, statusRoutes } from './routes/directory.js';
 import { operatorRoutes } from './routes/operators.js';
 import { policyRoutes } from './routes/policies.js';
+import { pushRoutes } from './routes/push.js';
 import { userAdminRoutes } from './routes/users-admin.js';
 
 /**
  * @param {object} config  see config.js
- * @param {{ isReady: () => boolean, dbPing?: () => Promise<unknown>, logger?: object, firebase?: object, astrologers?: object, fetchImpl?: typeof fetch }} deps
- *        `firebase` ({ revokeUser, deleteFirebaseUser }) and `astrologers` ({ claim, active }) are injectable for tests.
+ * @param {{ isReady: () => boolean, dbPing?: () => Promise<unknown>, logger?: object, firebase?: object, astrologers?: object, fetchImpl?: typeof fetch, fcm?: { send: Function } }} deps
+ *        `firebase` ({ revokeUser, deleteFirebaseUser }), `astrologers` ({ claim, active }) and `fcm` ({ send(message) }) are injectable for tests.
  */
-export function createApp(config, { isReady, dbPing = async () => {}, logger = createLogger('identity'), firebase, astrologers, fetchImpl } = {}) {
+export function createApp(config, { isReady, dbPing = async () => {}, logger = createLogger('identity'), firebase, astrologers, fetchImpl, fcm } = {}) {
   const fb = firebase ?? createFirebase(config, { logger });
+  const push = createPushService({ sender: fcm ?? createFcmSender({ messaging: () => fb.messaging?.() ?? null }), logger });
   const astro = astrologers ?? createAstrologerClient(config, { fetchImpl });
 
   const app = express();
@@ -41,6 +45,7 @@ export function createApp(config, { isReady, dbPing = async () => {}, logger = c
   internal.use('/audit', ops.audit);
   internal.use('/admin/audit-log', ops.auditRead);
   internal.use('/directory', directoryRoutes()); // other services
+  internal.use('/push', pushRoutes({ push })); // the phone registers (mobile-bff); calls / orders / engagement send
   internal.use(statusRoutes()); // /users/:uid/status
   app.use('/internal/identity', internal);
 

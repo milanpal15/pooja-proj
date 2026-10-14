@@ -1,6 +1,9 @@
 import { createServiceClient } from '@bhakti/common';
 
 export const TTL_MS = 15_000;
+/** How long "does this uid have a push-registered phone?" is remembered. */
+export const REACHABLE_TTL_MS = 60_000;
+const REACHABLE_TIMEOUT_MS = 1_500;
 const RETRY_AFTER_FAIL_MS = 5_000;
 
 /**
@@ -12,6 +15,10 @@ const RETRY_AFTER_FAIL_MS = 5_000;
  *   setRole(uid, role)   BEST EFFORT write of the convenience role (`devotee` | `astrologer`) on the user, as the monolith's setUserRole was:
  *                        a failure is logged and never fails the astrologer lifecycle (the role is re-derived at the next sign-in, and every
  *                        astrologer route re-checks the astrologer row itself).
+ *
+ *   pushReachable(uid)   true | false | undefined: does this uid have a phone registered for push (identity's registry). Cached 60 s per uid.
+ *                        UNDEFINED when identity cannot answer - the caller keeps whatever it had, it never flips on a failure.
+ *   sendPush(uid, msg)   best-effort `push/send` through identity (which holds the Firebase key); resolves `{sent, devices}`, NEVER rejects.
  *
  * Every read is non-critical: 15 s cache with stale-on-error, and identity down means "absent" (the uid is shown, no push is sent), never an
  * error in a request. After a failure the next 5 s of reads skip the network.
@@ -57,8 +64,33 @@ export function createIdentityDirectory(config, { fetchImpl, logger, now = () =>
     }
   }
 
+  const reachables = new Map(); // uid -> { value, at }
+
   return {
     getUser,
+    async pushReachable(uid) {
+      if (!uid) return undefined;
+      const hit = reachables.get(uid);
+      if (hit && now() - hit.at < REACHABLE_TTL_MS) return hit.value;
+      try {
+        const out = await client.get('/internal/identity/push/reachable', { query: { uid }, timeoutMs: REACHABLE_TIMEOUT_MS });
+        if (typeof out?.reachable !== 'boolean') return undefined;
+        reachables.set(uid, { value: out.reachable, at: now() });
+        if (reachables.size > 2000) reachables.delete(reachables.keys().next().value);
+        return out.reachable;
+      } catch (e) {
+        failed(e);
+        return undefined; // keep the previous value: an identity blink must not make an astrologer uncallable
+      }
+    },
+    async sendPush(uid, message) {
+      try {
+        return await client.post('/internal/identity/push/send', { uid, ...message });
+      } catch (e) {
+        logger?.warn(`push/send for ${uid} failed (${e?.code || e?.message})`);
+        return { sent: 0, devices: 0, error: true };
+      }
+    },
     async userName(uid, hint) {
       if (typeof hint === 'string' && hint.trim()) return hint;
       return (await getUser(uid))?.name || '';
@@ -78,6 +110,6 @@ export function createIdentityDirectory(config, { fetchImpl, logger, now = () =>
       }
     },
     client,
-    _reset: () => { users.clear(); failedAt = 0; },
+    _reset: () => { users.clear(); reachables.clear(); failedAt = 0; },
   };
 }

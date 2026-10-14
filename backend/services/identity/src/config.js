@@ -9,7 +9,7 @@ export const loadConfig = (env = process.env) => ({
     secret: { name: 'INTERNAL_JWT_SECRET', required: true },
     allowedIssuers: {
       name: 'ALLOWED_ISSUERS',
-      default: ['mobile-bff', 'admin-bff', 'monolith', 'catalog', 'wallet', 'orders', 'calls'],
+      default: ['mobile-bff', 'admin-bff', 'monolith', 'catalog', 'wallet', 'orders', 'calls', 'engagement'],
       parse: (v) => v.split(',').map((s) => s.trim()).filter(Boolean),
     },
     // Where the astrologer invite claim / lookup is asked. CALLS_URL set (phase 6) = the calls service, which owns astrologers; unset = the monolith

@@ -47,9 +47,10 @@ export function astrologerRouters() {
     }
     const a = req.astrologer;
     if (online) {
+      const reachable = await ctx.identity.pushReachable?.(req.token.uid); // undefined = identity could not say: leave the flag as it was
       const next = await Astrologer.findOneAndUpdate(
         { _id: a._id, status: 'active' },
-        [{ $set: { lastSeenAt: '$$NOW', presence: { $cond: [{ $eq: ['$presence', 'busy'] }, 'busy', 'online'] } } }],
+        [{ $set: { lastSeenAt: '$$NOW', ...(typeof reachable === 'boolean' ? { pushReachable: reachable } : {}), presence: { $cond: [{ $eq: ['$presence', 'busy'] }, 'busy', 'online'] } } }],
         { new: true },
       );
       return res.json({ presence: effectivePresence(next) });
@@ -62,7 +63,9 @@ export function astrologerRouters() {
   });
 
   devotee.post('/astrologer/me/heartbeat', ...me, async (req, res) => {
-    await Astrologer.updateOne({ _id: req.astrologer._id }, { $set: { lastSeenAt: new Date() } });
+    // Re-evaluated on every beat (identity's answer is cached ~60 s) so registering - or losing - a phone takes effect without toggling Online.
+    const reachable = await ctx.identity.pushReachable?.(req.token.uid);
+    await Astrologer.updateOne({ _id: req.astrologer._id }, { $set: { lastSeenAt: new Date(), ...(typeof reachable === 'boolean' ? { pushReachable: reachable } : {}) } });
     res.json({ ok: true });
   });
 

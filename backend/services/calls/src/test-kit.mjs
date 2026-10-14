@@ -42,6 +42,13 @@ export function fakeIdentity(users = []) {
     users,
     down: false,
     roleWrites: [],
+    /** uid -> boolean: which accounts have a push-registered phone. `reachableDown` = identity cannot answer (pushReachable resolves undefined). */
+    reachable: {},
+    reachableDown: false,
+    reachableAsks: 0,
+    pushSends: [],
+    pushReachable: async (uid) => { d.reachableAsks += 1; return d.reachableDown ? undefined : !!d.reachable[uid]; },
+    sendPush: async (uid, message) => { d.pushSends.push({ uid, message }); return { sent: 1, devices: 1 }; },
     userName: async (uid, hint) => (typeof hint === 'string' && hint.trim() ? hint : d.down ? '' : d.users.find((u) => u.uid === uid)?.name || ''),
     deviceIdOf: async (uid) => (d.down ? undefined : d.users.find((u) => u.uid === uid)?.deviceId),
     setRole: async (uid, role) => {
@@ -87,7 +94,7 @@ export function fakeSettings(initial = {}) {
 
 /** Records every notification instead of sending it. */
 export function fakePush() {
-  const p = { sent: [], throws: false, notifyIncomingCall: (uid, name) => { if (p.throws) throw new Error('push exploded'); p.sent.push({ uid, name }); } };
+  const p = { sent: [], throws: false, notifyIncomingCall: (uid, name, callId) => { if (p.throws) throw new Error('push exploded'); p.sent.push({ uid, name, callId }); } };
   return p;
 }
 

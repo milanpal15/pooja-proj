@@ -17,6 +17,7 @@ import { createFirebaseVerifier } from './firebase.js';
  *     `GET /api/poojas/:slug/reviews` are served from the orders service (packages/common/src/orders-mount.js); orders unreachable is 503 `orders_unavailable`.
  *   - CALLS_URL set (phase 6): the astrologer list / profile, the devotee call routes (request, poll, cancel, end, accept, decline, rate) and the astrologer's own
  *     `/api/astrologer/me/*` are served from the calls service (packages/common/src/calls-mount.js); calls unreachable is 503 `calls_unavailable`.
+ *   - IDENTITY_URL also serves the phone's FCM push registration `POST|DELETE /api/push/register` (background push; identity holds the registry and the Firebase key).
  * Explicit lists, fail-closed: anything else still goes to the monolith, whose own gate decides.
  */
 export function createApp(config, { logger = createLogger('mobile-bff'), fetchImpl, verifyIdToken, firebase, now } = {}) {
@@ -38,7 +39,13 @@ export function createApp(config, { logger = createLogger('mobile-bff'), fetchIm
   return createGatewayApp('mobile-bff', config, {
     logger,
     softDeps: Object.assign({}, ...mounts.map((m) => m.softDeps)),
-    mount: mounts.length ? (app) => mounts.forEach((m) => m.mount(app)) : undefined,
+    mount: mounts.length
+      ? (app) => {
+          // FIRST: `/api/push/register` is shared with engagement's anonymous Expo route; the FCM contract must be decided before that one runs.
+          identity?.mountPushRegister(app);
+          mounts.forEach((m) => m.mount(app));
+        }
+      : undefined,
     proxyHeaders: identity?.proxyHeaders,
   });
 }

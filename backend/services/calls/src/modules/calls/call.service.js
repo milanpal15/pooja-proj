@@ -92,7 +92,7 @@ export async function requestCall({ devoteeUid, astrologerId, requestId, devotee
       devoteeLive: true,
     });
     try {
-      ctx.push.notifyIncomingCall(a.uid, firstName(devoteeNameNow)); // best effort, never awaited
+      ctx.push.notifyIncomingCall(a.uid, firstName(devoteeNameNow), call._id); // best effort, never awaited
     } catch (e) {
       ctx.log.warn(`incoming-call push to ${a.uid} not sent (${e?.message})`); // the call row is written: nothing a notification does may fail the request
     }
