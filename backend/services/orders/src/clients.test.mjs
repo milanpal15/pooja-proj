@@ -131,13 +131,20 @@ describe('wallet client', () => {
   });
 
   test('business answers keep their code and extras; every non-answer is ambiguous 503; a refused token is OUR fault (503, not a business answer)', async () => {
-    const w = (f) => createWalletClient(cfg, { logger: log(), fetchImpl: f });
-    await assert.rejects(() => w(async () => res(402, { error: 'Not enough coins.', code: 'insufficient_coins', needed: 5, balance: 1, shortfall: 4, type: 'booking_debit' })).debit({ uid: 'u', amount: 5, type: 'booking_debit', idempotencyKey: 'k' }),
-      (e) => e.status === 402 && e.code === 'insufficient_coins' && e.extra.shortfall === 4 && !e.ambiguous);
-    await assert.rejects(() => w(async () => res(409, { error: 'x', code: 'already_refunded' })).refund({ uid: 'u', amount: 1, idempotencyKey: 'k', ofKey: 'd' }), (e) => e.status === 409 && e.code === 'already_refunded');
-    for (const f of [async () => res(500, {}), async () => { throw new Error('reset'); }, async () => res(200, '<html/>'), async () => res(401, { code: 'bad_signature' }), async () => res(403, { code: 'wrong_issuer' }), async () => res(404, '<h1>x</h1>'), (_u, init) => new Promise((_ok, no) => init.signal.addEventListener('abort', () => no(Object.assign(new Error('aborted'), { name: 'TimeoutError' }))))]) {
-      await assert.rejects(() => w(f).getBalance('u'), (e) => e.status === 503 && e.code === 'wallet_unavailable' && e.ambiguous === true);
+    // The case below waits for the client's own timeout, and AbortSignal.timeout() timers are unref'd: with nothing else
+    // running, Node 20 on Linux ends the test early ("event loop has already resolved"). Keep the loop alive until it's done.
+    const keepAlive = setInterval(() => {}, 100);
+    try {
+      const w = (f) => createWalletClient(cfg, { logger: log(), fetchImpl: f });
+      await assert.rejects(() => w(async () => res(402, { error: 'Not enough coins.', code: 'insufficient_coins', needed: 5, balance: 1, shortfall: 4, type: 'booking_debit' })).debit({ uid: 'u', amount: 5, type: 'booking_debit', idempotencyKey: 'k' }),
+        (e) => e.status === 402 && e.code === 'insufficient_coins' && e.extra.shortfall === 4 && !e.ambiguous);
+      await assert.rejects(() => w(async () => res(409, { error: 'x', code: 'already_refunded' })).refund({ uid: 'u', amount: 1, idempotencyKey: 'k', ofKey: 'd' }), (e) => e.status === 409 && e.code === 'already_refunded');
+      for (const f of [async () => res(500, {}), async () => { throw new Error('reset'); }, async () => res(200, '<html/>'), async () => res(401, { code: 'bad_signature' }), async () => res(403, { code: 'wrong_issuer' }), async () => res(404, '<h1>x</h1>'), (_u, init) => new Promise((_ok, no) => init.signal.addEventListener('abort', () => no(Object.assign(new Error('aborted'), { name: 'TimeoutError' }))))]) {
+        await assert.rejects(() => w(f).getBalance('u'), (e) => e.status === 503 && e.code === 'wallet_unavailable' && e.ambiguous === true);
+      }
+      assert.equal(await w(async () => { throw new Error('x'); }).balanceOrUndefined('u'), undefined);
+    } finally {
+      clearInterval(keepAlive);
     }
-    assert.equal(await w(async () => { throw new Error('x'); }).balanceOrUndefined('u'), undefined);
   });
 });
