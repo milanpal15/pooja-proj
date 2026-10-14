@@ -1,3 +1,4 @@
+import { catalogEnabled, poojaExists } from '../../lib/catalog-client.js';
 import { HttpError } from '../../lib/http-error.js';
 import { istToday } from '../../lib/ist.js';
 import { getNumberSetting } from '../../lib/settings.js';
@@ -63,6 +64,13 @@ const byDate = (a, b) => {
 
 const has = (hay, needle) => String(hay ?? '').toLowerCase().includes(String(needle).toLowerCase());
 
+/** Everything a devotee might type to find a pooja: its name, the temple, the festival, the tithi, the place. */
+function searchFields(p, look) {
+  const temple = look.temples.get(p.templeSlug);
+  const festival = look.festivals.get(p.festivalSlug);
+  return [p.title, p.titleHi, p.tagline, p.taglineHi, p.place, p.tithi, temple?.name, temple?.nameHi, festival?.name, festival?.nameHi];
+}
+
 export async function listPublic(query = {}, now = new Date()) {
   const rows = (await Pooja.find({ enabled: true }).lean()).filter((p) => isBookable(p, now)).sort(byDate);
   const look = await lookups(rows);
@@ -71,7 +79,7 @@ export async function listPublic(query = {}, now = new Date()) {
   const shown = rows.filter((p) =>
     (!temple || !p.templeSlug || p.templeSlug === temple) && (!festival || p.festivalSlug === festival) &&
     (!tithi || has(p.tithi, tithi)) && (!place || has(p.place, place)) &&
-    (!text || [p.title, p.titleHi, p.tagline, p.taglineHi, p.place].some((f) => has(f, text))));
+    (!text || searchFields(p, look).some((f) => has(f, text))));
   // Filter options come from everything listed, not from the current result, so the chips do not vanish as you pick one.
   const uniq = (xs) => [...new Set(xs.filter(Boolean))];
   return {
@@ -121,9 +129,11 @@ export async function detailPublic(slug, now = new Date()) {
 }
 
 export async function reviewsPublic(slug, { limit, before } = {}) {
-  const p = await findPublic(slug);
-  if (!p) throw new HttpError(404, 'not_found', 'Pooja not found.');
-  const q = { poojaSlug: p.slug, hidden: false };
+  // CATALOG_URL set: the pooja lives in the catalog service. Asking whether it exists is a cached, non-critical lookup
+  // (catalog unreachable = assume it does; an unknown slug then yields an empty list instead of a 404).
+  const exists = catalogEnabled() ? typeof slug === 'string' && (await poojaExists(slug)) : Boolean(await findPublic(slug));
+  if (!exists) throw new HttpError(404, 'not_found', 'Pooja not found.');
+  const q = { poojaSlug: slug, hidden: false };
   if (before) {
     const d = new Date(before);
     if (Number.isNaN(d.getTime())) throw new HttpError(400, 'bad_before', 'before must be an ISO date.');

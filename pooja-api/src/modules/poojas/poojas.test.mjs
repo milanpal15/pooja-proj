@@ -92,6 +92,10 @@ test('public list filters and the filter options', async () => {
   assert.deepEqual((await get('place=ujj')).poojas.map((p) => p.slug), ['st-live']);
   assert.deepEqual((await get('q=rudra')).poojas.map((p) => p.slug), ['st-live']);
   assert.equal((await get('q=zzz')).poojas.length, 0);
+  // Search finds a pooja by its temple's name, its festival and its tithi too, not only its own title and place.
+  assert.deepEqual((await get('q=kashi')).poojas.map((p) => p.slug), ['ok-1']); // ok-1 is at the Kashi Vishwanath temple
+  assert.deepEqual((await get('q=navrat')).poojas.map((p) => p.slug), ['ok-1']); // by festival name
+  assert.deepEqual((await get('q=pradosh')).poojas.map((p) => p.slug), ['st-live']); // by tithi
   const f = (await get('temple=ujjain')).filters; // options do not shrink with the selection
   assert.deepEqual(f.temples.map((t) => t.slug).sort(), ['kashi', 'ujjain']);
   assert.deepEqual(f.festivals, [{ slug: 'navratri', name: 'Navratri', nameHi: 'नवरात्रि' }]);
