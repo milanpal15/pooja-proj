@@ -1,20 +1,26 @@
 import { Field, Switch } from '../../../../ui/index.js';
 import { fieldsOf } from '../../lib/schema.js';
 import { useEd } from './EditorContext.js';
+import { groupWidgetFor } from './fields/registry.js';
 
 /**
  * A task's settings, drawn from its kind's `configSchema` (docs/EVENTS.md §4).
  * Generic on purpose: there is no code here for any particular kind. A field
- * that names a catalogue (`ref`) gets a select of that catalogue.
+ * that names a catalogue (`ref`) gets a select of that catalogue; a set of
+ * fields a registered group widget claims (see fields/registry.js, e.g. a
+ * place on a map) is drawn by that widget instead.
  */
 export function ConfigFields({ schema, config, onChange, path }) {
   const { lookups, dis, err } = useEd();
   const fields = fieldsOf(schema);
   if (!fields.length) return null;
   const put = (key, v) => onChange({ ...config, [key]: v });
+  const group = groupWidgetFor(schema);
+  const rest = group ? fields.filter((f) => !group.consumes.includes(f.key)) : fields;
   return (
     <div className="ev-config">
-      {fields.map((f) => {
+      {group && <group.Component schema={schema} keys={group.keys} config={config} onChange={onChange} path={path} />}
+      {rest.map((f) => {
         const error = err(`${path}.${f.key}`);
         const value = config[f.key] ?? '';
         if (f.type === 'boolean') return <Switch key={f.key} variant="card" label={f.label} hint={f.hint} checked={!!config[f.key]} onChange={(v) => put(f.key, v)} {...dis} />;

@@ -1,5 +1,21 @@
 import { BASE, Unauthorized, failure, notifyUnauthorized, qs, req, rows, send } from './client.js';
 
+/** GET that answers text (a CSV), with the same sign-in / error handling as `req`. */
+async function reqText(path) {
+  let res;
+  try {
+    res = await fetch(`${BASE}/api${path}`, { credentials: 'include' });
+  } catch {
+    throw Object.assign(new Error("Can't reach the API"), { offline: true });
+  }
+  if (res.status === 401) {
+    notifyUnauthorized();
+    throw new Unauthorized();
+  }
+  if (!res.ok) throw await failure(res);
+  return res.text();
+}
+
 /** CRUD over an admin-only collection that lives under /admin/<name>. */
 function adminResource(name, key = name) {
   return {
@@ -134,10 +150,31 @@ export const api = {
   saveHoroscopeDay: (date, readings) =>
     req(`/horoscope/day/${date}`, { method: 'PUT', body: JSON.stringify({ readings }) }),
 
+  /* ------------------------------------------------ users 360 (docs/USERS.md §2) -- */
   users: {
-    list: () => req('/users'),
-    update: (id, body) => req(`/users/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
-    remove: (id) => req(`/users/${id}`, { method: 'DELETE' }),
+    /** Server-side search + filters + cursor. -> { users:[UserRow], next, total|null } (contact masked by the server). */
+    page: async (params) => {
+      const r = await req(`/admin/users${qs(params)}`);
+      return { users: r?.users ?? [], next: r?.next ?? null, total: r?.total ?? null };
+    },
+    /** The 360 aggregate: { user, devices, wallet|{unavailable}, bookings, events, calls, audit }. */
+    get: (id) => req(`/admin/users/${encodeURIComponent(id)}`),
+    block: (id, body) => req(`/admin/users/${encodeURIComponent(id)}/block`, send('POST', body)),
+    unblock: (id, body = {}) => req(`/admin/users/${encodeURIComponent(id)}/unblock`, send('POST', body)),
+    signOut: (id) => req(`/admin/users/${encodeURIComponent(id)}/sign-out`, send('POST')),
+    tags: (id, { add = [], remove = [] }) => req(`/admin/users/${encodeURIComponent(id)}/tags`, send('POST', { add, remove })),
+    addNote: (id, text) => req(`/admin/users/${encodeURIComponent(id)}/notes`, send('POST', { text })),
+    removeNote: (id, noteId) => req(`/admin/users/${encodeURIComponent(id)}/notes/${encodeURIComponent(noteId)}`, send('DELETE')),
+    /** Deleting needs the typed confirmation: the contact or the last 6 of the uid (400 confirm_mismatch otherwise). */
+    remove: (id, confirm) => req(`/admin/users/${encodeURIComponent(id)}`, send('DELETE', { confirm })),
+    /** The CSV as text (the server streams it, capped, and audits it). Same filters as `page`, plus `ids` for a selection. */
+    exportCsv: (params) => reqText(`/admin/users/export${qs(params)}`),
+  },
+  /** Device-level blocks. GET -> { devices:[{ deviceId, reason, message, messageHi, until, at, by }] } */
+  blockedDevices: {
+    list: async () => rows(await req('/admin/blocked-devices'), 'devices'),
+    add: (body) => req('/admin/blocked-devices', send('POST', body)),
+    remove: (deviceId) => req(`/admin/blocked-devices/${encodeURIComponent(deviceId)}`, send('DELETE')),
   },
 
   /* ------------------------------------------- coins, astrologers, calls -- */

@@ -24,6 +24,7 @@ export function useEventEditor({ id, lookups }) {
   const [tried, setTried] = useState(false);
   const [saving, setSaving] = useState(false);
   const [remote, setRemote] = useState({});
+  const [warnings, setWarnings] = useState([]); // the last save's non-blocking notes (e.g. off_route)
   const kinds = lookups.kinds;
   const kindsRef = useRef(kinds);
   kindsRef.current = kinds;
@@ -35,6 +36,7 @@ export function useEventEditor({ id, lookups }) {
     setBase(JSON.stringify(d));
     setTried(false);
     setRemote({});
+    setWarnings([]);
   }, []);
 
   useEffect(() => {
@@ -87,6 +89,8 @@ export function useEventEditor({ id, lookups }) {
       const stored = doc && (idOf(doc) || doc.slug) ? { ...(event || {}), ...body, ...doc } : { ...(event || {}), ...body };
       toast.success(event ? 'Event saved' : 'Event created');
       open(stored);
+      const w = saved?.warnings ?? doc?.warnings;
+      setWarnings(Array.isArray(w) ? w : []);
       return stored;
     } catch (e) {
       if (e.code === 'bad_event' || e.body?.fields) {
@@ -100,5 +104,5 @@ export function useEventEditor({ id, lookups }) {
     }
   };
 
-  return { state, event, draft, errors, remote, dirty, saving, set, setBlock, chooseType, save, isNew: !event };
+  return { state, event, draft, errors, remote, warnings, dirty, saving, set, setBlock, chooseType, save, isNew: !event };
 }

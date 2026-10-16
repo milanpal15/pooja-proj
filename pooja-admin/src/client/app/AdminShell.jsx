@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button, useConfirm } from '../ui/index.js';
 import { useAccess, visibleTabs } from '../lib/access/index.js';
 import { useRoute } from '../lib/hooks/useRoute.js';
+import { childFor } from '../lib/nav/registry.js';
 import { Breadcrumbs } from './Breadcrumbs.jsx';
 import { CommandPalette } from './CommandPalette.jsx';
 import { NotFound } from './NotFound.jsx';
@@ -66,14 +67,19 @@ export function AdminShell({ me, onSignOut }) {
   const approvalsModule = modules.find((m) => m.id === 'Approvals');
   const Page = active?.Component;
   const home = () => go(`#${first.route}`);
+  // A module's sub-page (Users › Blocked devices) adds a crumb and names the page.
+  const child = active ? childFor(active, route.rest) : null;
   const crumbs = active
-    ? active.breadcrumb.map((label, i, a) => {
-        if (i === a.length - 1) return { label };
-        const g = modules.find((m) => m.group === active.group);
-        return { label, href: g ? `#${g.route}` : undefined };
-      })
+    ? [
+        ...active.breadcrumb.map((label, i, a) => {
+          if (i === a.length - 1) return child ? { label, href: `#${active.route}` } : { label };
+          const g = modules.find((m) => m.group === active.group);
+          return { label, href: g ? `#${g.route}` : undefined };
+        }),
+        ...(child ? [{ label: child.title }] : []),
+      ]
     : [{ label: 'Not found' }];
-  const title = active ? active.title : route.kind === 'module' ? route.module.title : "Page not found";
+  const title = child ? child.title : active ? active.title : route.kind === 'module' ? route.module.title : "Page not found";
 
   return (
     <div className="app">

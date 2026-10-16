@@ -9,6 +9,7 @@ import './styles/ui.css';
 import './styles/shell.css';
 import './styles/features.css';
 import './styles/governance.css';
+import './styles/users.css';
 
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>

@@ -12,6 +12,8 @@
  *   searchable  appears in the ⌘K palette
  *   keywords    extra words the palette matches
  *   records     'users' | 'temples': the palette also searches these records through the module's list endpoint
+ *   children    [{ slug, title, keywords }] sub-pages under the module (`#/people/users/blocked-devices`): they have their
+ *               own breadcrumb and palette entry but no sidebar item and the same area as the module
  *
  * The UI never decides a role's rights — the server sends the permission list.
  */
@@ -49,7 +51,11 @@ function mod(id, group, area, extra = {}) {
 export const MODULES = [
   mod('Overview', null, 'overview', { keywords: 'home dashboard summary charts' }),
 
-  mod('Users', 'people', 'devotees', { keywords: 'devotees accounts phone block', records: 'users' }),
+  mod('Users', 'people', 'devotees', {
+    keywords: 'devotees accounts phone block users 360',
+    records: 'users',
+    children: [{ slug: 'blocked-devices', title: 'Blocked devices', keywords: 'device ban blocklist deviceId' }],
+  }),
   mod('Announcements', 'people', 'announcements', { keywords: 'message notice banner modal' }),
 
   mod('App releases', 'releases', 'releases', { keywords: 'version build update minimum blocked maintenance policy android' }),
@@ -91,5 +97,24 @@ export const MODULES = [
   mod('Approvals', 'admin', 'approvals', { keywords: 'pending review second operator' }),
   mod('Rules', 'admin', 'policies', { title: 'Rules & policies', keywords: 'terms regulations legal' }),
 ];
+
+/** The sub-page of `module` that `rest` points at (`['blocked-devices']`), or null. */
+export const childFor = (module, rest = []) => module?.children?.find((c) => c.slug === rest[0]) ?? null;
+
+/** Every module's children as palette-shaped entries (same area as the parent, so access filtering is unchanged). */
+export const childModules = (modules) =>
+  modules.flatMap((m) =>
+    (m.children ?? []).map((c) => ({
+      id: `${m.id}/${c.slug}`,
+      title: c.title,
+      group: m.group,
+      area: m.area,
+      route: `${m.route}/${c.slug}`,
+      breadcrumb: [...m.breadcrumb, c.title],
+      searchable: true,
+      keywords: c.keywords ?? '',
+      child: true,
+    })),
+  );
 
 export const moduleById = (id) => MODULES.find((m) => m.id === id) ?? null;

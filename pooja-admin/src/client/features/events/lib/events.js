@@ -7,6 +7,7 @@
  * task kind. A type is only a preset of defaults; a kind is only a registry
  * entry read through `lib/schema.js`.
  */
+import { geoProblems, isGeoSchema, routeBody, routeFrom, routeProblems, blankRoute, stopSig } from './route.js';
 import { configBody, configDefaults, configProblems, fieldsOf } from './schema.js';
 
 export const MAX_MILESTONES = 60;
@@ -16,6 +17,7 @@ export const BLOCKS = [
   { id: 'schedule', label: 'Schedule', hint: 'When it happens' },
   { id: 'registration', label: 'Registration', hint: 'Devotees join, with a QR pass if you want one' },
   { id: 'venue', label: 'Venue', hint: 'Where it happens, or the online link' },
+  { id: 'route', label: 'Route', hint: 'A journey from a start to an end along a path; location milestones are its stops' },
   { id: 'milestones', label: 'Milestones', hint: 'Steps a devotee completes' },
   { id: 'rewards', label: 'Rewards', hint: 'Coins, badges and certificates' },
   { id: 'content', label: 'Content', hint: 'About text, gallery, FAQs and links' },
@@ -215,12 +217,16 @@ export function blankEvent() {
     schedule: { mode: 'single', startsAt: '', endsAt: '' },
     registration: { mode: 'free', coins: '', capacity: '', opensAt: '', closesAt: '', pass: true, fields: [] },
     venue: { name: '', city: '', address: '', lat: '', lng: '', organiser: '', onlineUrl: '' },
+    route: blankRoute(),
     milestones: { order: 'any', missed: 'catch_up_next', completion: { rule: 'all', n: '' }, items: [] },
     rewards: [],
     content: { body: '', bodyHi: '', gallery: [], faq: [], links: [] },
     schemaVersion: 1,
   };
 }
+
+/** A server-computed `routeKm` is trusted only while the stop and the path are as saved. */
+const withSig = (config, route) => (config.routeKm != null ? { ...config, _sig: stopSig(config, route) } : config);
 
 /** An API event (or a type's `defaults`) -> the editable draft. Missing parts take blank values. */
 export function draftFrom(e = {}, kinds = []) {
@@ -232,6 +238,7 @@ export function draftFrom(e = {}, kinds = []) {
   const vn = e.venue || {};
   const ms = e.milestones || {};
   const ct = e.content || {};
+  const route = routeFrom(e.route);
   return {
     ...b,
     slug: str(e.slug), typeSlug: str(e.typeSlug), tags: Array.isArray(e.tags) ? e.tags : [],
@@ -245,6 +252,7 @@ export function draftFrom(e = {}, kinds = []) {
       fields: (rg.fields || []).map((f) => ({ key: f.key, label: str(f.label), labelHi: str(f.labelHi), type: f.type || 'text', required: !!f.required, options: f.options || [] })),
     },
     venue: { name: str(vn.name), city: str(vn.city), address: str(vn.address), lat: numStr(vn.lat), lng: numStr(vn.lng), organiser: str(vn.organiser), onlineUrl: str(vn.onlineUrl) },
+    route,
     milestones: {
       order: ms.order || 'any', missed: ms.missed || 'catch_up_next',
       completion: { rule: ms.completion?.rule || 'all', n: numStr(ms.completion?.n) },
@@ -255,7 +263,7 @@ export function draftFrom(e = {}, kinds = []) {
         tasks: (m.tasks || []).map((t) => ({
           key: t.key, kind: str(t.kind), title: str(t.title), titleHi: str(t.titleHi),
           // Stored values over registry defaults; a kind the registry no longer lists keeps its config untouched.
-          config: { ...(kindOf(t.kind) ? configDefaults(kindOf(t.kind).configSchema) : {}), ...(t.config || {}) },
+          config: withSig({ ...(kindOf(t.kind) ? configDefaults(kindOf(t.kind).configSchema) : {}), ...(t.config || {}) }, route),
         })),
       })),
     },
@@ -294,6 +302,7 @@ export function toBody(d, kinds = []) {
     const v = d.venue;
     body.venue = { name: t(v.name), city: t(v.city), address: t(v.address), lat: toNum(v.lat), lng: toNum(v.lng), organiser: t(v.organiser), onlineUrl: t(v.onlineUrl) };
   }
+  if (has('route')) body.route = routeBody(d.route);
   if (has('milestones')) {
     const m = d.milestones;
     body.milestones = {
@@ -350,6 +359,7 @@ export function validateEvent(d, kinds = []) {
       if (f.type === 'choice' && !f.options.map(t).filter(Boolean).length) e[`registration.fields.${i}.options`] = 'Add at least one option';
     });
   }
+  if (has('route')) Object.assign(e, routeProblems(d.route));
   if (has('milestones')) {
     const m = d.milestones;
     if (m.items.length > MAX_MILESTONES) e['milestones.items'] = `Up to ${MAX_MILESTONES} milestones`;
@@ -365,7 +375,12 @@ export function validateEvent(d, kinds = []) {
         const tp = `${p}.tasks.${ti}`;
         if (!k.kind) e[`${tp}.kind`] = 'Choose what completes it';
         else if (kinds.length && !kindOf(k.kind)) e[`${tp}.kind`] = 'This task type is no longer available';
-        else if (kindOf(k.kind)) Object.entries(configProblems(kindOf(k.kind).configSchema, k.config)).forEach(([f, msg]) => { e[`${tp}.config.${f}`] = msg; });
+        else if (kindOf(k.kind)) {
+          const schema = kindOf(k.kind).configSchema;
+          // A kind that declares a place (lat + lng) gets the place checks; the registry decides, never the kind's name.
+          const extra = isGeoSchema(schema) ? geoProblems(k.config, fieldsOf(schema).map((f) => f.key)) : {};
+          Object.entries({ ...extra, ...configProblems(schema, k.config) }).forEach(([f, msg]) => { e[`${tp}.config.${f}`] = extra[f] || msg; });
+        }
       });
     });
   }

@@ -17,9 +17,11 @@ function parseCoins(text) {
  * Manual correction of one devotee's balance. A reason is required, the admin
  * confirms the exact effect, and each submit carries its own requestId so a
  * double click can never apply it twice.
+ *
+ * `initialWallet` ({uid,name,contact,balance}) pre-selects the devotee — used by Users › Wallet (features/users).
  */
-export function AdjustWalletForm({ onAdjusted }) {
-  const [wallet, setWallet] = useState(null);
+export function AdjustWalletForm({ onAdjusted, initialWallet = null }) {
+  const [wallet, setWallet] = useState(initialWallet);
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
   const [errors, setErrors] = useState({});

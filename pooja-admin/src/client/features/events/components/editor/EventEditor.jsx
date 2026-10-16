@@ -5,12 +5,14 @@ import { useLoader } from '../../../../lib/hooks/useLoader.js';
 import { Badge, Banner, Button, ErrorState, ReadOnlyBadge, TableSkeleton, useConfirm } from '../../../../ui/index.js';
 import { useEventEditor } from '../../hooks/useEventEditor.js';
 import { statusChip } from '../../lib/events.js';
+import { warningText, warningWhere } from '../../lib/route.js';
 import { BlocksCard } from './BlocksCard.jsx';
 import { ContentCard } from './ContentCard.jsx';
 import { DetailsCard } from './DetailsCard.jsx';
 import { EditorContext } from './EditorContext.js';
 import { MilestonesCard } from './MilestonesCard.jsx';
 import { ProgressCard } from './ProgressCard.jsx';
+import { RouteCard } from './RouteCard.jsx';
 import { RewardsCard } from './RewardsCard.jsx';
 import { WhenWhoCard } from './WhenWhoCard.jsx';
 
@@ -66,6 +68,12 @@ export function EventEditor({ id, canEdit, lookups, onClose, onCreated }) {
             </ul>
           </Banner>
         )}
+        {ed.warnings.length > 0 && (
+          <Banner tone="warning">
+            Saved, with {ed.warnings.length} {ed.warnings.length === 1 ? 'note' : 'notes'} to check.
+            <ul className="ev-errors">{ed.warnings.slice(0, 6).map((w, i) => <li key={i}>{warningWhere(w, d.milestones.items) ? `${warningWhere(w, d.milestones.items)}: ` : ''}{warningText(w)}</li>)}</ul>
+          </Banner>
+        )}
         <div className="ev-editor__grid">
           <div className="ev-col">
             <DetailsCard />
@@ -74,11 +82,12 @@ export function EventEditor({ id, canEdit, lookups, onClose, onCreated }) {
             {!ed.isNew && has('milestones') && <ProgressCard milestones={d.milestones.items} stats={stats} />}
           </div>
           <div className="ev-col">
+            {has('route') && <RouteCard stats={stats} />}
             {has('milestones') && <MilestonesCard />}
             {has('rewards') && <RewardsCard />}
             {has('content') && <ContentCard />}
-            {!has('milestones') && !has('rewards') && !has('content') && (
-              <p className="feat-note">Switch on Milestones, Rewards or Content under “Sections” to build them here.</p>
+            {!has('route') && !has('milestones') && !has('rewards') && !has('content') && (
+              <p className="feat-note">Switch on Route, Milestones, Rewards or Content under “Sections” to build them here.</p>
             )}
           </div>
         </div>

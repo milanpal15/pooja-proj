@@ -2,11 +2,10 @@ import { useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
 import { IconButton } from './Button.jsx';
+import { lockScroll, unlockScroll } from './scroll-lock.js';
 
 const FOCUSABLE =
   'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
-
-let openCount = 0;
 
 /**
  * A dialog. Focus moves in on open and returns to whatever opened it; Tab is
@@ -47,16 +46,14 @@ export function Modal({
   useEffect(() => {
     if (!open) return undefined;
     const trigger = document.activeElement;
-    openCount += 1;
-    document.body.style.overflow = 'hidden';
+    lockScroll();
     // First field if there is one, else the dialog itself (never the ✕, which
     // would make Enter close it).
     const dialog = dialogRef.current;
     const first = dialog?.querySelector('.ui-modal__body input, .ui-modal__body select, .ui-modal__body textarea, .ui-modal__body button, .ui-modal__foot button');
     (first || dialog)?.focus();
     return () => {
-      openCount -= 1;
-      if (openCount === 0) document.body.style.overflow = '';
+      unlockScroll();
       if (trigger instanceof HTMLElement && document.contains(trigger)) trigger.focus();
     };
   }, [open]);

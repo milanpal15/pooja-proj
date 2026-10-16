@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 
 import { api } from '../lib/api/index.js';
 import { rows } from '../lib/api/client.js';
+import { childModules } from '../lib/nav/registry.js';
 import { buildHash } from '../lib/nav/route.js';
 import { buildSections, filterRecords, pushRecent } from '../lib/nav/palette.js';
 import { readJson, writeJson } from '../lib/storage.js';
@@ -11,10 +12,11 @@ const RECENT_KEY = 'bhakti.palette.recent';
 const LIST_TTL = 60000;
 
 /**
- * ⌘K / Ctrl-K. Keyboard first: type, ↑/↓, Enter, Esc. Lists every module the session can view, and — for Users and
- * Temples, when the session may view them — records found through the same list endpoints the pages use, fetched
- * once, filtered locally after a short debounce, and shown exactly as the API returned them (masked for roles without
- * access). Recents live in sessionStorage so a name is not left in the browser after the tab closes.
+ * ⌘K / Ctrl-K. Keyboard first: type, ↑/↓, Enter, Esc. Lists every module the session can view (and a module's
+ * sub-pages, like Users › Blocked devices), and — for Users and Temples, when the session may view them — records:
+ * users are searched on the server (`GET /admin/users?q=`, six at most, shown exactly as the API returned them: masked
+ * for roles without access) and open that user's 360 at `#/people/users/<id>`; temples are fetched once and filtered
+ * locally. Recents live in sessionStorage so a name is not left in the browser after the tab closes.
  */
 export function CommandPalette({ open, onClose, modules, access, onNavigate }) {
   const [query, setQuery] = useState('');
@@ -22,6 +24,7 @@ export function CommandPalette({ open, onClose, modules, access, onNavigate }) {
   const [active, setActive] = useState(0);
   const [recents, setRecents] = useState(() => readJson(RECENT_KEY, [], 'session'));
   const [lists, setLists] = useState({ users: null, temples: null });
+  const [userHits, setUserHits] = useState([]);
   const [searching, setSearching] = useState(false);
   const cache = useRef({ users: { at: 0, rows: null }, temples: { at: 0, rows: null } });
   const inputRef = useRef(null);
@@ -54,7 +57,6 @@ export function CommandPalette({ open, onClose, modules, access, onNavigate }) {
     let dead = false;
     const need = [];
     const fresh = (k) => cache.current[k].rows && Date.now() - cache.current[k].at < LIST_TTL;
-    if (canUsers && !fresh('users')) need.push(['users', () => api.users.list()]);
     if (canTemples && !fresh('temples')) need.push(['temples', async () => rows(await api.temples.list(), 'temples')]);
     if (!need.length) return undefined;
     setSearching(true);
@@ -76,19 +78,38 @@ export function CommandPalette({ open, onClose, modules, access, onNavigate }) {
     };
   }, [open, debounced, canUsers, canTemples]);
 
+  // Users: asked of the server on every (debounced) query — never the whole list.
+  useEffect(() => {
+    const q = debounced.trim();
+    if (!open || !canUsers || q.length < 2) {
+      setUserHits([]);
+      return undefined;
+    }
+    let dead = false;
+    setSearching(true);
+    api.users
+      .page({ q, limit: 6 })
+      .then((r) => !dead && setUserHits(r.users))
+      .catch(() => !dead && setUserHits([]))
+      .finally(() => !dead && setSearching(false));
+    return () => {
+      dead = true;
+    };
+  }, [open, debounced, canUsers]);
+
   const sections = useMemo(() => {
     const q = debounced.trim();
-    const userHits =
-      q.length >= 2 && canUsers
-        ? filterRecords(lists.users ?? cache.current.users.rows ?? [], q, ['name', 'contact', 'email']).map((u) => ({
-            key: `u:${u._id ?? u.uid ?? u.contact}`,
-            kind: 'record',
-            title: u.name || u.contact || 'User',
-            sub: u.name ? u.contact : u.method,
-            route: '/people/users',
-            query: { q: u.contact || u.name },
-          }))
-        : [];
+    const userItems = q.length >= 2 && canUsers
+      ? userHits.map((u) => ({
+          key: `u:${u.id}`,
+          kind: 'record',
+          title: u.name || u.contact || 'User',
+          sub: u.name ? u.contact : u.method,
+          route: '/people/users',
+          rest: [u.id],
+          query: {},
+        }))
+      : [];
     const templeHits =
       q.length >= 2 && canTemples
         ? filterRecords(lists.temples ?? cache.current.temples.rows ?? [], q, ['name', 'nameHi', 'slug', 'city', 'location']).map((t) => ({
@@ -100,8 +121,8 @@ export function CommandPalette({ open, onClose, modules, access, onNavigate }) {
             query: { q: t.name || t.slug },
           }))
         : [];
-    return buildSections({ query: q, modules, recents, userHits, templeHits });
-  }, [debounced, modules, recents, lists, canUsers, canTemples]);
+    return buildSections({ query: q, modules: q ? [...modules, ...childModules(modules)] : modules, recents, userHits: userItems, templeHits });
+  }, [debounced, modules, recents, lists, userHits, canUsers, canTemples]);
 
   const flat = useMemo(() => sections.flatMap((s) => s.items), [sections]);
   useEffect(() => setActive(0), [debounced]);
@@ -117,7 +138,7 @@ export function CommandPalette({ open, onClose, modules, access, onNavigate }) {
     setRecents(next);
     writeJson(RECENT_KEY, next, 'session');
     onClose();
-    onNavigate(buildHash(item.route, [], item.query));
+    onNavigate(buildHash(item.route, item.rest ?? [], item.query));
   };
 
   const onKeyDown = (e) => {

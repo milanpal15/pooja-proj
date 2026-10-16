@@ -1,0 +1,101 @@
+/* Users 360 (features/users, docs/USERS.md §5). Tokens only. */
+.usr-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 24px; }
+.usr-toolbar__right { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.usr-search { flex: 1 1 320px; max-width: 460px; }
+.usr-views { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.usr-filters { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 12px 12px; padding: 0 24px 16px; border-bottom: 1px solid var(--outline-variant); align-items: start; }
+.usr-filters__clear { display: flex; align-items: flex-end; }
+.usr-pop { position: relative; }
+.usr-pop > summary { list-style: none; cursor: pointer; }
+.usr-pop > summary::-webkit-details-marker { display: none; }
+.usr-pop__trigger { display: inline-flex; align-items: center; min-height: var(--target); padding: 0 20px; border-radius: var(--radius-md); border: 1px solid var(--primary); background: var(--container-lowest); color: var(--primary); font-size: 14px; font-weight: 700; cursor: pointer; }
+.usr-pop__trigger:hover { background: var(--primary-container); }
+.usr-pop__trigger:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+.usr-pop__panel { position: absolute; right: 0; z-index: 30; top: calc(100% + 6px); min-width: 200px; padding: 10px 14px; display: flex; flex-direction: column; gap: 4px; background: var(--container-lowest); border: 1px solid var(--outline); border-radius: var(--radius-md); box-shadow: var(--shadow-high); }
+.usr-check { display: flex; align-items: center; gap: 10px; min-height: 36px; font-size: 14px; cursor: pointer; }
+.usr-check input { width: 18px; height: 18px; accent-color: var(--primary); }
+.usr-bulk { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; padding: 10px 24px; background: var(--accent-container); color: var(--on-accent-container); border-bottom: 1px solid var(--outline-variant); }
+.usr-bulk__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.usr-table .usr-sel { width: 44px; text-align: center; }
+.usr-table input[type='checkbox'] { width: 18px; height: 18px; accent-color: var(--primary); cursor: pointer; }
+.usr-table th .usr-sort { all: unset; cursor: pointer; font: inherit; text-transform: inherit; letter-spacing: inherit; color: inherit; }
+.usr-table th .usr-sort:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.usr-name { display: inline-flex; align-items: center; gap: 10px; font-weight: 700; color: var(--on-surface); text-decoration: none; }
+.usr-name:hover { color: var(--primary); text-decoration: underline; }
+.usr-row--active td { background: var(--row-hover); }
+.usr-busy { opacity: 0.6; transition: opacity 120ms; }
+.usr-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 24px; font-size: 13.5px; color: var(--on-surface-variant); border-top: 1px solid var(--outline-variant); }
+.usr-pad { padding: 12px 24px 0; }
+.usr-avatar { flex: none; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--primary-container); color: var(--primary); font-weight: 800; border: 1px solid var(--outline-variant); }
+.usr-tags { display: inline-flex; flex-wrap: nowrap; gap: 4px; align-items: center; }
+.usr-tags__more { font-size: 12px; color: var(--on-surface-variant); }
+.usr-sub { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.usr-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 4px; }
+.usr-fulllink { margin-left: auto; font-size: 13px; font-weight: 600; color: var(--primary); }
+.usr-strip { margin: 0 0 4px; }
+.usr-tabbody { min-width: 0; }
+.usr-stack { display: flex; flex-direction: column; gap: var(--space-md); }
+.usr-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; word-break: break-all; }
+.usr-count { margin: 4px 0 0; font-size: 12px; color: var(--on-surface-variant); text-align: right; font-variant-numeric: tabular-nums; display: block; }
+.usr-count--over { color: var(--error-ink); font-weight: 700; }
+.usr-limit { margin: 0; font-size: 12.5px; }
+.usr-skel { display: flex; flex-direction: column; gap: 16px; padding: 8px 0; }
+.usr-unavail { border: 1px dashed var(--outline); border-radius: var(--radius-lg); background: var(--container); }
+.usr-unavail__reason { color: var(--on-surface-faint); }
+.usr-kv { display: grid; gap: 0; margin: 0; }
+.usr-kv__row { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--divider); font-size: 14px; }
+.usr-kv dt { font-weight: 700; color: var(--on-surface-variant); font-size: 13px; }
+.usr-kv dd { margin: 0; overflow-wrap: anywhere; }
+.usr-photo { border-radius: 50%; object-fit: cover; margin-bottom: 12px; border: 1px solid var(--outline-variant); }
+.usr-blockcard { margin-top: 20px; padding: 16px; border-radius: var(--radius-lg); background: var(--error-container); border: 1px solid var(--error-line); }
+.usr-blockcard h3 { margin: 0 0 4px; font-size: 14px; color: var(--on-error-container); }
+.usr-plain { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.usr-tabhead { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 20px 0 8px; }
+.usr-tabhead h3, .usr-subhead { margin: 0; font-size: 14px; }
+.usr-subhead { margin: 18px 0 8px; }
+.usr-count-line { margin: 0 0 8px; font-size: 13px; }
+.usr-badges li { padding: 6px 0; }
+.usr-inline { display: flex; align-items: flex-start; gap: 10px; margin-top: 10px; }
+.usr-inline .ui-field { flex: 1; }
+.usr-inline .ui-btn { margin-top: 24px; }
+.usr-notes { display: flex; flex-direction: column; gap: 24px; }
+.usr-notelist { list-style: none; margin: 16px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.usr-notelist li { padding: 12px 14px; border-radius: var(--radius-md); background: var(--container); border: 1px solid var(--outline-variant); }
+.usr-notelist p { margin: 0 0 6px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; }
+.usr-notelist__meta { display: flex; align-items: center; justify-content: space-between; font-size: 12.5px; color: var(--on-surface-variant); }
+.usr-preview-tags { margin: 10px 0 0; font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.usr-clip { max-width: 280px; overflow-wrap: anywhere; }
+
+/* full page */
+.usr-page { padding: 0; overflow: hidden; }
+.usr-page__head { display: flex; flex-direction: column; gap: 12px; padding: 20px 24px 12px; }
+.usr-page__id { display: flex; align-items: center; gap: 16px; }
+.usr-page__name { margin: 0; font-size: 22px; }
+.usr-page .ui-tabs { padding: 0 24px; }
+.usr-page__body { padding: 20px 24px 32px; }
+
+/* block modal */
+.usr-block { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: var(--space-lg); align-items: start; }
+.usr-block__form { display: flex; flex-direction: column; gap: var(--space-md); min-width: 0; }
+.usr-block__until { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.usr-phone { position: sticky; top: 0; align-items: stretch; }
+.usr-phone .phone__screen { border-color: var(--on-surface); }
+.usr-phone__msg { max-height: 9em; font-size: 12px; }
+.usr-phone__msg--default { font-style: italic; }
+.usr-phone__until { margin: 0; font-size: 11.5px; font-weight: 700; color: var(--primary); }
+@media (max-width: 760px) {
+  .usr-block { grid-template-columns: 1fr; }
+  .usr-phone { position: static; max-width: 260px; margin: 0 auto; }
+  .usr-kv__row { grid-template-columns: 1fr; gap: 2px; }
+  .usr-toolbar, .usr-filters, .usr-bulk, .usr-foot { padding-left: 16px; padding-right: 16px; }
+  .usr-page__head, .usr-page__body { padding-left: 16px; padding-right: 16px; }
+}
+
+.usr-tags .ui-chip { white-space: nowrap; }
+.usr-table td { white-space: nowrap; }
+.usr-table td.usr-wrap { white-space: normal; }
+.ui-drawer .ui-tabs, .usr-page .ui-tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; }
+.ui-drawer .ui-tabs__tab, .usr-page .ui-tabs__tab { padding: 0 12px; white-space: nowrap; flex: none; }
+.ui-drawer__panel:focus-visible { outline: none; }
+.usr-block__until .ui-seg__opt { white-space: nowrap; }
+.ui-table .usr-code { white-space: nowrap; }
