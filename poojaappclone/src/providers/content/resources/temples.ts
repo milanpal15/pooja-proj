@@ -3,6 +3,7 @@ import type { Temple } from '@/constants/temples';
 
 import type { RemoteTemple } from '../types';
 
+import { assetUrl } from '../assets';
 import { toDeity } from './deities';
 
 const TEMPLE_DRAWN = {
@@ -21,6 +22,7 @@ function toTemple(r: RemoteTemple, deity: Deity): Temple {
     deity: deity.id,
     mark: r.mark || deity.mark,
     location: r.location ?? '',
+    image: assetUrl(r.imageUrl),
     aarti: r.aartiTime ?? '',
     offerings: r.offerings ?? [],
     backdrop: [

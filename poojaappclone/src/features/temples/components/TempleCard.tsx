@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
 
 import { TempleGlyph } from '@/components/illustrations/temple-glyph';
 import { Button, Card, Icon, Type } from '@/components/ui';
@@ -12,6 +12,7 @@ type TempleRow = React.ComponentProps<typeof TempleGlyph>['temple'] & {
   id: string;
   name: string;
   location: string;
+  image?: string;
   km?: number;
 };
 
@@ -44,7 +45,16 @@ export function TempleCard({
     <Card variant="ornate">
       <View style={styles.head2}>
         <View style={styles.glyphWrap}>
-          <TempleGlyph temple={tpl} size={72} />
+          {tpl.image ? (
+            <Image
+              source={{ uri: tpl.image }}
+              style={styles.photo}
+              resizeMode="cover"
+              accessibilityIgnoresInvertColors
+            />
+          ) : (
+            <TempleGlyph temple={tpl} size={72} />
+          )}
         </View>
         <View style={{ flex: 1, gap: 3 }}>
           <View style={styles.titleRow}>
@@ -136,6 +146,7 @@ const styles = StyleSheet.create({
   titleRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: Space.xs },
   heartBtn: { width: 32, height: 32, borderRadius: Radius.full, alignItems: 'center', justifyContent: 'center' },
   glyphWrap: { width: 72, height: 72, justifyContent: 'center' },
+  photo: { width: 72, height: 72, borderRadius: Radius.md },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
 
   actions: { flexDirection: 'row', gap: Space.sm, marginTop: Space.md },

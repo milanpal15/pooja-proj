@@ -23,6 +23,8 @@ export type Temple = {
   /** Short devanagari mark drawn on the idol's halo. */
   mark: string;
   location: string;
+  /** Dashboard photograph (resolved URL); the drawn gopuram shows when absent. */
+  image?: string;
   aarti: string;
   offerings: string[];
   /** Background wash, from top to bottom. */
