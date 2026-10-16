@@ -1,4 +1,4 @@
-import { Button, Card, DataTable, EmptyState, ErrorState, Field, TableSkeleton } from '../../../ui/index.js';
+import { Button, Card, DataTable, EmptyState, ErrorState, Field, TableSkeleton, useToast } from '../../../ui/index.js';
 import { downloadCsv, toCsv } from '../../../lib/csv.js';
 import { formatWhen } from '../../../lib/dates.js';
 import { formatCoins, formatSignedCoins } from '../../../lib/money.js';
@@ -18,6 +18,7 @@ const CSV_COLUMNS = [
 
 /** Full-width ledger with a type filter and a CSV export of exactly the rows shown. */
 export function TransactionTable({ rows, status, error, offline, type, onType, onRetry, limit }) {
+  const toast = useToast();
   const loaded = status === 'ready' || status === 'stale';
   return (
     <Card
@@ -37,7 +38,10 @@ export function TransactionTable({ rows, status, error, offline, type, onType, o
           <Button
             variant="secondary"
             disabled={!loaded || !rows?.length}
-            onClick={() => downloadCsv(`wallet-transactions${type ? `-${type}` : ''}.csv`, toCsv(CSV_COLUMNS, rows))}>
+            onClick={() => {
+              downloadCsv(`wallet-transactions${type ? `-${type}` : ''}.csv`, toCsv(CSV_COLUMNS, rows));
+              toast.success(`Exported ${rows.length} transaction${rows.length === 1 ? '' : 's'} to CSV`);
+            }}>
             Export CSV
           </Button>
         </>

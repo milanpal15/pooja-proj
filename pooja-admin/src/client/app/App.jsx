@@ -64,10 +64,14 @@ export function App() {
       <AdminShell
         me={me}
         onSignOut={() =>
-          api.logout().finally(() => {
-            setAuthed(false);
-            setSession(null);
-          })
+          api
+            .logout()
+            .then(() => toast.info('Signed out'))
+            .catch((e) => toast.error(`Sign-out could not reach the server, so this browser session may still be valid. ${e.message}`))
+            .finally(() => {
+              setAuthed(false);
+              setSession(null);
+            })
         }
       />
     </AccessProvider>

@@ -41,7 +41,7 @@ export function ContentManager({
   const access = useAccess();
   const readOnly = readOnlyProp ?? !access.canEdit(area);
   const action = rowAction && access.canEdit(rowAction.area ?? area) ? rowAction : undefined;
-  const c = useContentResource({ resource, fields, rowAction: action, onChange });
+  const c = useContentResource({ resource, fields, rowAction: action, onChange, title });
 
   // Horoscopes accumulate twelve rows a day forever, so the tab scopes the
   // table to one day. Everything else passes no filter and sees all of it.

@@ -18,6 +18,25 @@ body {
     grid-template-columns: 1fr;
   }
 }
+/* Desktop: the shell is exactly one screen tall. The sidebar stays put (scrolling inside itself only when its list
+   is taller than the window) and the page content scrolls on its own, so navigation never moves with the page. */
+@media (min-width: 901px) {
+  .app {
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .sidebar {
+    height: 100%;
+    overflow-y: auto;
+  }
+  .content {
+    height: 100%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
 
 /* Sidebar */
 .sidebar {

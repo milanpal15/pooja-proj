@@ -18,6 +18,7 @@ export function useUpload() {
     setBusy(key);
     try {
       const { url } = await api.upload(file);
+      toast.success('File uploaded', { detail: 'Save the form to keep it.' });
       return url;
     } catch (e) {
       toast.error(`Upload failed. ${e.message}`);

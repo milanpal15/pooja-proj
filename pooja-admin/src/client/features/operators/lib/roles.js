@@ -4,9 +4,9 @@
  * permission list with the session. Nothing else in the dashboard names a role.
  */
 export const ROLES = [
-  { value: 'admin', label: 'Admin', desc: 'Sees and edits everything, including operators and roles.' },
-  { value: 'editor', label: 'Editor', desc: 'Edits content, horoscope, panchang and announcements. Everywhere else they can look but not touch.' },
-  { value: 'viewer', label: 'Viewer', desc: 'Read-only. Opens screens, changes nothing. No devotee accounts or operators.' },
+  { value: 'admin', label: 'Admin', desc: 'Everything: edits every screen, including devotees, operators, roles and push.' },
+  { value: 'editor', label: 'Editor', desc: 'Edits content, horoscope, panchang, announcements and events. Views everything else except devotees, operators and push, which they cannot open.' },
+  { value: 'viewer', label: 'Viewer', desc: 'Read-only. Opens every screen except devotees, operators and push, and changes nothing.' },
 ];
 
 export const roleLabel = (value) => ROLES.find((r) => r.value === value)?.label ?? value;

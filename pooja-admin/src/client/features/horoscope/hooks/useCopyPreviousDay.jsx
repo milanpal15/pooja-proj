@@ -2,7 +2,7 @@ import { useState } from 'react';
 
 import { api } from '../../../lib/api/index.js';
 import { shiftDate } from '../../../lib/dates.js';
-import { useConfirm } from '../../../ui/index.js';
+import { useConfirm, useToast } from '../../../ui/index.js';
 import { isWritten } from '../lib/status.js';
 
 /**
@@ -12,6 +12,7 @@ import { isWritten } from '../lib/status.js';
  */
 export function useCopyPreviousDay({ date, written, reload, setMsg }) {
   const confirm = useConfirm();
+  const toast = useToast();
   const [copying, setCopying] = useState(false);
 
   const copy = async () => {
@@ -23,6 +24,7 @@ export function useCopyPreviousDay({ date, written, reload, setMsg }) {
       const n = prev.readings.filter(isWritten).length;
       if (!n) {
         setMsg(`Nothing published on ${from} to copy.`);
+        toast.info(`Nothing published on ${from} to copy.`);
         return;
       }
       if (written) {
@@ -43,13 +45,13 @@ export function useCopyPreviousDay({ date, written, reload, setMsg }) {
       }
       const res = await api.saveHoroscopeDay(date, prev.readings);
       await reload();
-      setMsg(
-        `Copied ${res.saved} reading${res.saved === 1 ? '' : 's'} from ${from}` +
-          (res.removed ? `, cleared ${res.removed}` : '') +
-          ' — edit each one before it goes out.',
-      );
+      const text =
+        `Copied ${res.saved} reading${res.saved === 1 ? '' : 's'} from ${from}` + (res.removed ? `, cleared ${res.removed}` : '');
+      setMsg(`${text} — edit each one before it goes out.`);
+      toast.success(text, { detail: 'Edit each one before it goes out.' });
     } catch (e) {
       setMsg(`Could not copy — ${e.message}`);
+      toast.error(`Could not copy. ${e.message}`);
     } finally {
       setCopying(false);
     }

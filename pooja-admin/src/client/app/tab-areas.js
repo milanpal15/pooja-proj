@@ -32,6 +32,7 @@ export const TAB_AREAS = [
   { id: 'Home layout', area: 'content' },
   { id: 'Home slider', area: 'content' },
   { id: 'Live darshan', area: 'content' },
+  { id: 'Events', area: 'events' },
   { id: 'Horoscope', area: 'horoscope' },
   { id: 'Panchang', area: 'panchang' },
   { id: 'Reminders', area: 'content' },

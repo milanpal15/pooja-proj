@@ -14,6 +14,8 @@ export function useFlags() {
     setBusy(key);
     try {
       await api.setFlag(key, enabled);
+      const name = data?.find?.((f) => f.key === key)?.label || key;
+      toast.success(`${name}: flag turned ${enabled ? 'on' : 'off'}`, { detail: 'The app picks this up the next time it loads its settings.' });
     } catch (e) {
       toast.error(`Could not change the flag. ${e.message}`);
     }

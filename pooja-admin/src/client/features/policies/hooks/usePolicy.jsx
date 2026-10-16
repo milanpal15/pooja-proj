@@ -58,6 +58,8 @@ export function usePolicy() {
       const updated = await api.savePolicy('terms', { title, bodyMd: body }, publish);
       setDoc(updated);
       setNote(publish ? `Published as v${updated.version}` : 'Saved (version unchanged)');
+      if (publish) toast.success(`Policy published as version ${updated.version}`, { detail: 'Every devotee will be asked to accept it again on their next launch.' });
+      else toast.success('Policy draft saved', { detail: 'Version unchanged; nobody is asked to accept again.' });
     } catch (e) {
       // The draft stays on screen; only a failed LOAD replaces the page.
       toast.error(`Could not save. ${e.message}`);

@@ -1,5 +1,6 @@
 import { Button, Field, Modal } from '../../../ui/index.js';
 import { ROLES } from '../lib/roles.js';
+import { PasswordField } from './PasswordField.jsx';
 
 /** "New operator". */
 export function OperatorModal({ form, saving, error, onChange, onCreate, onClose }) {
@@ -22,7 +23,7 @@ export function OperatorModal({ form, saving, error, onChange, onCreate, onClose
       }>
       {!!error && <p className="feat-form-error" role="alert">{error}</p>}
       <Field label="Username" value={form.username} placeholder="3–32 characters, a–z 0–9 . _ -" onChange={set('username')} />
-      <Field label="Password" type="password" value={form.password} placeholder="at least 8 characters" onChange={set('password')} />
+      <PasswordField value={form.password} onChange={set('password')} />
       <Field
         label="Role"
         type="select"

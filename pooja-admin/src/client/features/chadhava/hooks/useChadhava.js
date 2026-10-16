@@ -37,17 +37,17 @@ export function useChadhava() {
     const id = idOf(payload);
     if (id) await api.chadhavaListings.update(id, payload);
     else await api.chadhavaListings.create(payload);
-    toast.success('Saved');
+    toast.success(id ? 'Listing saved' : 'Listing added');
     await listings.reload();
   };
 
   const toggleListing = (l) => {
     const next = !l.enabled;
     listings.setData((rs) => rs.map((r) => (idOf(r) === idOf(l) ? { ...r, enabled: next } : r)));
-    return run('Could not change that.', () => api.chadhavaListings.update(idOf(l), { enabled: next }));
+    return run('Could not change that.', () => api.chadhavaListings.update(idOf(l), { enabled: next }), next ? 'Listing is on sale' : 'Listing hidden from the app');
   };
 
-  const removeListing = (l) => run('Could not delete.', () => api.chadhavaListings.remove(idOf(l)), 'Deleted');
+  const removeListing = (l) => run('Could not delete.', () => api.chadhavaListings.remove(idOf(l)), 'Listing deleted');
 
   /** Save one offering (new, edited, or moved to another listing). Throws so the panel can stay open. */
   const saveOffering = async (offering, toId) => {
@@ -67,7 +67,7 @@ export function useChadhava() {
       const from = byId(offering.listingId);
       await api.chadhavaListings.update(offering.listingId, { offerings: (from.offerings || []).filter((o) => o.key !== offering.key) });
     }
-    toast.success('Saved');
+    toast.success(offering.key ? 'Offering saved' : 'Offering added');
     await listings.reload();
   };
 
@@ -75,12 +75,12 @@ export function useChadhava() {
     const l = byId(offering.listingId);
     const offerings = (l.offerings || []).map((o) => (o.key === offering.key ? { ...o, enabled: !(o.enabled !== false) } : o));
     listings.setData((rs) => rs.map((r) => (idOf(r) === offering.listingId ? { ...r, offerings } : r)));
-    return run('Could not change that.', () => api.chadhavaListings.update(offering.listingId, { offerings }));
+    return run('Could not change that.', () => api.chadhavaListings.update(offering.listingId, { offerings }), 'Offering updated');
   };
 
   const removeOffering = (offering) => {
     const l = byId(offering.listingId);
-    return run('Could not delete.', () => api.chadhavaListings.update(offering.listingId, { offerings: (l.offerings || []).filter((o) => o.key !== offering.key) }), 'Deleted');
+    return run('Could not delete.', () => api.chadhavaListings.update(offering.listingId, { offerings: (l.offerings || []).filter((o) => o.key !== offering.key) }), 'Offering deleted');
   };
 
   return {

@@ -2,6 +2,7 @@ import { useAccess } from '../../lib/access/index.js';
 import { Banner, Button, Card, DataTable, ReadOnlyBadge, useConfirm } from '../../ui/index.js';
 import { AuditLog } from './components/AuditLog.jsx';
 import { OperatorModal } from './components/OperatorModal.jsx';
+import { roleLabel } from './lib/roles.js';
 import { RoleGuide } from './components/RoleSelect.jsx';
 import { OperatorRow } from './components/OperatorRow.jsx';
 import { ResetPasswordModal } from './components/ResetPasswordModal.jsx';
@@ -31,6 +32,29 @@ export function OperatorsPage({ me, area = 'operators' }) {
       tone: 'danger',
     });
     if (ok) ops.remove(o);
+  };
+
+  const askRole = async (o, role) => {
+    if (role === o.role) return;
+    const ok = await confirm({
+      title: 'Change role',
+      message: `Change ${o.username} from ${roleLabel(o.role)} to ${roleLabel(role)}? It takes effect on their next request.`,
+      confirmLabel: `Make ${roleLabel(role)}`,
+    });
+    if (ok) ops.setRole(o, role);
+  };
+
+  const askToggle = async (o) => {
+    if (o.active) {
+      const ok = await confirm({
+        title: 'Disable account',
+        message: `Disable ${o.username}? They will not be able to sign in or use the dashboard until you enable the account again.`,
+        confirmLabel: 'Disable account',
+        tone: 'danger',
+      });
+      if (!ok) return;
+    }
+    ops.toggleActive(o);
   };
 
   const modalOpen = !!ops.adding || !!ops.resetting;
@@ -75,8 +99,8 @@ export function OperatorsPage({ me, area = 'operators' }) {
                 isMe={!!me && o.username === me.username}
                 busy={ops.busy === o._id}
                 readOnly={readOnly}
-                onSetRole={ops.setRole}
-                onToggleActive={ops.toggleActive}
+                onSetRole={askRole}
+                onToggleActive={askToggle}
                 onSetPassword={(op) => ops.setResetting({ id: op._id, username: op.username, password: '' })}
                 onDelete={askDelete}
               />

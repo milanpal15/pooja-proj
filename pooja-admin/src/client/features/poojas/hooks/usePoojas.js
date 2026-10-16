@@ -42,6 +42,7 @@ export function usePoojas(nameOf) {
     const next = !p.enabled;
     list.setData((rs) => rs.map((r) => (idOf(r) === idOf(p) ? { ...r, enabled: next } : r)));
     const ok = await guard(idOf(p), 'Could not change that.', () => api.poojas.update(idOf(p), { enabled: next }));
+    if (ok) toast.success(next ? 'Pooja is on sale' : 'Pooja hidden from the app');
     // Status is computed server-side from `enabled`, so re-read either way.
     await list.reload();
     return ok;
@@ -58,7 +59,7 @@ export function usePoojas(nameOf) {
 
   const remove = async (p) => {
     const ok = await guard(idOf(p), 'Could not delete.', () => api.poojas.remove(idOf(p)));
-    if (ok) toast.success('Deleted');
+    if (ok) toast.success('Pooja deleted');
     await list.reload();
   };
 

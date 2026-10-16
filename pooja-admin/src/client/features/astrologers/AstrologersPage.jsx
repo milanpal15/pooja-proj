@@ -21,7 +21,11 @@ export function AstrologersPage({ area = 'astrologers' }) {
   const visible = useMemo(() => filterRows(data.rows, filters), [data.rows, filters]);
   const specialities = useMemo(() => [...new Set(data.rows.flatMap((a) => a.specialities || []))].sort(), [data.rows]);
 
-  const listed = (a, v) => actions.setListed(a, v).catch((e) => toast.error(`Could not change ${a.name}. ${e.message}`));
+  const listed = (a, v) =>
+    actions
+      .setListed(a, v)
+      .then(() => toast.success(v ? `${a.name} is listed in the app` : `${a.name} is hidden from the app`))
+      .catch((e) => toast.error(`Could not change ${a.name}. ${e.message}`));
 
   return (
     <div className="ui-page">

@@ -25,6 +25,7 @@ export function useSlides() {
     list.setData((rows) => rows.map((r) => (idOf(r) === idOf(s) ? { ...r, enabled: next } : r)));
     try {
       await api.hero.update(idOf(s), { enabled: next });
+      toast.success(next ? 'Slide is live' : 'Slide hidden');
     } catch (e) {
       await fail('Could not change that.', e);
     }
@@ -37,6 +38,7 @@ export function useSlides() {
     list.setData(next.map((r, i) => ({ ...r, order: (i + 1) * 10 })));
     try {
       await api.hero.reorder(next.map(idOf));
+      toast.success('Slide order saved');
     } catch (e) {
       await fail('Could not reorder.', e);
     }

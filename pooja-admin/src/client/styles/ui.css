@@ -643,6 +643,15 @@ textarea.ui-input {
 .ui-toast__text b {
   display: block;
 }
+.ui-toast__detail {
+  display: block;
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--on-surface-variant);
+}
+.ui-toast__close {
+  flex: none;
+}
 @keyframes ui-toast-in {
   from {
     opacity: 0;

@@ -16,6 +16,7 @@ export function useStreams() {
     list.setData((rows) => rows.map((r) => (idOf(r) === idOf(s) ? { ...r, enabled: next } : r)));
     try {
       await api.liveStreams.update(idOf(s), { enabled: next });
+      toast.success(next ? 'Stream is now visible in the app' : 'Stream hidden from the app');
       list.reload();
     } catch (e) {
       toast.error(`Could not change that. ${e.message}`);

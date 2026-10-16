@@ -1,4 +1,4 @@
-import { Card, DataTable, EmptyState, ErrorState, TableSkeleton } from '../../../ui/index.js';
+import { Card, DataTable, EmptyState, ErrorState, TableSkeleton, useToast } from '../../../ui/index.js';
 import { downloadCsv, toCsv } from '../../../lib/csv.js';
 import { formatDuration } from '../../../lib/dates.js';
 import { CALL_LIMIT } from '../hooks/useCalls.js';
@@ -17,6 +17,7 @@ const CSV = [
 ];
 
 export function CallTable({ calls, status, error, offline, filters, onFilters, onDetails, onRetry }) {
+  const toast = useToast();
   const loaded = status === 'ready' || status === 'stale';
   return (
     <Card
@@ -27,7 +28,10 @@ export function CallTable({ calls, status, error, offline, filters, onFilters, o
           value={filters}
           onChange={onFilters}
           canExport={loaded && calls.length > 0}
-          onExport={() => downloadCsv(`calls${filters.from ? `-${filters.from}` : ''}.csv`, toCsv(CSV, calls))}
+          onExport={() => {
+            downloadCsv(`calls${filters.from ? `-${filters.from}` : ''}.csv`, toCsv(CSV, calls));
+            toast.success(`Exported ${calls.length} call${calls.length === 1 ? '' : 's'} to CSV`);
+          }}
         />
       }>
       {status === 'loading' && <TableSkeleton />}

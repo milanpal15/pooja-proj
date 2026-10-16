@@ -29,7 +29,10 @@ export function CoinsPage() {
   const packsReadOnly = !access.canEdit('money');
 
   const toggle = (pack, active) =>
-    actions.setActive(pack, active).catch((e) => toast.error(`Could not change the pack. ${e.message}`));
+    actions
+      .setActive(pack, active)
+      .then(() => toast.success(active ? 'Pack is on sale' : 'Pack taken off sale'))
+      .catch((e) => toast.error(`Could not change the pack. ${e.message}`));
 
   return (
     <div className="ui-page">

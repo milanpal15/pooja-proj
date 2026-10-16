@@ -13,7 +13,7 @@ import { toBody } from '../lib/fields.js';
  * is a toast with the API's own sentence; the form stays open and the rows
  * stay as they were. Only a failed LOAD replaces the table (`err`).
  */
-export function useContentResource({ resource, fields, rowAction, onChange }) {
+export function useContentResource({ resource, fields, rowAction, onChange, title = 'Item' }) {
   const toast = useToast();
   const [rows, setRows] = useState([]);
   const [err, setErr] = useState(null); // { message, offline } when the list could not load
@@ -40,10 +40,12 @@ export function useContentResource({ resource, fields, rowAction, onChange }) {
 
   const save = async () => {
     setSaving(true);
+    let isNew = false;
     try {
       const body = toBody(editing, fields);
-      if (body._id) await resource.update(body._id, body);
-      else await resource.create(body);
+      isNew = !body._id;
+      if (isNew) await resource.create(body);
+      else await resource.update(body._id, body);
     } catch (e) {
       toast.error(`Could not save. ${e.message}`);
       setSaving(false);
@@ -51,7 +53,7 @@ export function useContentResource({ resource, fields, rowAction, onChange }) {
     }
     setSaving(false);
     setEditing(null);
-    toast.success('Saved');
+    toast.success(`${title} ${isNew ? 'created' : 'saved'}`);
     await load();
     onChange?.();
   };
@@ -63,6 +65,7 @@ export function useContentResource({ resource, fields, rowAction, onChange }) {
     setRows((rs) => rs.map((r) => (r._id === row._id ? { ...r, [key]: next } : r)));
     try {
       await resource.update(row._id, { [key]: next });
+      toast.success(`${title}: ${fields.find((f) => f.key === key)?.label || key} turned ${next ? 'on' : 'off'}`);
       onChange?.();
     } catch (e) {
       setRows((rs) => rs.map((r) => (r._id === row._id ? { ...r, [key]: !next } : r)));
@@ -79,7 +82,7 @@ export function useContentResource({ resource, fields, rowAction, onChange }) {
       toast.error(`Could not delete. ${e.message}`);
       return;
     }
-    toast.success('Deleted');
+    toast.success(`${title} deleted`);
     await load();
     onChange?.();
   };
@@ -104,6 +107,7 @@ export function useContentResource({ resource, fields, rowAction, onChange }) {
     try {
       const { url } = await api.upload(file);
       setEditing((e) => ({ ...e, [field]: url }));
+      toast.success('File uploaded', { detail: 'It is attached to this form; save to keep it.' });
     } catch (e) {
       toast.error(`Upload failed. ${e.message}`);
     } finally {

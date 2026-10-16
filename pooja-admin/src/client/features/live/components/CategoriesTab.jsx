@@ -28,7 +28,7 @@ export function CategoriesTab({ area, lookups, addRef }) {
       const body = { name: d.name.trim(), nameHi: d.nameHi.trim(), enabled: d.enabled };
       if (edit.id) await api.liveCategories.update(edit.id, body);
       else await api.liveCategories.create({ ...body, slug: slugify(d.name), order: Math.max(0, ...cats.map((c) => c.order ?? 0)) + 10 });
-      toast.success('Category saved');
+      toast.success(edit.id ? 'Category saved' : 'Category added');
       setEdit(null);
       await lookups.reloadCategories();
     } catch (e) {
@@ -40,6 +40,7 @@ export function CategoriesTab({ area, lookups, addRef }) {
   const toggle = async (c) => {
     try {
       await api.liveCategories.update(idOf(c), { enabled: c.enabled === false });
+      toast.success(c.enabled === false ? 'Category turned on' : 'Category turned off');
       await lookups.reloadCategories();
     } catch (e) {
       toast.error(`Could not change that. ${e.message}`);

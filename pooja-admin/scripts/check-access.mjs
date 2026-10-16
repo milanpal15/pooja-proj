@@ -17,21 +17,21 @@ import { fileURLToPath } from 'node:url';
 import { TAB_AREAS } from '../src/client/app/tab-areas.js';
 import { makeAccess, tabReadOnly, tabVisible, visibleTabs } from '../src/client/lib/access/permissions.js';
 
-const AREAS = ['overview', 'content', 'horoscope', 'panchang', 'announcements', 'push', 'flags', 'policies', 'devotees', 'astrologers', 'money', 'wallets', 'orders', 'calls', 'payouts', 'operators'];
+const AREAS = ['overview', 'content', 'horoscope', 'panchang', 'announcements', 'push', 'flags', 'policies', 'devotees', 'astrologers', 'money', 'wallets', 'orders', 'calls', 'payouts', 'operators', 'events'];
 const ABSENT = { editor: ['push', 'devotees', 'operators'], viewer: ['push', 'devotees', 'operators'] };
 
 // §21.3, transcribed. "edit" lists what the role may change; everything else it can see is view-only.
 const perms = (view, edit) => [...edit.map((a) => `${a}:edit`), ...view.filter((a) => !edit.includes(a)).map((a) => `${a}:view`)];
 const ROLES = {
   admin: perms(AREAS, AREAS),
-  editor: perms(AREAS.filter((a) => !ABSENT.editor.includes(a)), ['content', 'horoscope', 'panchang', 'announcements']),
+  editor: perms(AREAS.filter((a) => !ABSENT.editor.includes(a)), ['content', 'horoscope', 'panchang', 'announcements', 'events']),
   viewer: perms(AREAS.filter((a) => !ABSENT.viewer.includes(a)), []),
 };
 const session = (role) => ({ required: true, authed: true, username: role, role, permissions: ROLES[role] });
 
 const ALL = TAB_AREAS.map((t) => t.id);
 const byIdEarly = Object.fromEntries(TAB_AREAS.map((t) => [t.id, t]));
-const CONTENT_EDITABLE = ['Announcements', 'Deities', 'Temples', 'Aartis', 'Festivals', 'Sevas', 'Offerings', 'Knowledge', 'FAQs', 'Home layout', 'Poojas', 'Chadhava', 'Home slider', 'Live darshan', 'Horoscope', 'Panchang', 'Reminders', 'Alert Tones', 'Wallpapers', 'Settings'];
+const CONTENT_EDITABLE = ['Announcements', 'Deities', 'Temples', 'Aartis', 'Festivals', 'Sevas', 'Offerings', 'Knowledge', 'FAQs', 'Home layout', 'Poojas', 'Chadhava', 'Home slider', 'Live darshan', 'Events', 'Horoscope', 'Panchang', 'Reminders', 'Alert Tones', 'Wallpapers', 'Settings'];
 const EXPECT = {
   // Admin sees and edits everything (orders:edit = move a booking on, hide a review).
   admin: { visible: ALL, readOnly: [] },

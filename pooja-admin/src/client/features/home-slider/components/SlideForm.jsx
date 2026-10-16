@@ -91,6 +91,7 @@ export function SlideForm({ draft, set, errors, targets }) {
           )}
         </div>
         {draft.type === 'link' && <Field label={refLabel} type="url" placeholder="https://" value={draft.ref} error={errors.ref} onChange={(v) => set({ ref: v })} />}
+        {['event', 'live', 'route'].includes(draft.type) && <Field label={refLabel} placeholder={draft.type === 'route' ? '/events' : 'slug'} value={draft.ref} error={errors.ref} onChange={(v) => set({ ref: v })} />}
       </Block>
 
       <Block title="Schedule and audience">

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 import { api } from '../../../lib/api/index.js';
-import { useConfirm } from '../../../ui/index.js';
+import { useConfirm, useToast } from '../../../ui/index.js';
 import { RASHIS } from '../constants/rashis.js';
 import { blankReading } from '../lib/status.js';
 
@@ -12,6 +12,12 @@ import { blankReading } from '../lib/status.js';
  */
 export function useReadingEditor({ date, reload, setMsg }) {
   const confirm = useConfirm();
+  const toast = useToast();
+  const fail = (verb, e) => {
+    setMsg(`Could not ${verb} — ${e.message}`);
+    toast.error(`Could not ${verb}. ${e.message}`);
+  };
+  const nameOf = (r) => RASHIS.find((x) => x.value === r.rashi)?.name || 'Reading';
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
   const [busyRow, setBusyRow] = useState('');
@@ -25,8 +31,9 @@ export function useReadingEditor({ date, reload, setMsg }) {
     try {
       await api.horoscopes.update(row._id, { enabled: !row.enabled });
       await reload();
+      toast.success(`${nameOf(row)} reading ${row.enabled ? 'hidden from' : 'shown in'} the app`);
     } catch (e) {
-      setMsg(`Could not update — ${e.message}`);
+      fail('update', e);
     } finally {
       setBusyRow('');
     }
@@ -35,12 +42,15 @@ export function useReadingEditor({ date, reload, setMsg }) {
   const save = async () => {
     setSaving(true);
     try {
-      if (editing._id) await api.horoscopes.update(editing._id, editing);
-      else await api.horoscopes.create(editing);
+      const isNew = !editing._id;
+      if (isNew) await api.horoscopes.create(editing);
+      else await api.horoscopes.update(editing._id, editing);
+      const name = nameOf(editing);
       setEditing(null);
       await reload();
+      toast.success(isNew ? `${name} reading saved for ${editing.date}` : `${name} reading updated`);
     } catch (e) {
-      setMsg(`Could not save — ${e.message}`);
+      fail('save', e);
     } finally {
       setSaving(false);
     }
@@ -59,8 +69,9 @@ export function useReadingEditor({ date, reload, setMsg }) {
       await api.horoscopes.remove(editing._id);
       setEditing(null);
       await reload();
+      toast.success(`${s?.name || 'Reading'} reading for ${editing.date} deleted`);
     } catch (e) {
-      setMsg(`Could not delete — ${e.message}`);
+      fail('delete', e);
     }
   };
 

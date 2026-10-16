@@ -1,4 +1,5 @@
-import { Button, Field, Modal } from '../../../ui/index.js';
+import { Button, Modal } from '../../../ui/index.js';
+import { PasswordField } from './PasswordField.jsx';
 
 export function ResetPasswordModal({ form, saving, error, onChange, onSave, onClose }) {
   return (
@@ -19,13 +20,7 @@ export function ResetPasswordModal({ form, saving, error, onChange, onSave, onCl
         </>
       }>
       {!!error && <p className="feat-form-error" role="alert">{error}</p>}
-      <Field
-        label="New password"
-        type="password"
-        value={form.password}
-        placeholder="at least 8 characters"
-        onChange={(v) => onChange({ ...form, password: v })}
-      />
+      <PasswordField label="New password" value={form.password} onChange={(v) => onChange({ ...form, password: v })} />
     </Modal>
   );
 }

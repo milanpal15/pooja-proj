@@ -21,19 +21,25 @@ export function useUsers() {
     load();
   }, [load]);
 
-  const write = async (work, failed) => {
+  const write = async (work, failed, done) => {
     try {
       await work();
     } catch (e) {
       toast.error(`${failed} ${e.message}`);
       return;
     }
+    toast.success(done);
     load();
   };
 
+  const who = (u) => u.name || u.contact || 'User';
   const toggleBlock = (u) =>
-    write(() => api.users.update(u._id, { blocked: !u.blocked }), u.blocked ? 'Could not unblock.' : 'Could not block.');
-  const remove = (u) => write(() => api.users.remove(u._id), 'Could not delete.');
+    write(
+      () => api.users.update(u._id, { blocked: !u.blocked }),
+      u.blocked ? 'Could not unblock.' : 'Could not block.',
+      u.blocked ? `${who(u)} unblocked` : `${who(u)} blocked. They are signed out of the app.`,
+    );
+  const remove = (u) => write(() => api.users.remove(u._id), 'Could not delete.', `${who(u)} deleted`);
 
   return { rows, err, reload: load, toggleBlock, remove };
 }

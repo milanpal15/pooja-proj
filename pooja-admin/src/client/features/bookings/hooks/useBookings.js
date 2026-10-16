@@ -39,7 +39,7 @@ function useStatusList({ fetchRows, setStatus, noun }) {
     setBusy(idOf(row));
     try {
       await setStatus(idOf(row), step.to);
-      toast.success('Status updated');
+      toast.success(`${row.bookingRef || row.ref || 'Status'} moved to ${step.to === 'sankalp' ? 'Sankalp done' : step.to[0].toUpperCase() + step.to.slice(1)}`);
       await list.reload();
     } catch (e) {
       toast.error(`Could not update. ${e.message}`);

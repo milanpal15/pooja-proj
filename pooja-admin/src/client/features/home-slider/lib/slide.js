@@ -16,6 +16,12 @@ export const TARGET_TYPES = [
   { value: 'bhajan', label: 'Bhajan' },
   { value: 'astrologer', label: 'Astrologer' },
   { value: 'coins', label: 'Add coins' },
+  { value: 'events', label: 'Events list' },
+  { value: 'event', label: 'One event', refLabel: 'Event slug' },
+  { value: 'live', label: 'Live darshan', refLabel: 'Stream slug (optional)' },
+  { value: 'panchang', label: 'Panchang' },
+  { value: 'horoscope', label: 'Rashifal' },
+  { value: 'route', label: 'App screen', refLabel: 'In-app path, e.g. /events' },
   { value: 'link', label: 'Web link', refLabel: 'Link (https only)' },
   { value: 'none', label: 'Nothing (not tappable)' },
 ];
@@ -26,7 +32,7 @@ export const LANGUAGES = [
 ];
 
 const typeOf = (value) => TARGET_TYPES.find((t) => t.value === value);
-export const needsRef = (type) => ['pooja', 'chadhava', 'temple', 'link'].includes(type);
+export const needsRef = (type) => ['pooja', 'chadhava', 'temple', 'event', 'live', 'route', 'link'].includes(type);
 export const refKindOf = (type) => typeOf(type)?.refKind;
 
 /** Is `s` an https URL with a host and nothing a browser would not open? */
@@ -78,7 +84,9 @@ export function validateSlide(d) {
   if (!typeOf(d.type)) e.type = 'Pick where the slide opens.';
   else if (needsRef(d.type)) {
     const ref = String(d.ref || '').trim();
-    if (!ref) e.ref = d.type === 'link' ? 'Enter the link.' : 'Pick one.';
+    if (!ref && d.type === 'live') { /* optional: opens the live list */ }
+    else if (!ref) e.ref = d.type === 'link' ? 'Enter the link.' : ['event', 'route'].includes(d.type) ? 'Enter a value.' : 'Pick one.';
+    else if (d.type === 'route' && !ref.startsWith('/')) e.ref = 'Must start with /';
     else if (d.type === 'link' && !isHttpsUrl(ref)) e.ref = 'Links must start with https://';
   }
   if (d.start && d.end && d.end < d.start) e.end = 'The end date is before the start date.';
@@ -143,6 +151,12 @@ export function targetLabel(target, names = {}, href = '') {
     case 'bhajan': return 'Bhajan';
     case 'astrologer': return 'Astrologer list';
     case 'coins': return 'Add coins';
+    case 'events': return 'Events list';
+    case 'event': return `Event · ${ref || '—'}`;
+    case 'live': return ref ? `Live darshan · ${ref}` : 'Live darshan';
+    case 'panchang': return 'Panchang';
+    case 'horoscope': return 'Rashifal';
+    case 'route': return `Screen · ${ref || '—'}`;
     case 'link': {
       try { return `Web link · ${new URL(ref).hostname}`; } catch { return 'Web link'; }
     }

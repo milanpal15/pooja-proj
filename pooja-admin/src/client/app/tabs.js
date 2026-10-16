@@ -19,6 +19,7 @@ import {
   wallpaperStyleResource,
 } from '../features/content/index.js';
 import { ChadhavaPage } from '../features/chadhava/index.js';
+import { EventsPage } from '../features/events/index.js';
 import { FlagsPage } from '../features/flags/index.js';
 import { HomeLayoutPage } from '../features/home-layout/index.js';
 import { HomeSliderPage } from '../features/home-slider/index.js';
@@ -62,6 +63,7 @@ const PAGES = {
   'Home layout': HomeLayoutPage,
   'Home slider': HomeSliderPage,
   'Live darshan': LivePage,
+  Events: EventsPage,
   Horoscope: HoroscopePage,
   Panchang: contentPage(panchangResource),
   Reminders: contentPage(reminderResource),

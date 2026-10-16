@@ -160,6 +160,26 @@ export const api = {
     reorder: (ids) => req('/admin/home-sections/order', send('PUT', { ids })),
   },
 
+  /**
+   * Home layout v2 (docs/HOME_LAYOUT.md §4). Area content; editors write, viewers read.
+   * A refused document throws with `code: 'bad_layout'` and `body.fields` = { 'blocks.3.data.source': message }.
+   */
+  homeLayout: {
+    /** { draft:{schemaVersion,blocks,updatedAt,updatedBy}, published:{version,publishedAt,publishedBy,note,blockCount}, history:[…], dirty } */
+    get: () => req('/admin/home-layout'),
+    /** Block types, sources, action types, icons, tones, flags — every form is drawn from it. */
+    registry: () => req('/admin/home-layout/registry'),
+    saveDraft: (doc) => req('/admin/home-layout/draft', send('PUT', doc)),
+    /** Checks a document, saves nothing. Resolves { ok:true }; a bad one throws like saveDraft. */
+    validate: (doc) => req('/admin/home-layout/validate', send('POST', doc)),
+    publish: (note) => req('/admin/home-layout/publish', send('POST', { note: note || undefined })),
+    /** Copies a version into the DRAFT (does not publish). */
+    rollback: (version) => req('/admin/home-layout/rollback', send('POST', { version })),
+    resetDefault: () => req('/admin/home-layout/reset-default', send('POST')),
+    /** The stored document of one version. */
+    version: (n) => req(`/admin/home-layout/versions/${n}`),
+  },
+
   /** Live darshan (docs/LIVE_DARSHAN.md). Area content. */
   liveStreams: {
     ...adminResource('live-streams', 'streams'),
@@ -169,6 +189,27 @@ export const api = {
     check: (body) => req('/admin/live-streams/check', send('POST', body)),
   },
   liveCategories: adminResource('live-categories', 'categories'),
+
+  /** Events (docs/EVENTS.md §5.2). Area `events`; editors write, viewers read. */
+  events: {
+    ...adminResource('events', 'events'),
+    /** The full document. Tolerates `{ event }` or a bare document. */
+    get: async (id) => {
+      const r = await req(`/admin/events/${id}`);
+      return r?.event ?? r;
+    },
+    /** The task-kind registry: [{ kind, title, configSchema, signals, interactive }]. The rule builder is drawn from it. */
+    taskKinds: async () => rows(await req('/admin/events/task-kinds'), 'kinds'),
+    /** { joined, finished, perMilestone:[{key,completedCount,completedPct}], checkedIn }; any value may be null (unknown). */
+    stats: (id) => req(`/admin/events/${id}/stats`),
+    /** { items:[{id,name,contact,joinedAt,passCode,progress:{done,total},completed,lastActivityAt}], next } — names are masked by the API. */
+    participants: async (id, { cursor, limit = 50 } = {}) => {
+      const r = await req(`/admin/events/${id}/participants${qs({ cursor, limit })}`);
+      return { items: Array.isArray(r) ? r : r?.items ?? [], next: Array.isArray(r) ? null : r?.next ?? null };
+    },
+  },
+  eventTypes: adminResource('event-types', 'types'),
+  eventBadges: adminResource('event-badges', 'badges'),
 
   /** Chadhava offering catalogue — editors may manage it. */
   offerings: adminResource('offerings', 'offerings'),
