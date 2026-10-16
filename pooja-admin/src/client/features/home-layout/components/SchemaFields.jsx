@@ -1,4 +1,4 @@
-import { Field, Switch } from '../../../ui/index.js';
+import { Field, Segmented, Switch } from '../../../ui/index.js';
 import { schemaFields } from '../lib/registry.js';
 import { useBuilder } from './BuilderContext.js';
 
@@ -20,6 +20,19 @@ export function SchemaFields({ schema, values, onChange, base }) {
         const error = err(`${base}.${f.key}`);
         const value = values[f.key] ?? '';
         if (f.type === 'boolean') return <Switch key={f.key} variant="card" label={f.label} hint={f.hint} checked={!!values[f.key]} onChange={(v) => put(f.key, v)} {...dis} />;
+        if (f.type === 'select' && f.segmented && !f.ref) {
+          const cur = String(value);
+          return (
+            <div key={f.key} className="ui-field">
+              <span className="ui-field__label">{f.label}</span>
+              {dis.disabled
+                ? <span className="ui-readout">{f.options.find((o) => o.value === cur)?.label || cur || 'Default'}</span>
+                : <Segmented label={f.label} options={f.options} value={cur} onChange={(v) => put(f.key, v)} />}
+              {f.hint && !error && <p className="ui-field__hint">{f.hint}</p>}
+              {error && <p className="ui-field__error">{error}</p>}
+            </div>
+          );
+        }
         if (f.type === 'select') {
           return (
             <Field key={f.key} label={f.label} type="select" value={String(value)} hint={f.hint} error={error} onChange={(v) => put(f.key, v)} {...dis}>

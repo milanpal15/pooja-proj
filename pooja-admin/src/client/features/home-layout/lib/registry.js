@@ -12,6 +12,14 @@ export const humanise = (k) => {
   return s.charAt(0).toUpperCase() + s.slice(1);
 };
 
+/** docs/HOME_LAYOUT.md 9.1: the closed list, used only when an older registry does not send `audiences`. */
+export const FALLBACK_AUDIENCES = [
+  { key: 'new_user', label: 'New users (first 7 days)', description: '' },
+  { key: 'has_booking', label: 'Has a booking', description: '' },
+  { key: 'in_event', label: 'In an event', description: '' },
+  { key: 'lapsed', label: "Hasn't opened in 14 days", description: '' },
+];
+
 const asKey = (x, ...names) => (typeof x === 'string' ? x : names.map((n) => x?.[n]).find((v) => v != null) ?? '');
 
 /** The raw registry -> { types, typeMap, sources, sourceMap, actions, icons, tones, flags }. Never throws. */
@@ -23,6 +31,8 @@ export function normaliseRegistry(raw) {
     description: t.description || '',
     minAppVersion: t.minAppVersion || '',
     icon: t.icon || '',
+    fixed: t.fixed === true,
+    summary: typeof t.summary === 'string' ? t.summary : '',
     group: t.group || t.category || '',
     props: t.props || null,
     data: {
@@ -48,7 +58,9 @@ export function normaliseRegistry(raw) {
     actions: (Array.isArray(r.actionTypes) ? r.actionTypes : []).map((a) => asKey(a, 'type', 'key', 'value')).filter(Boolean),
     icons: (Array.isArray(r.icons) ? r.icons : []).map((a) => asKey(a, 'name', 'key', 'value')).filter(Boolean),
     tones: (Array.isArray(r.tones) ? r.tones : []).map((a) => asKey(a, 'name', 'key', 'value')).filter(Boolean),
-    limits: { blocks: 60, items: 24, text: 160, ...(r.limits && typeof r.limits === 'object' ? r.limits : {}) },
+    audiences: (Array.isArray(r.audiences) && r.audiences.length ? r.audiences : FALLBACK_AUDIENCES).map((a) => (typeof a === 'string' ? { key: a, label: humanise(a), description: '' } : { key: asKey(a, 'key', 'id', 'value'), label: a.label || humanise(asKey(a, 'key', 'id', 'value')), description: a.description || '' })).filter((a) => a.key),
+    tileStyles: (Array.isArray(r.tileStyles) ? r.tileStyles : []).map((a) => (typeof a === 'string' ? { value: a, label: humanise(a) } : { value: asKey(a, 'key', 'value', 'id'), label: a.label || humanise(asKey(a, 'key', 'value', 'id')) })).filter((a) => a.value),
+    limits: { layouts: 8, blocks: 60, items: 24, text: 160, ...(r.limits && typeof r.limits === 'object' ? r.limits : {}) },
     flags: (Array.isArray(r.flags) ? r.flags : []).map((a) => asKey(a, 'key', 'name', 'value')).filter(Boolean),
   };
 }
@@ -78,10 +90,16 @@ export function defaultMode(type) {
 const KEY_REFS = { temple: 'temples', category: 'categories' };
 const SKIP = ['type', 'required', 'additionalProperties', '$schema', 'title', 'description'];
 
+/** Presentation only: how a few well-known prop values read. The values themselves come from the registry. */
+const OPTION_LABELS = { icon: 'Icon + label', image: 'Image tiles', pill: 'Pills', photo3: 'Photo cards (3)', book2: 'Book cards (2)', list: 'List', grid4: 'Grid (4)', banner: 'Banner', html: 'HTML' };
+const PROP_LABELS = { columns: 'Per row', tileStyle: 'Tile style', layout: 'Layout', showWallet: 'Show the wallet chip', kind: 'Kind' };
+export const optionLabel = (key, o) => (key === 'tileStyle' || key === 'layout' || key === 'kind' ? OPTION_LABELS[o] : null) ?? String(o);
+
 function field(key, spec, required) {
   const s = typeof spec === 'string' ? { type: spec } : spec || {};
   const t = String(s.type || '').toLowerCase();
-  const options = (s.options || s.enum || []).map((o) => (typeof o === 'object' ? { value: String(o.value), label: o.label ?? String(o.value) } : { value: String(o), label: String(o) }));
+  const labels = s.labels && typeof s.labels === 'object' ? s.labels : {};
+  const options = (s.options || s.enum || []).map((o) => (typeof o === 'object' ? { value: String(o.value), label: o.label ?? String(o.value) } : { value: String(o), label: labels[o] ?? optionLabel(key, o) }));
   const html = t === 'html' || s.format === 'html' || s.format === 'textarea' || /^html/i.test(key) || (s.maxLength || 0) > 300;
   let type = 'text';
   if (t === 'number' || t === 'integer') type = 'number';
@@ -93,8 +111,10 @@ function field(key, spec, required) {
     key,
     type,
     options,
+    /** A short closed choice (2-5 options) reads best as joined buttons. */
+    segmented: options.length >= 2 && options.length <= 5,
     integer: t === 'integer',
-    label: s.label || s.title || humanise(key),
+    label: s.label || s.title || PROP_LABELS[key] || humanise(key),
     numeric: t === 'number' || t === 'integer',
     hint: s.hint || s.description || (t === 'html' || s.format === 'html' ? 'Sanitised when saved.' : ''),
     placeholder: s.placeholder || '',

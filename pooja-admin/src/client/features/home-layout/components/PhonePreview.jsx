@@ -1,92 +1,99 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { api } from '../../../lib/api/index.js';
-import { Segmented } from '../../../ui/index.js';
-import { previewModel, visibilityLabel } from '../lib/preview.js';
+import { shownBlocks, visibilityLabel } from '../lib/preview.js';
+import { FIXED_ID } from './SectionList.jsx';
+import { Glyph } from './Glyph.jsx';
 
-const initial = (s) => (s ? String(s).trim().charAt(0).toUpperCase() : '·');
-
-function Tile({ it, shape }) {
+/** One tile of a grid / shelf, in the active tile style. */
+function Tile({ it, shape, tileStyle }) {
+  if (tileStyle === 'pill') return <li className="hl3-tilechip">{it.title || '·'}</li>;
   return (
-    <li className={`hl2-tile hl2-tile--${shape}`}>
-      <span className="hl2-tile__art" style={it.image ? { backgroundImage: `url(${api.asset(it.image)})` } : undefined}>
-        {!it.image && <span aria-hidden="true">{it.icon ? it.icon.slice(0, 2) : initial(it.title)}</span>}
-        {it.live && <i className="hl2-tile__live">LIVE</i>}
-        {it.badge && <i className="hl2-tile__badge">{it.badge}</i>}
+    <li className={`hl3-pvtile hl3-pvtile--${shape} ${tileStyle === 'image' ? 'hl3-pvtile--image' : ''}`}>
+      <span className="hl3-pvtile__art" style={it.image ? { backgroundImage: `url(${api.asset(it.image)})` } : undefined}>
+        {!it.image && <Glyph name={it.icon} size={14} />}
+        {it.live && <i className="hl3-pvtile__live">LIVE</i>}
+        {it.badge && <i className="hl3-pvtile__badge">{it.badge}</i>}
       </span>
-      <span className="hl2-tile__name">{it.title || '(untitled)'}</span>
-      {shape === 'row' && it.subtitle && <span className="hl2-tile__sub">{it.subtitle}</span>}
+      {tileStyle !== 'image' && <span className="hl3-pvtile__name">{it.title}</span>}
     </li>
   );
 }
 
-/** One block drawn from its model: a card with title, tone and what it holds. */
+function Body({ m }) {
+  if (m.art === 'topbar') return <div className="hl3-pv__top"><i className="hl3-pv__ring" /><i className="hl3-pv__bar" /><i className="hl3-pv__chip" /></div>;
+  if (m.art === 'search') return null;
+  if (m.art === 'chips' && m.kind !== 'items') return <div className="hl3-pv__chips">{[0, 1, 2, 3, 4].map((i) => <i key={i} />)}</div>;
+  if (m.kind === 'gap') return <div className="hl3-pv__gap" style={{ height: Math.min(m.height, 96) / 2 + 8 }}>{m.height}px</div>;
+  if (m.kind === 'items') {
+    if (m.items.length === 0) return <div className="hl3-pv__empty">Nothing in this section yet</div>;
+    const cap = m.cols ? m.cols * 3 : 6;
+    return (
+      <ul className={`hl3-pvtiles hl3-pvtiles--${m.shape} ${m.tileStyle === 'pill' ? 'hl3-pvtiles--pill' : ''}`} style={m.cols && m.tileStyle !== 'pill' ? { gridTemplateColumns: `repeat(${m.cols}, minmax(0, 1fr))` } : undefined}>
+        {m.items.slice(0, cap).map((it, i) => <Tile key={i} it={it} shape={m.shape} tileStyle={m.tileStyle} />)}
+        {m.items.length > cap && <li className="hl3-pvtile__more">+{m.items.length - cap} more</li>}
+      </ul>
+    );
+  }
+  if (m.kind === 'source') return <div className="hl3-pv__src">live: {m.source}{m.limit ? ` · up to ${m.limit}` : ''}</div>;
+  return null;
+}
+
+/** One block drawn from its model, in the design's flat style. */
 function PreviewBlock({ m, selected, onSelect }) {
-  const off = m.visibility;
+  const label = m.title || m.typeTitle;
+  const cls = ['hl3-pv', `hl3-pv--${m.art || m.kind}`, m.tone ? `hl-tone-${m.tone}` : '', selected ? 'hl3-pv--on' : '', m.visibility ? 'hl3-pv--off' : ''].filter(Boolean).join(' ');
   return (
-    <li className={`hl2-pv ${m.tone ? `hl-tone-${m.tone}` : ''} ${selected ? 'hl2-pv--on' : ''} ${off ? 'hl2-pv--off' : ''} ${m.kind === 'gap' ? 'hl2-pv--gap' : ''}`}>
-      <button type="button" className="hl2-pv__hit" aria-label={`Select ${m.title || m.typeTitle}`} aria-current={selected ? 'true' : undefined} onClick={() => onSelect(m.id)} />
-      {m.kind === 'gap' ? (
-        <div className="hl2-pv__gap" style={{ height: Math.min(m.height, 96) / 2 + 12 }}><span>{m.typeTitle} · {m.height}px</span></div>
-      ) : (
-        <>
-          <div className="hl2-pv__head">
-            <span className="hl2-pv__title">{m.title || m.typeTitle}</span>
-            {m.hasAction && <span className="hl2-pv__see">{m.actionLabel || 'See all'} ›</span>}
-          </div>
-          {m.subtitle && <div className="hl2-pv__sub">{m.subtitle}</div>}
-          {m.kind === 'source' && (
-            <div className="hl2-pv__hatch">live source: <b>{m.source}</b>{m.auth ? ' · signed-in only' : ''}{m.limit ? ` · up to ${m.limit}` : ''}</div>
-          )}
-          {m.kind === 'items' && (m.items.length === 0 ? (
-            <div className="hl2-pv__empty">No cards yet</div>
-          ) : (
-            <ul className={`hl2-tiles hl2-tiles--${m.shape}`} style={m.cols ? { gridTemplateColumns: `repeat(${m.cols}, minmax(0, 1fr))` } : undefined}>
-              {m.items.slice(0, m.cols ? m.cols * 2 : 6).map((it, i) => <Tile key={i} it={it} shape={m.shape} />)}
-              {m.items.length > (m.cols ? m.cols * 2 : 6) && <li className="hl2-tile__more">+{m.items.length - (m.cols ? m.cols * 2 : 6)} more</li>}
-            </ul>
-          ))}
-          {m.kind === 'plain' && (m.note || m.icon) && <div className="hl2-pv__plain">{m.note}{m.note && m.icon ? ' · ' : ''}{m.icon ? `icon: ${m.icon}` : ''}</div>}
-        </>
-      )}
-      <div className="hl2-pv__meta">
-        {m.unknownType && <span className="hl2-pv__chip hl2-pv__chip--warn">unknown type</span>}
-        {off && <span className="hl2-pv__chip hl2-pv__chip--warn">{visibilityLabel(off)}</span>}
-        {m.flag && <span className="hl2-pv__chip">flag: {m.flag}</span>}
-        {m.language !== 'all' && <span className="hl2-pv__chip">{m.language.toUpperCase()} only</span>}
-      </div>
+    <li className={cls}>
+      <button type="button" className="hl3-pv__hit" aria-label={`Select ${label}`} aria-current={selected ? 'true' : undefined} onClick={() => onSelect(m.id)} />
+      {m.art !== 'topbar' && m.art !== 'search' && <em className="hl3-pv__em">{label}{selected ? ' · editing' : ''}{m.visibility ? ` · ${visibilityLabel(m.visibility)}` : ''}</em>}
+      <Body m={m} />
     </li>
   );
 }
 
 /**
- * A schematic phone drawn from the layout JSON alone. It does not run the app:
- * live sources are hatched placeholders, and a block that would not show
- * (off, out of its dates, or in the other language) is greyed. The language
- * toggle only changes which texts and language-limited blocks are drawn.
+ * LIVE PREVIEW: a schematic phone drawn from the layout JSON alone, as the chosen "Preview as"
+ * person would see it (sections they would not see are left out, except the one being edited,
+ * which stays, greyed, so it can still be edited). It does not run the app.
  */
-export function PhonePreview({ blocks, reg, selectedId, lang, onLang, onSelect }) {
-  const now = Date.now();
+export function PhonePreview({ blocks, reg, fixed, selectedId, persona, onSelect, note }) {
   const screen = useRef(null);
-  // Keep the selected block in view inside the phone (scrolls the phone, never the page).
+  const [scroll, setScroll] = useState({ page: 1, pages: 1 });
+  const now = Date.now();
+  const keep = selectedId === FIXED_ID ? null : selectedId;
+  const opts = { now, lang: persona.lang, persona };
+  const models = shownBlocks(blocks, reg, opts, keep);
+  // The fixed pair is selected as one row; its blocks draw highlighted together.
+  const fixedIds = new Set(blocks.slice(0, fixed).map((b) => b.id));
+
+  const measure = useCallback(() => {
+    const el = screen.current;
+    if (!el) return;
+    const h = el.clientHeight || 1;
+    setScroll({ page: Math.min(Math.ceil(el.scrollHeight / h), Math.floor(el.scrollTop / h) + 1), pages: Math.max(1, Math.ceil((el.scrollHeight - 1) / h)) });
+  }, []);
+  useLayoutEffect(measure, [measure, models.length, blocks, persona]);
   useEffect(() => {
     const el = screen.current?.querySelector('[aria-current="true"]')?.parentElement;
     const box = screen.current;
     if (el && box) box.scrollTo({ top: Math.max(0, el.offsetTop - 20), behavior: 'smooth' });
   }, [selectedId]);
+
   return (
-    <div className="hl2-phone">
-      <div className="hl2-phone__bar">
-        <h2 className="hl2-h">Preview</h2>
-        <Segmented label="Preview language" options={[{ value: 'en', label: 'EN' }, { value: 'hi', label: 'HI' }]} value={lang} onChange={onLang} />
+    <div className="hl3-phone">
+      <div className="hl3-label hl3-phone__head">Live preview<span>Scroll {scroll.page} of {scroll.pages}</span></div>
+      <div className="hl3-phone__frame">
+        <div className="hl3-phone__screen">
+          <ol ref={screen} className="hl3-phone__scroll" aria-label="Schematic phone preview" onScroll={measure}>
+            {models.map((m) => <PreviewBlock key={m.id} m={m} selected={m.id === selectedId || (selectedId === FIXED_ID && fixedIds.has(m.id))} onSelect={(id) => onSelect(fixedIds.has(id) ? FIXED_ID : id)} />)}
+            {models.length === 0 && <li className="hl3-pv__empty">Empty Home</li>}
+          </ol>
+          <div className="hl3-phone__nav" aria-hidden="true"><i className="hl3-phone__tab hl3-phone__tab--on" /><i /><i /><i /><i /></div>
+        </div>
       </div>
-      <div className="hl2-phone__frame">
-        <ol ref={screen} className="hl2-phone__screen" aria-label="Schematic phone preview">
-          {blocks.map((b) => <PreviewBlock key={b.id} m={previewModel(b, reg, { now, lang })} selected={b.id === selectedId} onSelect={onSelect} />)}
-          {blocks.length === 0 && <li className="hl2-pv__empty">Empty Home</li>}
-        </ol>
-      </div>
-      <p className="hl2-phone__note">A sketch from the layout, not the app. Hatched blocks fill from live data on the phone.</p>
+      <p className="hl3-note hl3-note--c">Click a block to edit it. The preview follows the “Preview as” choice above.</p>
+      {note && <p className="hl3-note hl3-note--c hl3-note--warn">{note}</p>}
     </div>
   );
 }

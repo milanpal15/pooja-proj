@@ -165,9 +165,9 @@ export const api = {
    * A refused document throws with `code: 'bad_layout'` and `body.fields` = { 'blocks.3.data.source': message }.
    */
   homeLayout: {
-    /** { draft:{schemaVersion,blocks,updatedAt,updatedBy}, published:{version,publishedAt,publishedBy,note,blockCount}, history:[…], dirty } */
+    /** { draft:{schemaVersion:2,layouts,updatedAt,updatedBy}, published:{version,publishedAt,publishedBy,note,blockCount,layoutCount?}, history:[…], changes, dirty } (docs/HOME_LAYOUT.md §9) */
     get: () => req('/admin/home-layout'),
-    /** Block types, sources, action types, icons, tones, flags — every form is drawn from it. */
+    /** Block types (with `fixed`, `summary`), sources, audiences, tile styles, action types, icons, tones, flags — every form is drawn from it. */
     registry: () => req('/admin/home-layout/registry'),
     saveDraft: (doc) => req('/admin/home-layout/draft', send('PUT', doc)),
     /** Checks a document, saves nothing. Resolves { ok:true }; a bad one throws like saveDraft. */
@@ -175,7 +175,10 @@ export const api = {
     publish: (note) => req('/admin/home-layout/publish', send('POST', { note: note || undefined })),
     /** Copies a version into the DRAFT (does not publish). */
     rollback: (version) => req('/admin/home-layout/rollback', send('POST', { version })),
+    /** The set becomes {layouts:[default]} with the built-in default (a draft; does not publish). */
     resetDefault: () => req('/admin/home-layout/reset-default', send('POST')),
+    /** The draft becomes the published set again -> { draft }. */
+    discard: () => req('/admin/home-layout/discard', send('POST')),
     /** The stored document of one version. */
     version: (n) => req(`/admin/home-layout/versions/${n}`),
   },

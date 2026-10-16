@@ -27,3 +27,19 @@ export const takesRef = (type) => refKind(type) !== 'none';
 
 /** A one-line description for the preview chip / list: "pooja → kashi-aarti". */
 export const actionLabel = (a) => (!a || !a.type || a.type === 'none' ? '' : a.ref ? `${a.type} → ${a.ref}` : a.type);
+
+/**
+ * "Opens · <target>" under a tile's name (presentation only): the screen an action opens, in words an operator knows.
+ * `label` maps a catalogue ref to its title when the dashboard has the list.
+ */
+const OPENS = {
+  pooja: 'Pooja Seva list', chadhava: 'Chadhava Seva list', temple: 'Temples', bhajan: 'Bhajan tab', astrologer: 'Astrologers', coins: 'Wallet',
+  event: 'Event', live: 'Live Darshan list', panchang: 'Panchang', horoscope: 'Rashifal', events: 'Events', link: 'Web link',
+};
+export function actionTarget(a, label = (x) => x) {
+  if (!a || !a.type || a.type === 'none') return 'Nothing yet';
+  if (a.type === 'route') return a.ref || 'In-app screen';
+  if (a.type === 'link') return a.ref ? a.ref.replace(/^https?:\/\//, '') : 'Web link';
+  const base = OPENS[a.type] || a.type;
+  return a.ref ? `${base.replace(/ list$/, '')} · ${label(a.ref)}` : base;
+}

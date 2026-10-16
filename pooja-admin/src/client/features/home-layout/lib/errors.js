@@ -1,8 +1,8 @@
 /**
- * The API's 400 `bad_layout` `fields` ({ 'blocks.3.data.source': 'message' })
- * mapped onto the exact block and field. Errors are keyed by block ID at the
- * moment they arrive, so reordering the list afterwards cannot point them at
- * the wrong block, and each one remembers the value it was about: it stays
+ * The API's 400 `bad_layout` `fields` ({ 'layouts.1.blocks.3.audience.0': 'message' })
+ * mapped onto the exact layout, block and field. Errors are keyed by layout and
+ * block ID at the moment they arrive, so reordering afterwards cannot point them
+ * at the wrong block, and each one remembers the value it was about: it stays
  * while that value is unchanged and clears the moment the field is edited.
  */
 
@@ -25,50 +25,77 @@ export function getPath(obj, path) {
 }
 
 /**
- * @returns {{ entries: Array<{path, blockId, sub, message, snapshot}>, global: Array<{path, message}> }}
- * `sub` is the path inside the block ('data.source', '' for the block itself).
- * `global` holds what belongs to no block ('schemaVersion', 'blocks', a gone index).
+ * @returns {{ entries: Array<{path, layoutId, blockId, sub, message, snapshot}>, global: Array<{path, message}> }}
+ * `blockId` is null for an error on the layout itself ('layouts.2.name'); `sub` is the path inside the block
+ * (or layout) ('data.source', 'audience.0', '' for the block itself). `global` holds what belongs to no layout
+ * ('schemaVersion', 'layouts', a gone index).
  */
-export function mapErrors(fields, blocks) {
+export function mapErrors(fields, doc) {
   const entries = [];
   const global = [];
+  const layouts = doc?.layouts || [];
   for (const [path, message] of Object.entries(normaliseFields(fields))) {
-    const m = /^blocks\.(\d+)(?:\.(.*))?$/.exec(path);
-    const block = m ? blocks[Number(m[1])] : null;
-    if (!block) {
+    const m = /^layouts\.(\d+)(?:\.(.*))?$/.exec(path);
+    const layout = m ? layouts[Number(m[1])] : null;
+    if (!layout) {
       global.push({ path, message });
       continue;
     }
-    const sub = m[2] || '';
-    entries.push({ path, blockId: block.id, sub, message, snapshot: sub ? JSON.stringify(getPath(block, sub) ?? null) : null });
+    const rest = m[2] || '';
+    const b = /^blocks\.(\d+)(?:\.(.*))?$/.exec(rest);
+    if (b) {
+      const block = layout.blocks?.[Number(b[1])];
+      if (!block) {
+        entries.push({ path, layoutId: layout.id, blockId: null, sub: rest, message, snapshot: null });
+        continue;
+      }
+      const sub = b[2] || '';
+      entries.push({ path, layoutId: layout.id, blockId: block.id, sub, message, snapshot: sub ? JSON.stringify(getPath(block, sub) ?? null) : null });
+    } else {
+      // 'blocks' (a count rule) has no single value to watch; keep it until the next save.
+      entries.push({ path, layoutId: layout.id, blockId: null, sub: rest, message, snapshot: rest && rest !== 'blocks' ? JSON.stringify(getPath(layout, rest) ?? null) : null });
+    }
   }
   return { entries, global };
 }
 
-/** The entries still true for the current blocks (field unedited, block still there). */
-export function activeEntries(entries, blocks) {
+/** The entries still true for the current document (field unedited, layout / block still there). */
+export function activeEntries(entries, doc) {
   return entries.filter((e) => {
-    const b = blocks.find((x) => x.id === e.blockId);
-    if (!b) return false;
-    return e.snapshot === null || JSON.stringify(getPath(b, e.sub) ?? null) === e.snapshot;
+    const l = (doc?.layouts || []).find((x) => x.id === e.layoutId);
+    if (!l) return false;
+    if (e.blockId) {
+      const b = (l.blocks || []).find((x) => x.id === e.blockId);
+      if (!b) return false;
+      return e.snapshot === null || JSON.stringify(getPath(b, e.sub) ?? null) === e.snapshot;
+    }
+    return e.snapshot === null || JSON.stringify(getPath(l, e.sub) ?? null) === e.snapshot;
   });
 }
 
-/** { blockId: { sub: message } } */
-export function bySubpath(entries) {
-  const out = {};
-  for (const e of entries) (out[e.blockId] ||= {})[e.sub] = e.message;
+/** { blocks: { 'layoutId/blockId': { sub: message } }, layouts: { layoutId: { sub: message } } } */
+export function indexErrors(entries) {
+  const out = { blocks: {}, layouts: {} };
+  for (const e of entries) {
+    if (e.blockId) (out.blocks[blockKey(e.layoutId, e.blockId)] ||= {})[e.sub] = e.message;
+    else (out.layouts[e.layoutId] ||= {})[e.sub] = e.message;
+  }
   return out;
 }
+export const blockKey = (layoutId, blockId) => `${layoutId}/${blockId}`;
 
 /** How many errors sit at or under `sub` ('data.items.2') for one block's map. */
 export const countUnder = (errs = {}, sub) => Object.keys(errs).filter((k) => k === sub || k.startsWith(`${sub}.`)).length;
 
-/** "Block 4 · shelf › data › source" for a banner line. */
-export function describeEntry(e, blocks) {
-  const i = blocks.findIndex((b) => b.id === e.blockId);
-  const b = blocks[i];
-  const raw = b ? (b.title || b.type) : e.blockId;
+/** "Navratri layout › Section 4 (Services grid) › data › source" for a banner line. */
+export function describeEntry(e, doc, reg) {
+  const l = (doc?.layouts || []).find((x) => x.id === e.layoutId);
+  const lead = (doc?.layouts || []).length > 1 && l ? `${l.name} › ` : '';
+  const tail = e.sub ? ` › ${e.sub.replace(/\./g, ' › ')}` : '';
+  if (!e.blockId) return `${lead || (l ? `${l.name} › ` : '')}Layout settings${tail}`;
+  const i = (l?.blocks || []).findIndex((b) => b.id === e.blockId);
+  const b = l?.blocks?.[i];
+  const raw = b ? b.title || reg?.typeMap?.[b.type]?.title || b.type : e.blockId;
   const label = raw.length > 32 ? `${raw.slice(0, 31)}…` : raw;
-  return `Block ${i + 1} (${label})${e.sub ? ` › ${e.sub.replace(/\./g, ' › ')}` : ''}`;
+  return `${lead}Section ${i + 1} (${label})${tail}`;
 }

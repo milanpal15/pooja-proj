@@ -6,7 +6,7 @@ import { exportName, format, parseDocument, peek } from '../lib/json.js';
 import { toBody } from '../lib/layout.js';
 
 /**
- * The whole `{schemaVersion, blocks}` document as text. What is typed here is
+ * The whole `{schemaVersion, layouts}` set as text (an older single-layout paste is wrapped as the default layout). What is typed here is
  * only a draft of the text until "Apply to builder": nothing reaches the
  * layout (or the server) by accident. Import is lenient (missing fields are
  * filled, ids made, unknown fields dropped, all reported); the server has the
@@ -48,7 +48,7 @@ export function JsonTab({ doc, reg, text, onText, canEdit, busy, onApply, onVali
     if (!p.doc) return;
     const r = await onValidate(p.doc); // the text as written (not cleaned), so unknown fields are reported too
     if (r.failed) setResult({ kind: 'parse', message: `Could not check. ${r.message}` });
-    else setResult(r.ok ? { kind: 'ok', notes: p.notes } : { kind: 'bad', entries: r.entries, global: r.global, blocks: p.doc.blocks, notes: p.notes });
+    else setResult(r.ok ? { kind: 'ok', notes: p.notes } : { kind: 'bad', entries: r.entries, global: r.global, doc: p.doc, notes: p.notes });
   };
   const doImport = async (file) => {
     try {
@@ -81,7 +81,7 @@ export function JsonTab({ doc, reg, text, onText, canEdit, busy, onApply, onVali
         <Button variant="outline" size="sm" onClick={doCopy}>Copy</Button>
         <input ref={fileRef} type="file" accept="application/json,.json" tabIndex={-1} aria-hidden="true" className="ui-filefield__input" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) doImport(f); }} />
         <span className="hl2-bar__spacer" />
-        {read.ok ? <Badge tone="success">{read.blocks} blocks</Badge> : <Badge tone="danger">Invalid JSON</Badge>}
+        {read.ok ? <Badge tone="success">{read.layouts} {read.layouts === 1 ? 'layout' : 'layouts'}, {read.blocks} sections</Badge> : <Badge tone="danger">Invalid JSON</Badge>}
         {edited && <Badge tone="warning">Not applied</Badge>}
         {canEdit && (
           <>
@@ -92,7 +92,7 @@ export function JsonTab({ doc, reg, text, onText, canEdit, busy, onApply, onVali
         )}
       </div>
       {!read.ok && <p className="ui-field__error" role="alert">{read.error}</p>}
-      <textarea className="ui-input hl2-json" spellCheck={false} rows={26} aria-label="Home layout JSON" readOnly={!canEdit} value={shown} onChange={(e) => type(e.target.value)} />
+      <textarea className="ui-input hl2-json" spellCheck={false} rows={26} aria-label="Home layout JSON (all layouts)" readOnly={!canEdit} value={shown} onChange={(e) => type(e.target.value)} />
       {result?.kind === 'parse' && <Banner tone="error">{result.message}</Banner>}
       {result?.kind === 'ok' && <Banner tone="success">The server accepts this layout. Apply it, save the draft, then publish.</Banner>}
       {result?.kind === 'bad' && (
@@ -100,7 +100,7 @@ export function JsonTab({ doc, reg, text, onText, canEdit, busy, onApply, onVali
           The server refused it: {result.entries.length + result.global.length} {result.entries.length + result.global.length === 1 ? 'problem' : 'problems'}.
           <ul className="hl2-errors">
             {result.global.map((g) => <li key={g.path}><b>{g.path.replace(/\./g, ' › ')}</b>: {g.message}</li>)}
-            {result.entries.map((e) => <li key={e.path}><b>{describeEntry(e, result.blocks)}</b>: {e.message}</li>)}
+            {result.entries.map((e) => <li key={e.path}><b>{describeEntry(e, result.doc, reg)}</b>: {e.message}</li>)}
           </ul>
         </Banner>
       )}

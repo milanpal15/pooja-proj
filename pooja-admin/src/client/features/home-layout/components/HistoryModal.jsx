@@ -3,15 +3,16 @@ import { useState } from 'react';
 import { api } from '../../../lib/api/index.js';
 import { formatWhen } from '../../../lib/dates.js';
 import { Badge, Banner, Button, Modal, TableSkeleton, useToast } from '../../../ui/index.js';
-import { compare, summary } from '../lib/diff.js';
+import { compareSets, summarySet } from '../lib/diff.js';
 import { exportName, format } from '../lib/json.js';
+import { normaliseDoc } from '../lib/layout.js';
 
 /**
  * Published versions, newest first. "View JSON" loads the stored document and
  * compares it with the current draft by block id; "Roll back to draft" copies
  * that version into the DRAFT (it does not publish).
  */
-export function HistoryModal({ meta, draft, canEdit, unsaved, busy, onRollback, onClose }) {
+export function HistoryModal({ meta, draft, canEdit, unsaved, busy, onRollback, onReset, onClose }) {
   const toast = useToast();
   const [view, setView] = useState(null); // { version, status, doc, error }
   const live = meta.published?.version;
@@ -21,7 +22,7 @@ export function HistoryModal({ meta, draft, canEdit, unsaved, busy, onRollback, 
     setView({ version: v, status: 'loading' });
     try {
       const doc = await api.homeLayout.version(v);
-      setView({ version: v, status: 'ready', doc: doc?.blocks ? doc : doc?.document || doc });
+      setView({ version: v, status: 'ready', doc: normaliseDoc(doc?.layouts || doc?.blocks ? doc : doc?.document || doc) });
     } catch (e) {
       setView({ version: v, status: 'error', error: e.message });
     }
@@ -39,9 +40,9 @@ export function HistoryModal({ meta, draft, canEdit, unsaved, busy, onRollback, 
 
   if (view) {
     const text = view.doc ? format(view.doc) : '';
-    const diff = view.doc ? compare(draft, view.doc) : null;
+    const diff = view.doc ? compareSets(draft, view.doc) : null;
     return (
-      <Modal open onClose={onClose} title={`Version ${view.version}`} subtitle={diff ? `Compared with your draft: ${summary(diff)} (${diff.before} → ${diff.after} blocks)` : ''} size="md"
+      <Modal open onClose={onClose} title={`Version ${view.version}`} subtitle={diff ? `Compared with your draft: ${summarySet(diff)}` : ''} size="md"
         footer={<><Button variant="secondary" onClick={() => setView(null)}>Back to history</Button>{view.doc && <><Button variant="outline" onClick={() => copy(text)}>Copy</Button><Button variant="outline" onClick={() => download(text, view.version)}>Export</Button></>}</>}>
         {view.status === 'loading' && <TableSkeleton rows={6} />}
         {view.status === 'error' && <Banner tone="error">Could not load that version. {view.error}</Banner>}
@@ -50,14 +51,14 @@ export function HistoryModal({ meta, draft, canEdit, unsaved, busy, onRollback, 
     );
   }
   return (
-    <Modal open onClose={onClose} title="History" subtitle="Published versions, newest first. The last 20 are listed." size="md" footer={<Button variant="secondary" onClick={onClose}>Close</Button>}>
+    <Modal open onClose={onClose} title="Version history" subtitle="Published versions, newest first. The last 20 are listed." size="md" footerExtra={canEdit && <Button variant="outline" disabled={!!busy} onClick={onReset}>Reset draft to built-in default</Button>} footer={<Button variant="secondary" onClick={onClose}>Close</Button>}>
       {rows.length === 0 && <p className="ui-field__hint">Nothing has been published yet.</p>}
       <ul className="hl2-history">
         {rows.map((h) => (
           <li key={h.version} className="hl2-history__row">
             <div className="hl2-history__text">
               <span className="hl2-history__title"><b>Version {h.version}</b>{h.version === live && <Badge tone="success">Live</Badge>}</span>
-              <span>{h.publishedAt ? formatWhen(h.publishedAt) : ''}{h.publishedBy ? ` · ${h.publishedBy}` : ''} · {h.blockCount ?? '?'} blocks</span>
+              <span>{h.publishedAt ? formatWhen(h.publishedAt) : ''}{h.publishedBy ? ` · ${h.publishedBy}` : ''} · {h.layoutCount ? `${h.layoutCount} ${h.layoutCount === 1 ? 'layout' : 'layouts'}, ` : ''}{h.blockCount ?? '?'} sections</span>
               {h.note && <em>“{h.note}”</em>}
             </div>
             <div className="hl2-history__actions">

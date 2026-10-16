@@ -7,6 +7,8 @@ import { useBuilder } from './BuilderContext.js';
 import { ItemsEditor } from './ItemsEditor.jsx';
 import { SchemaFields } from './SchemaFields.jsx';
 
+/** Presentation only: what the board calls a grid's entries. Everything else holds cards. */
+const NOUN = { quick_grid: 'tile' };
 const MODE_LABEL = { inline: 'Cards written here', source: 'Live feed' };
 
 /**
@@ -41,7 +43,7 @@ export function DataEditor({ block, type, onChange }) {
       {modes.length > 1 && !ro && <Segmented label="Where the content comes from" options={modes.map((m) => ({ value: m, label: MODE_LABEL[m] }))} value={mode} onChange={switchTo} />}
       {err('data') && <p className="ui-field__error" role="alert">{err('data')}</p>}
       {(!data || !modes.includes(mode)) && !ro && <p className="ui-field__hint">Pick how this block gets its content.</p>}
-      {mode === 'inline' && <ItemsEditor items={data.items || []} max={maxItemsOf(type, reg)} show={type.data.itemFields} onChange={(items) => onChange({ ...data, items })} />}
+      {mode === 'inline' && <ItemsEditor items={data.items || []} max={maxItemsOf(type, reg)} show={type.data.itemFields} noun={NOUN[type.type] || 'card'} onChange={(items) => onChange({ ...data, items })} />}
       {mode === 'source' && (
         <>
           <Field label="Source" type="select" value={data.source || ''} error={err('data.source')} hint={src?.description || (src?.auth ? 'Shown to signed-in devotees only.' : 'The app loads this live, so it never goes stale.')} onChange={setSource} {...dis}>
