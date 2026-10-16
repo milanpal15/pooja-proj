@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { api, setForbiddenHandler, setUnauthorizedHandler } from '../lib/api/index.js';
 import { AccessProvider, FORBIDDEN_TEXT } from '../lib/access/index.js';
+import { removeKey } from '../lib/storage.js';
 import { LoginPage } from '../features/login/index.js';
 import { useToast } from '../ui/index.js';
 import { AdminShell } from './AdminShell.jsx';
@@ -58,7 +59,7 @@ export function App() {
 
   if (authed === null) return null;
   if (!authed) return <LoginPage onAuthed={check} />;
-  const me = { username: session?.username ?? 'admin', role: session?.role ?? '' };
+  const me = { username: session?.username ?? 'admin', role: session?.role ?? '', roleName: session?.roleName ?? '', environment: session?.environment ?? '' };
   return (
     <AccessProvider session={session}>
       <AdminShell
@@ -69,6 +70,7 @@ export function App() {
             .then(() => toast.info('Signed out'))
             .catch((e) => toast.error(`Sign-out could not reach the server, so this browser session may still be valid. ${e.message}`))
             .finally(() => {
+              removeKey('bhakti.palette.recent', 'session');
               setAuthed(false);
               setSession(null);
             })

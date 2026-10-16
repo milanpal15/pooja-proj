@@ -15,10 +15,15 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { TAB_AREAS } from '../src/client/app/tab-areas.js';
+import { KNOWN_AREA_KEYS } from '../src/client/lib/access/areas.js';
+import { MODULES, GROUPS } from '../src/client/lib/nav/registry.js';
+import { resolveRoute } from '../src/client/lib/nav/route.js';
 import { makeAccess, tabReadOnly, tabVisible, visibleTabs } from '../src/client/lib/access/permissions.js';
 
-const AREAS = ['overview', 'content', 'horoscope', 'panchang', 'announcements', 'push', 'flags', 'policies', 'devotees', 'astrologers', 'money', 'wallets', 'orders', 'calls', 'payouts', 'operators', 'events'];
-const ABSENT = { editor: ['push', 'devotees', 'operators'], viewer: ['push', 'devotees', 'operators'] };
+// Every area (docs/ROLES.md §1): the monolith's 17 plus the governance areas that live only in backend/.
+const AREAS = KNOWN_AREA_KEYS;
+const ADMIN_ONLY = ['push', 'devotees', 'operators', 'audit', 'roles'];
+const ABSENT = { editor: ADMIN_ONLY, viewer: ADMIN_ONLY };
 
 // §21.3, transcribed. "edit" lists what the role may change; everything else it can see is view-only.
 const perms = (view, edit) => [...edit.map((a) => `${a}:edit`), ...view.filter((a) => !edit.includes(a)).map((a) => `${a}:view`)];
@@ -32,11 +37,12 @@ const session = (role) => ({ required: true, authed: true, username: role, role,
 const ALL = TAB_AREAS.map((t) => t.id);
 const byIdEarly = Object.fromEntries(TAB_AREAS.map((t) => [t.id, t]));
 const CONTENT_EDITABLE = ['Announcements', 'Deities', 'Temples', 'Aartis', 'Festivals', 'Sevas', 'Offerings', 'Knowledge', 'FAQs', 'Home layout', 'Poojas', 'Chadhava', 'Home slider', 'Live darshan', 'Events', 'Horoscope', 'Panchang', 'Reminders', 'Alert Tones', 'Wallpapers', 'Settings'];
+const HIDDEN_FROM_NON_ADMIN = ['Users', 'Operators', 'Audit log', 'Roles & permissions'];
 const EXPECT = {
   // Admin sees and edits everything (orders:edit = move a booking on, hide a review).
   admin: { visible: ALL, readOnly: [] },
-  editor: { visible: ALL.filter((t) => !['Users', 'Operators'].includes(t)), editable: CONTENT_EDITABLE },
-  viewer: { visible: ALL.filter((t) => !['Users', 'Operators'].includes(t)), editable: [] },
+  editor: { visible: ALL.filter((t) => !HIDDEN_FROM_NON_ADMIN.includes(t)), editable: CONTENT_EDITABLE },
+  viewer: { visible: ALL.filter((t) => !HIDDEN_FROM_NON_ADMIN.includes(t)), editable: [] },
 };
 EXPECT.editor.readOnly = EXPECT.editor.visible.filter((t) => !CONTENT_EDITABLE.includes(t));
 EXPECT.viewer.readOnly = EXPECT.viewer.visible;
@@ -91,6 +97,22 @@ ok(() => assert.equal(tabVisible(byId['Coins & Wallets'], walletsOnly), true, 'a
 ok(() => assert.equal(tabVisible(byId['Calls & Payouts'], walletsOnly), false));
 ok(() => assert.ok(TAB_AREAS.every((t) => [].concat(t.area).every((a) => AREAS.includes(a))), 'every tab names a known area'));
 ok(() => assert.equal(new Set(ALL).size, ALL.length, 'tab ids are unique (they are the #hash)'));
+
+// 3b. The module registry (docs/DASHBOARD_REVAMP.md §4): every module has a known area, a real group, a unique route,
+//     and its old #Tab hash still resolves to it. Editors and viewers see Releases and Approvals but may not edit them.
+ok(() => assert.equal(MODULES, TAB_AREAS, 'tab-areas.js re-exports the registry'));
+ok(() => assert.ok(MODULES.every((m) => [].concat(m.area).every((a) => KNOWN_AREA_KEYS.includes(a))), 'every module names a known area'));
+ok(() => assert.ok(MODULES.every((m) => !m.group || GROUPS.some((g) => g.key === m.group)), 'every module is in a known group'));
+ok(() => assert.equal(new Set(MODULES.map((m) => m.route)).size, MODULES.length, 'module routes are unique'));
+ok(() => assert.ok(MODULES.every((m) => resolveRoute('#' + encodeURIComponent(m.id), MODULES, GROUPS).module?.id === m.id), 'every old #Tab link resolves'));
+ok(() => assert.ok(MODULES.every((m) => resolveRoute('#' + m.route, MODULES, GROUPS).module?.id === m.id), 'every canonical route resolves'));
+ok(() => assert.deepEqual(['App releases', 'Approvals', 'Audit log', 'Roles & permissions'].map((id) => byIdEarly[id].area), ['releases', 'approvals', 'audit', 'roles']));
+ok(() => assert.equal(section('editor', 'releases', 'view'), true));
+ok(() => assert.equal(section('editor', 'releases', 'edit'), false, 'editor: no policy edits'));
+ok(() => assert.equal(section('viewer', 'approvals', 'edit'), false));
+ok(() => assert.equal(section('editor', 'audit', 'view'), false, 'audit is admin-only'));
+ok(() => assert.equal(section('editor', 'roles', 'view'), false, 'roles is admin-only'));
+ok(() => assert.equal(section('admin', 'roles', 'edit'), true));
 
 // 4. No component compares a role name (§21.6). The Operators screen's picker
 //    lists roles as data and never branches on one.

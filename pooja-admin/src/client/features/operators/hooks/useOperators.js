@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { api } from '../../../lib/api/index.js';
 import { useToast } from '../../../ui/index.js';
-import { roleLabel } from '../lib/roles.js';
+import { operatorError, roleLabel } from '../lib/roles.js';
 
 /**
  * The operator list, the two modal forms, and every write. A table action
@@ -10,7 +10,7 @@ import { roleLabel } from '../lib/roles.js';
  * lockout refusals: "This is the only admin left", "You cannot deactivate
  * yourself"); the two modals also keep the reason inline in `err`.
  */
-export function useOperators() {
+export function useOperators(roleOptions) {
   const toast = useToast();
   const [rows, setRows] = useState([]);
   const [err, setErr] = useState(null);
@@ -39,7 +39,7 @@ export function useOperators() {
       toast.success(done);
       await load();
     } catch (e) {
-      toast.error(`${failed} ${e.message}`);
+      toast.error(`${failed} ${operatorError(e)}`);
     } finally {
       setBusy('');
     }
@@ -50,12 +50,12 @@ export function useOperators() {
     setSaving(true);
     try {
       const made = await api.operators.create(adding);
-      toast.success(`Operator ${made?.username || adding.username} created as ${roleLabel(adding.role).toLowerCase()}`);
+      toast.success(`Operator ${made?.username || adding.username} created as ${roleLabel(adding.role, roleOptions).toLowerCase()}`);
       setAdding(null);
       await load();
     } catch (e) {
-      setErr(e.message);
-      toast.error(`Could not create the operator. ${e.message}`);
+      setErr(operatorError(e));
+      toast.error(`Could not create the operator. ${operatorError(e)}`);
     } finally {
       setSaving(false);
     }
@@ -89,7 +89,7 @@ export function useOperators() {
     create,
     resetPassword,
     setRole: (o, role) =>
-      act(o, () => api.operators.update(o._id, { role }), `${o.username}: role changed to ${roleLabel(role).toLowerCase()}`, 'Could not change the role.'),
+      act(o, () => api.operators.update(o._id, { role }), `${o.username}: role changed to ${roleLabel(role, roleOptions).toLowerCase()}`, 'Could not change the role.'),
     toggleActive: (o) =>
       act(
         o,

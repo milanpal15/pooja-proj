@@ -3,7 +3,7 @@ import { ROLES } from '../lib/roles.js';
 import { PasswordField } from './PasswordField.jsx';
 
 /** "New operator". */
-export function OperatorModal({ form, saving, error, onChange, onCreate, onClose }) {
+export function OperatorModal({ roles = ROLES, form, saving, error, onChange, onCreate, onClose }) {
   const set = (k) => (v) => onChange({ ...form, [k]: v });
   return (
     <Modal
@@ -28,8 +28,8 @@ export function OperatorModal({ form, saving, error, onChange, onCreate, onClose
         label="Role"
         type="select"
         value={form.role}
-        options={ROLES.map((r) => ({ value: r.value, label: r.label }))}
-        hint={ROLES.find((r) => r.value === form.role)?.desc}
+        options={roles.map((r) => ({ value: r.value, label: r.label }))}
+        hint={roles.find((r) => r.value === form.role)?.desc}
         onChange={set('role')}
       />
     </Modal>

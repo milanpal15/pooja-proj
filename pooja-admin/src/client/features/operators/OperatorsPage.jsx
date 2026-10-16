@@ -1,12 +1,12 @@
 import { useAccess } from '../../lib/access/index.js';
 import { Banner, Button, Card, DataTable, ReadOnlyBadge, useConfirm } from '../../ui/index.js';
-import { AuditLog } from './components/AuditLog.jsx';
 import { OperatorModal } from './components/OperatorModal.jsx';
 import { roleLabel } from './lib/roles.js';
 import { RoleGuide } from './components/RoleSelect.jsx';
 import { OperatorRow } from './components/OperatorRow.jsx';
 import { ResetPasswordModal } from './components/ResetPasswordModal.jsx';
 import { useOperators } from './hooks/useOperators.js';
+import { useRoleOptions } from '../../lib/hooks/useRoleOptions.js';
 
 /**
  * The people who sign in to this dashboard.
@@ -22,7 +22,8 @@ import { useOperators } from './hooks/useOperators.js';
 export function OperatorsPage({ me, area = 'operators' }) {
   const confirm = useConfirm();
   const readOnly = !useAccess().canEdit(area);
-  const ops = useOperators();
+  const { options: roles } = useRoleOptions();
+  const ops = useOperators(roles);
 
   const askDelete = async (o) => {
     const ok = await confirm({
@@ -38,8 +39,8 @@ export function OperatorsPage({ me, area = 'operators' }) {
     if (role === o.role) return;
     const ok = await confirm({
       title: 'Change role',
-      message: `Change ${o.username} from ${roleLabel(o.role)} to ${roleLabel(role)}? It takes effect on their next request.`,
-      confirmLabel: `Make ${roleLabel(role)}`,
+      message: `Change ${o.username} from ${roleLabel(o.role, roles)} to ${roleLabel(role, roles)}? It takes effect on their next request.`,
+      confirmLabel: `Make ${roleLabel(role, roles)}`,
     });
     if (ok) ops.setRole(o, role);
   };
@@ -78,7 +79,7 @@ export function OperatorsPage({ me, area = 'operators' }) {
         )}
 
         <div style={{ padding: '16px 24px 0' }}>
-          <RoleGuide />
+          <RoleGuide roles={roles} />
         </div>
 
         <DataTable label="Operators" minWidth={720}>
@@ -95,6 +96,7 @@ export function OperatorsPage({ me, area = 'operators' }) {
             {ops.rows.map((o) => (
               <OperatorRow
                 key={o._id}
+                roles={roles}
                 operator={o}
                 isMe={!!me && o.username === me.username}
                 busy={ops.busy === o._id}
@@ -111,6 +113,7 @@ export function OperatorsPage({ me, area = 'operators' }) {
 
       {ops.adding && (
         <OperatorModal
+          roles={roles}
           form={ops.adding}
           saving={ops.saving}
           error={ops.err}
@@ -131,7 +134,9 @@ export function OperatorsPage({ me, area = 'operators' }) {
         />
       )}
 
-      <AuditLog />
+      <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+        Who changed what is in the <a href="#/insights/audit-log">Audit log</a>.
+      </p>
     </div>
   );
 }

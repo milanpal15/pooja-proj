@@ -38,7 +38,55 @@ export const api = {
   },
   logout: () => req('/admin/logout', { method: 'POST' }),
   /** Newest first. Admin only (area `operators`). */
-  auditLog: async (limit = 100) => rows(await req(`/admin/audit-log${qs({ limit })}`), 'entries'),
+  auditLog: async (limit = 100) => {
+    const r = await req(`/admin/audit-log${qs({ limit })}`);
+    return Array.isArray(r) ? r : r?.items ?? r?.entries ?? [];
+  },
+  /**
+   * The Audit log page (docs/RELEASES.md §5). params: { operator, area, method, from, to, limit, before }.
+   * -> { items:[{ id, at, operator, role, area, method, path, targetId, status, selfApproved?, before?, after? }], next }
+   */
+  auditPage: async (params) => {
+    const r = await req(`/admin/audit-log${qs(params)}`);
+    return { items: Array.isArray(r) ? r : r?.items ?? r?.entries ?? [], next: Array.isArray(r) ? null : r?.next ?? null };
+  },
+
+  /* ------------------------- releases, approvals, roles (docs/RELEASES.md §5, docs/ROLES.md §2) -- */
+  /** { releases, policy, approvalsEnabled, pending } */
+  releases: {
+    get: () => req('/admin/releases'),
+    create: (body) => req('/admin/releases', send('POST', body)),
+    update: (id, body) => req(`/admin/releases/${id}`, send('PUT', body)),
+    withdraw: (id) => req(`/admin/releases/${id}/withdraw`, send('POST')),
+  },
+  versionPolicy: {
+    /** 200 { policy } (applied) or 202 { approval } (sent for approval). 400 bad_policy carries body.fields. */
+    save: (body) => req('/admin/version-policy', send('PUT', body)),
+    /** A hypothetical: { minVersionCode?, recommendedVersionCode?, blockedVersionCodes?, minOsApi? }. */
+    impact: (body) => req('/admin/version-policy/impact', send('POST', body)),
+  },
+  /** { byVersion, total, blockedRequests } */
+  versionUsage: () => req('/admin/versions/usage'),
+  approvals: {
+    /** status: 'pending' | '' (all). Tolerates a bare array, { approvals } or { items }. */
+    list: async (status = '') => {
+      const r = await req(`/admin/approvals${qs({ status })}`);
+      return Array.isArray(r) ? r : r?.approvals ?? r?.items ?? [];
+    },
+    approve: (id, note) => req(`/admin/approvals/${id}/approve`, send('POST', { note: note || undefined })),
+    reject: (id, note) => req(`/admin/approvals/${id}/reject`, send('POST', { note })),
+    cancel: (id) => req(`/admin/approvals/${id}/cancel`, send('POST')),
+    settings: () => req('/admin/approvals/settings'),
+    saveSettings: (approvalsEnabled) => req('/admin/approvals/settings', send('PUT', { approvalsEnabled })),
+  },
+  /** GET -> { roles:[{ key, name, description, builtin, permissions?, operatorCount }], areas:[{ key, label, description, group, levels }] } */
+  roles: {
+    list: () => req('/admin/roles'),
+    create: (body) => req('/admin/roles', send('POST', body)),
+    update: (key, body) => req(`/admin/roles/${key}`, send('PUT', body)),
+    remove: (key) => req(`/admin/roles/${key}`, send('DELETE')),
+    duplicate: (key, body) => req(`/admin/roles/${key}/duplicate`, send('POST', body)),
+  },
 
   // Resolve a stored asset path (host-relative like `/uploads/x.png`, or an
   // older absolute URL) into a loadable URL for the dashboard.

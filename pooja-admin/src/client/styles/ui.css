@@ -911,3 +911,24 @@ textarea.ui-input {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---- ChipInput ---- */
+.ui-chips { display: flex; flex-wrap: wrap; gap: 6px; min-height: 32px; align-items: center; }
+.ui-chips__none { font-size: 13px; color: var(--on-surface-faint); }
+.ui-chip { display: inline-flex; align-items: center; gap: 2px; min-height: 32px; padding: 0 6px 0 12px; border-radius: var(--radius-full); background: var(--container-high); border: 1px solid var(--outline-variant); font-size: 13.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ui-chip__x { width: 28px; height: 28px; border: 0; background: none; border-radius: 50%; font-size: 18px; line-height: 1; color: var(--on-surface-variant); cursor: pointer; }
+.ui-chip__x:hover { background: var(--error-container); color: var(--error-ink); }
+.ui-chip__x:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 1px; }
+.ui-chips__add { display: flex; gap: 8px; margin-top: 8px; }
+.ui-chips__add .ui-input { flex: 1; min-width: 0; }
+
+/* ---- DiffView ---- */
+.ui-diff__table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.ui-diff__table th, .ui-diff__table td { padding: 8px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--divider); word-break: break-word; }
+.ui-diff__table thead th { font-size: 11.5px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--on-surface-variant); }
+.ui-diff__table tbody th { font-weight: 600; width: 32%; }
+.ui-diff__table del { text-decoration: line-through; color: var(--on-error-container); background: var(--error-container); padding: 1px 6px; border-radius: 4px; }
+.ui-diff__table ins { text-decoration: none; color: var(--success); background: var(--success-container); padding: 1px 6px; border-radius: 4px; font-weight: 600; }
+.ui-diff__muted { color: var(--on-surface-faint); }
+.ui-diff__none { margin: 0; font-size: 13.5px; color: var(--on-surface-variant); }
+.ui-diff__toggle { margin-top: 6px; min-height: 36px; border: 0; background: none; padding: 0; font: inherit; font-size: 13px; font-weight: 600; color: var(--primary); cursor: pointer; text-decoration: underline; }

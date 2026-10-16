@@ -1,12 +1,18 @@
-/**
- * The roles an operator can hold (DESIGN.md §21.1). This is only the picker's
- * vocabulary — what each role may DO is decided by the server, which sends the
- * permission list with the session. Nothing else in the dashboard names a role.
- */
-export const ROLES = [
-  { value: 'admin', label: 'Admin', desc: 'Everything: edits every screen, including devotees, operators, roles and push.' },
-  { value: 'editor', label: 'Editor', desc: 'Edits content, horoscope, panchang, announcements and events. Views everything else except devotees, operators and push, which they cannot open.' },
-  { value: 'viewer', label: 'Viewer', desc: 'Read-only. Opens every screen except devotees, operators and push, and changes nothing.' },
-];
+import { FALLBACK_ROLES } from '../../../lib/hooks/useRoleOptions.js';
 
-export const roleLabel = (value) => ROLES.find((r) => r.value === value)?.label ?? value;
+/**
+ * Only the picker's vocabulary for when the roles list cannot be read (DESIGN.md §21.1). Roles normally come from
+ * GET /admin/roles (useRoleOptions); what a role may DO is decided by the server and nothing here names a role in a branch.
+ */
+export const ROLES = FALLBACK_ROLES;
+export const roleLabel = (value, options = ROLES) => options.find((r) => r.value === value)?.label ?? value;
+
+/** The operator-write refusals worth a sentence of their own (docs/ROLES.md §2). */
+export function operatorError(e) {
+  if (e?.code === 'escalation') {
+    const list = e.body?.permissions || e.body?.offending || [];
+    return `You can only give a role you hold the permissions of yourself.${list.length ? ` Missing for you: ${list.join(', ')}.` : ''}`;
+  }
+  if (e?.code === 'unknown_role') return 'That role no longer exists. Reload the page and choose another.';
+  return e?.message || 'Something went wrong.';
+}

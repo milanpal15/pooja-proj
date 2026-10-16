@@ -1,4 +1,6 @@
+import { ApprovalsPage } from '../features/approvals/index.js';
 import { AstrologersPage } from '../features/astrologers/index.js';
+import { AuditPage } from '../features/audit/index.js';
 import { BookingsPage } from '../features/bookings/index.js';
 import { CallsPage } from '../features/calls/index.js';
 import { CoinsPage } from '../features/coins/index.js';
@@ -31,9 +33,11 @@ import { OverviewPage } from '../features/overview/index.js';
 import { CoinOrdersPage } from '../features/coin-orders/index.js';
 import { PoliciesPage } from '../features/policies/index.js';
 import { PoojasPage } from '../features/poojas/index.js';
+import { ReleasesPage } from '../features/releases/index.js';
+import { RolesPage } from '../features/roles/index.js';
 import { UsersPage } from '../features/users/index.js';
 import { VisitorsPage } from '../features/visitors/index.js';
-import { TAB_AREAS } from './tab-areas.js';
+import { GROUPS, TAB_AREAS } from './tab-areas.js';
 
 /**
  * THE TAB REGISTRY (DESIGN.md §15.2, §21.6). One entry per tab, in sidebar
@@ -77,9 +81,15 @@ const PAGES = {
   Users: UsersPage,
   'Coin Orders': CoinOrdersPage,
   Visitors: VisitorsPage,
+  'App releases': ReleasesPage,
+  Approvals: ApprovalsPage,
+  'Audit log': AuditPage,
+  'Roles & permissions': RolesPage,
 };
 
 export const TABS = TAB_AREAS.map((t) => {
   if (!PAGES[t.id]) throw new Error(`tabs.js: no page for tab "${t.id}"`);
   return { ...t, Component: PAGES[t.id] };
 });
+
+export { GROUPS };

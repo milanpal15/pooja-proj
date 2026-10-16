@@ -8,6 +8,7 @@ import './styles/tokens.css';
 import './styles/ui.css';
 import './styles/shell.css';
 import './styles/features.css';
+import './styles/governance.css';
 
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>

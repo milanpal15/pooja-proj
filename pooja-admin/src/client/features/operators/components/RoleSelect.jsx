@@ -2,7 +2,8 @@ import { Field } from '../../../ui/index.js';
 import { ROLES } from '../lib/roles.js';
 
 /** The role dropdown in the table (the "New operator" modal has its own labelled one). */
-export function RoleSelect({ value, onChange, disabled, label = 'Role' }) {
+export function RoleSelect({ value, onChange, disabled, label = 'Role', roles = ROLES }) {
+  const known = roles.some((r) => r.value === value);
   return (
     <Field
       hideLabel
@@ -11,19 +12,19 @@ export function RoleSelect({ value, onChange, disabled, label = 'Role' }) {
       className="ui-field--auto"
       value={value}
       disabled={disabled}
-      options={ROLES.map((r) => ({ value: r.value, label: r.label }))}
+      options={[...(known ? [] : [{ value, label: `${value} (unknown)` }]), ...roles.map((r) => ({ value: r.value, label: r.label }))]}
       onChange={onChange}
     />
   );
 }
 
 /** One line per role: what it can do. */
-export function RoleGuide() {
+export function RoleGuide({ roles = ROLES }) {
   return (
     <ul className="role-guide">
-      {ROLES.map((r) => (
+      {roles.map((r) => (
         <li key={r.value}>
-          <strong>{r.label}</strong> — {r.desc}
+          <strong>{r.label}</strong>{r.desc ? ` — ${r.desc}` : ''}
         </li>
       ))}
     </ul>

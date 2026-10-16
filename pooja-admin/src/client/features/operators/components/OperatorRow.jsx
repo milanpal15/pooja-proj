@@ -2,7 +2,7 @@ import { Button, StatusText, Switch } from '../../../ui/index.js';
 import { roleLabel } from '../lib/roles.js';
 import { RoleSelect } from './RoleSelect.jsx';
 
-export function OperatorRow({ operator: o, isMe, busy, readOnly = false, onSetRole, onToggleActive, onSetPassword, onDelete }) {
+export function OperatorRow({ roles, operator: o, isMe, busy, readOnly = false, onSetRole, onToggleActive, onSetPassword, onDelete }) {
   return (
     <tr>
       <td>
@@ -11,9 +11,9 @@ export function OperatorRow({ operator: o, isMe, busy, readOnly = false, onSetRo
       </td>
       <td>
         {readOnly ? (
-          roleLabel(o.role)
+          o.roleName || roleLabel(o.role, roles)
         ) : (
-          <RoleSelect value={o.role} label={`Role of ${o.username}`} disabled={busy || isMe} onChange={(role) => onSetRole(o, role)} />
+          <RoleSelect roles={roles} value={o.role} label={`Role of ${o.username}`} disabled={busy || isMe} onChange={(role) => onSetRole(o, role)} />
         )}
       </td>
       <td className="muted">{o.lastLogin ? new Date(o.lastLogin).toLocaleString() : 'never'}</td>
