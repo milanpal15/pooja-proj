@@ -11,24 +11,24 @@ import { Kumkum, Radius, Saffron, useTheme } from '@/theme';
  * Profile's card (that feature does not export one and a feature may not
  * deep-import another); it reuses Profile's `bp_share_*` strings.
  */
-export function ShareCard() {
+export function ShareCard({ title, sub, message }: { title?: string; sub?: string; message?: string } = {}) {
   const { c, scheme } = useTheme();
   const { t } = useLanguage();
   const dark = scheme === 'dark';
 
   const share = () => {
-    const message = STORE_URL ? `${t('bp_share_msg')} ${STORE_URL}` : t('bp_share_msg');
-    Share.share({ message }).catch(() => {});
+    const body = message || t('bp_share_msg');
+    Share.share({ message: STORE_URL ? `${body} ${STORE_URL}` : body }).catch(() => {});
   };
 
   return (
     <LinearGradient colors={dark ? [c.containerLow, c.containerLow] : [Saffron[50], Kumkum[100]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.card}>
       <View style={{ flex: 1, gap: 2 }}>
         <Type v="titleSm" color={dark ? c.onSurface : Kumkum[700]}>
-          {t('bp_share_h')}
+          {title || t('bp_share_h')}
         </Type>
         <Type v="bodySm" color={dark ? c.onSurfaceVariant : Saffron[700]}>
-          {t('bp_share_sub')}
+          {sub || t('bp_share_sub')}
         </Type>
       </View>
       <Pressable accessibilityRole="button" onPress={share} style={[styles.btn, { backgroundColor: c.primary }]}>

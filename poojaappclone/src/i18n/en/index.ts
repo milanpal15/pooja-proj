@@ -7,6 +7,7 @@ import { booking } from './booking';
 import { chadhava } from './chadhava';
 import { journal } from './journal';
 import { darshan } from './darshan';
+import { events } from './events';
 import { profile } from './profile';
 import { help } from './help';
 import { auth } from './auth';
@@ -14,6 +15,7 @@ import { coins } from './coins';
 import { astrologer } from './astrologer';
 import { homeLayout } from './home-layout';
 import { homeV2 } from './home-v2';
+import { search } from './search';
 import { poojaSeva } from './pooja-seva';
 import { chadhavaSeva } from './chadhava-seva';
 import { bhajanProfile } from './bhajan-profile';
@@ -29,6 +31,7 @@ export const en = {
   ...chadhava,
   ...journal,
   ...darshan,
+  ...events,
   ...profile,
   ...help,
   ...auth,
@@ -39,4 +42,5 @@ export const en = {
   ...bhajanProfile,
   ...homeLayout,
   ...homeV2,
+  ...search,
 } as const;

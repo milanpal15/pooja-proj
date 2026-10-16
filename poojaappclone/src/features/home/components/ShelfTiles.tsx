@@ -41,12 +41,13 @@ export function PhotoTile({ item, hi, onPress }: Props) {
 export function BookTile({ item, hi, onPress }: Props) {
   const { c } = useTheme();
   const title = itemTitle(item, hi);
+  const img = assetUrl(item.image);
   return (
     <Pressable
       accessibilityRole="button"
       onPress={() => onPress(item)}
       style={[styles.book, { backgroundColor: c.accentContainer, borderColor: c.goldHairline }]}>
-      <Icon name={toIconName(item.icon)} size={28} color={c.primary} />
+      {img ? <Image source={{ uri: img }} style={styles.bookPic} resizeMode="cover" accessibilityIgnoresInvertColors /> : <Icon name={toIconName(item.icon)} size={28} color={c.primary} />}
       <Type v="titleSm" center numberOfLines={2}>
         {title}
       </Type>
@@ -58,8 +59,10 @@ export function BookTile({ item, hi, onPress }: Props) {
 export function ListItem({ item, hi, onPress }: Props) {
   const { c } = useTheme();
   const sub = itemSub(item, hi);
+  const img = assetUrl(item.image);
   return (
     <Pressable accessibilityRole="button" onPress={() => onPress(item)} style={styles.row}>
+      {!!img && <Image source={{ uri: img }} style={styles.rowPic} resizeMode="cover" accessibilityIgnoresInvertColors />}
       <View style={{ flex: 1 }}>
         <Type v="titleSm" numberOfLines={1}>
           {itemTitle(item, hi)}
@@ -80,5 +83,7 @@ const styles = StyleSheet.create({
   photoImg: { width: '100%', height: '100%' },
   strip: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: 6, backgroundColor: 'rgba(20,8,6,0.7)' },
   book: { flex: 1, minHeight: 84, borderRadius: 14, borderWidth: 1, padding: 12, alignItems: 'center', justifyContent: 'center', gap: 6 },
+  bookPic: { width: 44, height: 44, borderRadius: 12 },
+  rowPic: { width: 40, height: 40, borderRadius: 10 },
   row: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 8 },
 });

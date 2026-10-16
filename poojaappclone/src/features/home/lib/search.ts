@@ -1,5 +1,5 @@
-/** Where the Home search box goes: the pooja list, pre-filtered when something was typed. */
+/** Where Home's search goes: the Search screen, carrying whatever was typed. */
 export function searchPath(query: string): string {
   const q = query.trim();
-  return q ? `/poojas?q=${encodeURIComponent(q)}` : '/poojas';
+  return q ? `/search?q=${encodeURIComponent(q)}` : '/search';
 }

@@ -1,12 +1,13 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
 
 import { Icon, type IconName, Type } from '@/components/ui';
+import { assetUrl } from '@/providers/content';
 import { useTheme } from '@/theme';
 
-export type QuickItem = { key: string; label: string; icon: IconName; href: string; badge?: string };
+export type QuickItem = { key: string; label: string; icon: IconName; href: string; badge?: string; /** An uploaded picture; replaces the glyph. */ image?: string };
 
-/** The 4-column service grid. LIVE is a corner badge; the glyph takes the primary role colour. */
-export function QuickGrid({ items, onOpen }: { items: QuickItem[]; onOpen: (href: string) => void }) {
+/** The service grid, 3 or 4 tiles across (the block's `columns`). A badge is a corner pill; the glyph takes the primary role colour. */
+export function QuickGrid({ items, columns = 4, onOpen }: { items: QuickItem[]; columns?: 3 | 4; onOpen: (href: string) => void }) {
   const { c } = useTheme();
   return (
     <View style={styles.grid}>
@@ -16,9 +17,14 @@ export function QuickGrid({ items, onOpen }: { items: QuickItem[]; onOpen: (href
           accessibilityRole="button"
           accessibilityLabel={it.badge ? `${it.label}, ${it.badge}` : it.label}
           onPress={() => onOpen(it.href)}
-          style={({ pressed }) => [styles.cell, pressed && { opacity: 0.75 }]}>
+          style={({ pressed }) => [styles.cell, { width: columns === 3 ? '33.333%' : '25%' }, pressed && { opacity: 0.75 }]}>
           <View style={[styles.box, { backgroundColor: c.containerLowest, borderColor: c.outlineVariant }]}>
-            <Icon name={it.icon} size={26} color={c.primary} />
+            {it.image ? (
+              // The picture is laid out normally and rounded itself: an absolutely positioned Image under overflow:hidden + radius draws nothing on Android.
+              <Image source={{ uri: assetUrl(it.image) }} style={styles.pic} resizeMode="cover" accessibilityIgnoresInvertColors />
+            ) : (
+              <Icon name={it.icon} size={26} color={c.primary} />
+            )}
           </View>
           {!!it.badge && (
             <View style={[styles.badge, { backgroundColor: c.live }]}>
@@ -38,8 +44,9 @@ export function QuickGrid({ items, onOpen }: { items: QuickItem[]; onOpen: (href
 
 const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 14 },
-  cell: { width: '25%', alignItems: 'center', gap: 7, paddingHorizontal: 4 },
+  cell: { alignItems: 'center', gap: 7, paddingHorizontal: 4 },
   box: { width: 60, height: 60, borderRadius: 18, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  pic: { width: 58, height: 58, borderRadius: 17 },
   badge: { position: 'absolute', top: -6, right: 8, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 },
   badgeText: { fontSize: 9, lineHeight: 12 },
   label: { fontSize: 11.5, lineHeight: 14, letterSpacing: 0 },

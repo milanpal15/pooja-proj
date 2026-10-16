@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { Image, Pressable, StyleSheet, View } from 'react-native';
 
 import { SectionBand, Type } from '@/components/ui';
-import { type RemoteHomeSection, useContent } from '@/providers/content';
+import { assetUrl, type RemoteHomeSection, useContent } from '@/providers/content';
 import { useTheme } from '@/theme';
 
 import { pick } from '../lib/pick';
@@ -17,11 +17,16 @@ export function KnowledgeShelf({ section, hi }: { section: RemoteHomeSection; hi
   const router = useRouter();
   const { c } = useTheme();
   const { deityById, deityArt, knowledge } = useContent();
-  const deities = (section.items ?? []).flatMap((i) => {
+  // Each card: the deity it names (if the dashboard has it) and/or its own picture, title and link.
+  const cards = (section.items ?? []).flatMap((i) => {
     const d = i.deitySlug ? deityById(i.deitySlug) : undefined;
-    return d && d.id === i.deitySlug ? [d] : [];
+    const known = d && d.id === i.deitySlug ? d : undefined;
+    const name = pick(hi, i.title ?? '', i.titleHi ?? '') || known?.name || '';
+    if (!name && !i.image) return [];
+    const own = i.image ? assetUrl(i.image) : '';
+    return [{ key: `${i.deitySlug ?? ''}:${i.title ?? ''}:${i.image ?? ''}`, known, name, accent: known?.accent ?? '#8A4B06', source: own ? { uri: own } : known ? deityArt(known.id) : undefined, href: i.href || '' }];
   });
-  if (!deities.length) return null;
+  if (!cards.length) return null;
 
   return (
     <SectionBand
@@ -30,21 +35,20 @@ export function KnowledgeShelf({ section, hi }: { section: RemoteHomeSection; hi
       footerLabel={sectionFooter(section, hi) || undefined}
       onFooter={() => router.push((section.footerHref || '/knowledge') as never)}>
       <View style={styles.row}>
-        {deities.map((d) => {
-          const art = deityArt(d.id);
-          const lore = knowledge.find((k) => k.deitySlug === d.id);
+        {cards.map((d) => {
+          const lore = d.known ? knowledge.find((k) => k.deitySlug === d.known!.id) : undefined;
           return (
             <Pressable
-              key={d.id}
+              key={d.key}
               accessibilityRole="button"
-              onPress={() => router.push({ pathname: '/knowledge', params: { deity: d.id } } as never)}
+              onPress={() => router.push((d.href && d.href.startsWith('/') ? d.href : d.known ? { pathname: '/knowledge', params: { deity: d.known.id } } : '/knowledge') as never)}
               style={styles.cell}>
-              {art ? (
-                <Image source={art} style={styles.disc} resizeMode="cover" />
+              {d.source ? (
+                <Image source={d.source} style={styles.disc} resizeMode="cover" />
               ) : (
                 <View style={[styles.disc, { backgroundColor: d.accent, alignItems: 'center', justifyContent: 'center' }]}>
                   <Type v="titleMd" color="#FFFFFF">
-                    {Array.from(d.name)[0]}
+                    {Array.from(d.name || '•')[0]}
                   </Type>
                 </View>
               )}

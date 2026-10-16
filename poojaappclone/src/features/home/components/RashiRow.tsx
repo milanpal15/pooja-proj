@@ -1,25 +1,23 @@
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Type } from '@/components/ui';
-import { RASHIS } from '@/features/horoscope';
+import type { Rashi } from '@/features/horoscope';
 import { useLanguage } from '@/i18n';
 import { useTheme } from '@/theme';
 
 import { SectionHead } from './SectionHead';
 
-const SHOWN = 4;
-
-/** "Aaj ka Rashifal": the first four signs from the horoscope feature's own list; each opens the Horoscope screen. */
-export function RashiRow({ onOpen }: { onOpen: () => void }) {
+/** "Aaj ka Rashifal": the signs it is given (from the horoscope feature's own list); each opens the Horoscope screen. */
+export function RashiRow({ rashis, title, link, onOpen }: { rashis: Rashi[]; title: string; link: string; onOpen: () => void }) {
   const { c } = useTheme();
-  const { t, lang } = useLanguage();
+  const { lang } = useLanguage();
   const hi = lang === 'hi';
 
   return (
     <View style={styles.wrap}>
-      <SectionHead title={t('hv_rashifal')} link={t('hv_all_signs')} onLink={onOpen} />
+      <SectionHead title={title} link={link} onLink={onOpen} />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
-        {RASHIS.slice(0, SHOWN).map((r) => (
+        {rashis.map((r) => (
           <Pressable
             key={r.id}
             accessibilityRole="button"

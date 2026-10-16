@@ -11,14 +11,33 @@ import { useAuth } from '@/providers/auth';
  * hole, no error banner on the front page).
  */
 
-/** Open poojas — feeds both the featured promo and the "Upcoming poojas" row. */
+const recent = new Map<string, { at: number; p: Promise<unknown> }>();
+
+/**
+ * Home blocks mount independently now, and several read the same feed (the
+ * featured pooja and the pooja shelf). Requests for one key inside `ttlMs`
+ * share a single promise instead of each hitting the API; a failure is
+ * forgotten at once so the next mount retries.
+ */
+function shared<T>(key: string, fn: () => Promise<T>, ttlMs = 15_000): Promise<T> {
+  const hit = recent.get(key);
+  if (hit && Date.now() - hit.at < ttlMs) return hit.p as Promise<T>;
+  const p = fn();
+  recent.set(key, { at: Date.now(), p });
+  p.catch(() => {
+    if (recent.get(key)?.p === p) recent.delete(key);
+  });
+  return p;
+}
+
+/** Open poojas — feeds the featured pooja, the "Upcoming poojas" shelf and any other block bound to them. */
 export function useHomePoojas() {
-  const load = useCallback(() => fetchPoojas(), []);
+  const load = useCallback(() => shared('poojas', () => fetchPoojas()), []);
   return useLoad(load);
 }
 
 export function useHomeChadhava() {
-  const load = useCallback(() => fetchChadhavaListings(), []);
+  const load = useCallback(() => shared('chadhava', () => fetchChadhavaListings()), []);
   return useLoad(load);
 }
 

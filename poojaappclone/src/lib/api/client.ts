@@ -74,6 +74,8 @@ export async function authedFetch(path: string, init: RequestInit = {}, timeoutM
       body,
     );
   }
+  // 204 No Content (e.g. leaving an event) has no body to parse.
+  if (res.status === 204) return null;
   return res.json();
 }
 

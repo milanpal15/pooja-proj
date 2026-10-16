@@ -2,30 +2,24 @@ import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import type { ImageSourcePropType } from 'react-native';
 
 import { Type } from '@/components/ui';
-import type { Deity } from '@/constants/deities';
 import { useTheme } from '@/theme';
+
+/** One avatar: a dashboard deity, or any custom card an operator wrote (own picture, own link). */
+export type DeityEntry = { id: string; name: string; accent: string; source?: ImageSourcePropType; href?: string };
 
 /**
  * The deity "stories" row. Each avatar is the dashboard's artwork when there is
  * some, else the deity's initial on its own accent colour; tapping opens that
  * deity in the Pooja tab. The gold ring is a plain border — RN has no conic gradient.
  */
-export function DeityRow({
-  deities,
-  art,
-  onPick,
-}: {
-  deities: Deity[];
-  art: (id: string) => ImageSourcePropType | undefined;
-  onPick: (id: string) => void;
-}) {
+export function DeityRow({ entries, onPick }: { entries: DeityEntry[]; onPick: (entry: DeityEntry) => void }) {
   const { c } = useTheme();
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
-      {deities.map((d) => {
-        const img = art(d.id);
+      {entries.map((d) => {
+        const img = d.source;
         return (
-          <Pressable key={d.id} accessibilityRole="button" accessibilityLabel={d.name} onPress={() => onPick(d.id)} style={styles.item}>
+          <Pressable key={d.id} accessibilityRole="button" accessibilityLabel={d.name} onPress={() => onPick(d)} style={styles.item}>
             <View style={[styles.ring, { borderColor: c.gold }]}>
               {img ? (
                 <Image source={img} style={styles.face} resizeMode="cover" />

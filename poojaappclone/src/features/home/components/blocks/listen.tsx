@@ -1,10 +1,12 @@
 import { useMemo } from 'react';
 
-import { useLanguage } from '@/i18n';
 import { fill } from '@/lib/format';
-import { useContent } from '@/providers/content';
 
-import { ListenCard, type ListenChip } from './ListenCard';
+import { useSource } from '../../hooks/use-sources';
+import { sourceLimit, sourceParams } from '../../lib/layout';
+import { Frame } from '../Frame';
+import { ListenCard, type ListenChip } from '../ListenCard';
+import { type BlockProps, useBlock } from './use-block';
 
 const CATS: { key: string; label: 'hv_cat_morning' | 'hv_cat_evening' | 'hv_cat_meditation'; icon: ListenChip['icon'] }[] = [
   { key: 'morning', label: 'hv_cat_morning', icon: 'sparkle' },
@@ -17,9 +19,10 @@ const CATS: { key: string; label: 'hv_cat_morning' | 'hv_cat_evening' | 'hv_cat_
  * tracks, and the first playable track. Omitted when there are no tracks.
  * (Playback itself lives in the Bhajan tab — tapping hands off to it.)
  */
-export function ListenBlock({ onOpen }: { onOpen: () => void }) {
-  const { aartis } = useContent();
-  const { t } = useLanguage();
+export function ListenBlock({ block }: BlockProps) {
+  const { t, title, linkLabel, follow } = useBlock(block);
+  const feed = useSource('bhajans.featured', { params: sourceParams(block), limit: sourceLimit(block) });
+  const aartis = feed.data.aartis;
 
   const { chips, track } = useMemo(() => {
     const have = new Set(aartis.map((a) => (a.category ?? '').toLowerCase()));
@@ -31,13 +34,15 @@ export function ListenBlock({ onOpen }: { onOpen: () => void }) {
 
   if (!track) return null;
   return (
-    <ListenCard
-      title={t('hv_listen')}
-      link={t('hv_collection')}
-      chips={chips}
-      track={{ id: track._id, title: track.title, artist: track.artist ?? '', len: track.duration ?? '' }}
-      playLabel={fill(t('hv_play'), { title: track.title })}
-      onOpen={onOpen}
-    />
+    <Frame>
+      <ListenCard
+        title={title || t('hv_listen')}
+        link={linkLabel || t('hv_collection')}
+        chips={chips}
+        track={{ id: track._id, title: track.title, artist: track.artist ?? '', len: track.duration ?? '' }}
+        playLabel={fill(t('hv_play'), { title: track.title })}
+        onOpen={() => follow('/bhajan')}
+      />
+    </Frame>
   );
 }

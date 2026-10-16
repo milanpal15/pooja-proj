@@ -37,9 +37,8 @@ function load(file, cache = new Map()) {
 const { inWindow } = load(path.join(here, 'schedule.ts'));
 const { resolveHref } = load(path.join(here, 'href.ts'));
 const { pick } = load(path.join(here, 'pick.ts'));
-const { renderableSections, shelfSections, visibleItems, chunk } = load(path.join(here, 'sections.ts'));
+const { visibleItems, chunk } = load(path.join(here, 'sections.ts'));
 const { rewriteUploads, wrapHtml, classifyNavigation, originOf } = load(path.join(here, 'html.ts'));
-const { DEFAULT_SECTIONS } = load(path.join(here, '..', 'constants', 'default-layout.ts'));
 const { visibleSlides, toSlides } = load(path.join(here, 'slides.ts'));
 const { daysUntil } = load(path.join(here, 'days.ts'));
 const { pickFeaturedPooja } = load(path.join(here, 'featured.ts'));
@@ -81,35 +80,6 @@ test('visibleItems: hides only a known-off flag', () => {
   const items = [{ title: 'a', flag: 'liveDarshan' }, { title: 'b', flag: 'unknownKey' }, { title: 'c' }];
   assert.deepEqual(visibleItems(items, { liveDarshan: false }).map((i) => i.title), ['b', 'c']);
   assert.deepEqual(visibleItems(items, { liveDarshan: true }).map((i) => i.title), ['a', 'b', 'c']);
-});
-
-test('renderableSections: order, schedule, disabled, empty sections', () => {
-  const sections = [
-    { key: 'c', source: 'custom', layout: 'book2', order: 30, items: [{ title: 'x', flag: 'bhajan' }] },
-    { key: 'a', source: 'hero', order: 10 },
-    { key: 'expired', source: 'festivals', order: 15, endsAt: '2026-10-01T00:00:00Z' },
-    { key: 'off', source: 'darshan', order: 16, enabled: false },
-    { key: 'empty', source: 'daily', order: 20, items: [] },
-    { key: 'future', source: 'custom', order: 40, startsAt: '2026-11-01T00:00:00Z', items: [{ title: 'y' }] },
-  ];
-  assert.deepEqual(renderableSections(sections, {}, NOW).map((s) => s.key), ['a', 'c']);
-  assert.deepEqual(renderableSections(sections, { bhajan: false }, NOW).map((s) => s.key), ['a']);
-});
-
-test('shelfSections: skips every source the fixed layout renders itself', () => {
-  const sources = ['hero', 'astrologer', 'grid', 'festivals', 'daily', 'temples', 'features', 'darshan', 'custom', 'knowledge'];
-  const out = shelfSections(sources.map((source) => ({ key: source, source })));
-  assert.deepEqual(out.map((s) => s.source), ['custom', 'knowledge']);
-});
-
-test('default layout: shelves are the four seeded keys, in order, and honour schedule', () => {
-  const keysAt = (d) => shelfSections(renderableSections(DEFAULT_SECTIONS, {}, d)).map((s) => s.key);
-  assert.deepEqual(keysAt(new Date('2026-10-05T06:00:00Z')), ['pitru-paksha', 'books', 'knowledge', 'ancestors']);
-  // The two seasonal shelves switch themselves off after Pitru Paksha.
-  assert.deepEqual(keysAt(new Date('2026-12-01T06:00:00Z')), ['books', 'knowledge']);
-  const books = DEFAULT_SECTIONS.find((s) => s.key === 'books');
-  assert.equal(books.layout, 'book2');
-  assert.equal(books.tone, 'gold');
 });
 
 test('chunk', () => {
@@ -217,9 +187,9 @@ test('greeting, search, weekday deity, tones', () => {
   assert.equal(firstName(undefined), '');
   assert.equal(avatarInitial('coco demon'), 'C');
   assert.equal(avatarInitial(''), 'ॐ');
-  assert.equal(searchPath('  shani '), '/poojas?q=shani');
-  assert.equal(searchPath('a b&c'), '/poojas?q=a%20b%26c');
-  assert.equal(searchPath('  '), '/poojas');
+  assert.equal(searchPath('  shani '), '/search?q=shani');
+  assert.equal(searchPath('a b&c'), '/search?q=a%20b%26c');
+  assert.equal(searchPath('  '), '/search');
   const ds = [{ id: 'shiva' }, { id: 'shani' }];
   assert.equal(deityForWeekday(ds, 6).id, 'shani');
   assert.equal(deityForWeekday(ds, 4).id, 'shiva');

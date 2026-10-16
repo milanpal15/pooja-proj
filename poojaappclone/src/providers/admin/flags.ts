@@ -8,7 +8,8 @@ export type FeatureKey =
   | 'payments'
   | 'announcements'
   | 'phoneAuth'
-  | 'astrologerCalls';
+  | 'astrologerCalls'
+  | 'events';
 
 export type Flags = Record<FeatureKey, boolean>;
 
@@ -33,4 +34,5 @@ export const DEFAULT_FLAGS: Flags = {
   announcements: true,
   phoneAuth: false,
   astrologerCalls: true,
+  events: true,
 };

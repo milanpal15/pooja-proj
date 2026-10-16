@@ -9,6 +9,8 @@ export * from './auth';
 export * from './bookings';
 export * from './calls';
 export * from './chadhava';
+export * from './events';
+export * from './home-layout';
 export * from './live';
 export * from './poojas';
 export * from './wallet';

@@ -1,11 +1,11 @@
 import { Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon } from '@/components/ui';
+import { Icon, type IconName } from '@/components/ui';
 import { BottomTabInset } from '@/theme';
 
-/** The floating music button: straight to the Bhajan tab. Sits above the custom tab bar. */
-export function MusicFab({ label, onPress }: { label: string; onPress: () => void }) {
+/** The floating action button (music by default). Sits above the custom tab bar. */
+export function MusicFab({ label, icon = 'music', onPress }: { label: string; icon?: IconName; onPress: () => void }) {
   const insets = useSafeAreaInsets();
   return (
     <Pressable
@@ -13,7 +13,7 @@ export function MusicFab({ label, onPress }: { label: string; onPress: () => voi
       accessibilityLabel={label}
       onPress={onPress}
       style={[styles.fab, { bottom: insets.bottom + BottomTabInset + 16 }]}>
-      <Icon name="music" size={24} color="#FFFFFF" strokeWidth={2} />
+      <Icon name={icon} size={24} color="#FFFFFF" strokeWidth={2} />
     </Pressable>
   );
 }
