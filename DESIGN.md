@@ -1763,8 +1763,10 @@ The dashboard serves three kinds of operator. What a person may **see** and what
 | **editor** | Edits **content** (§21.3). Everywhere else they can look but not touch. |
 | **viewer** | Read-only. Opens screens, changes nothing. |
 
-Not in scope: custom roles. If they are ever wanted, the permission table in §21.2 is the
-extension point (a role becomes a named set of the same permissions).
+**Custom roles (microservices stack only, docs/ROLES.md):** the three above are built-in presets; an admin can define more
+(`roles` area). `Operator.role` is a role *key*; identity resolves key → permissions from the store (built-ins from code) and the
+admin BFF caches that for a few seconds. `releases`, `approvals`, `audit` and `roles` exist only in `backend/` (pooja-api never gets them;
+`access-parity.test.mjs` exempts them). `audit` and `roles` are admin-only presets, like `operators`.
 
 ### 21.2 Permissions
 
@@ -1803,7 +1805,11 @@ from that list, so changing a role is a one-file server change and the UI cannot
 | `calls` | Call log, live calls, force-end, goodwill refund | edit | view *(masked)* | view *(masked)* |
 | `payouts` | Earnings summaries, recording a payout | edit | view | view |
 | `events` | Events, event types, badges, participants (docs/EVENTS.md) | edit | **edit** | view *(masked)* |
-| `operators` | Dashboard accounts, roles, passwords | edit | — | — |
+| `operators` | Dashboard accounts, which role each holds, passwords | edit | — | — |
+| `releases` | App releases, the version policy (minimum / recommended / blocked builds, OS floor, maintenance), adoption by build (docs/RELEASES.md; microservices stack only) | edit | view | view |
+| `approvals` | The second-person approval queue for risky version changes; the on/off switch | edit | view | view |
+| `audit` | The audit log with before/after (docs/RELEASES.md §5) | view | — | — |
+| `roles` | Creating custom roles and choosing per-area view/edit (docs/ROLES.md) | edit | — | — |
 
 "—" means the area is **absent**: no sidebar entry, and the API answers 403. Only
 **operators** is wholly admin-only for visibility, as decided; devotee accounts and the push
