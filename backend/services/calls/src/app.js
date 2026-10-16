@@ -12,7 +12,7 @@ import { createRedactor } from './lib/redact.js';
 import { createSettingsReader } from './lib/settings.js';
 import { createWalletClient } from './lib/wallet.js';
 import { astrologerRouters } from './modules/astrologers/index.js';
-import { callRouters } from './modules/calls/index.js';
+import { callDirectoryRoutes, callRouters } from './modules/calls/index.js';
 import { payoutRouters } from './modules/payouts/index.js';
 
 /**
@@ -57,6 +57,7 @@ export function createApp(config, { isReady, dbPing = async () => {}, logger = c
   const astrologers = astrologerRouters();
   const calls = callRouters();
   const payouts = payoutRouters();
+  internal.use(callDirectoryRoutes()); // identity only: a devotee's / astrologer's call history, read-only (Users 360)
   for (const r of [astrologers.directory, astrologers.public, astrologers.devotee, calls.devotee, payouts.devotee, astrologers.admin, calls.admin, payouts.admin]) internal.use(r);
   internal.use((_req, res) => res.status(404).json({ error: 'not found', code: 'not_found' }));
 

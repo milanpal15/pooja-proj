@@ -20,7 +20,8 @@ test('the copied gate matches pooja-api/src/access byte-for-purpose', { skip: !h
   assert.deepEqual(Object.fromEntries(Object.entries(ROLE_PERMISSIONS).map(([k, v]) => [k, noEvents(v)])), p.ROLE_PERMISSIONS);
   assert.deepEqual(p.AREAS, AREAS.filter((a) => !BFF_ONLY.includes(a)), 'the shared areas, in the same order');
   // ...and the Home-layout row (catalog + BFF only; pooja-api has no home-layout routes).
-  const mine = ROUTE_AREAS.filter((row) => !BFF_ONLY.includes(row.area) && !String(row.path).includes('home-layout') || String(row.path).includes('audit-log'));
+  // ...and the Users 360 rows (identity + BFF only, docs/USERS.md: `/admin/users...`, `/admin/blocked-devices`; area `devotees` exists in pooja-api but these paths do not).
+  const mine = ROUTE_AREAS.filter((row) => (!BFF_ONLY.includes(row.area) && !String(row.path).includes('home-layout') && !/admin\\\/(\(users\|blocked-devices\)|users)/.test(String(row.path))) || String(row.path).includes('audit-log'));
   assert.equal(mine.length, r.ROUTE_AREAS.length);
   mine.forEach((row, i) => {
     assert.equal(String(row.path), String(r.ROUTE_AREAS[i].path), `row ${i} path`);

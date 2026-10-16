@@ -12,7 +12,7 @@ export const loadConfig = (env = process.env) => {
       secret: { name: 'INTERNAL_JWT_SECRET', required: true },
       allowedIssuers: {
         name: 'ALLOWED_ISSUERS',
-        default: ['mobile-bff', 'admin-bff', 'catalog'],
+        default: ['mobile-bff', 'admin-bff', 'catalog', 'identity'],
         parse: (v) => v.split(',').map((s) => s.trim()).filter(Boolean),
       },
       // The three services an order is made from. All required: an order without a price, a wallet or a name is not an order.

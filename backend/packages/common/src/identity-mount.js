@@ -15,6 +15,7 @@
  */
 import express from 'express';
 
+import { blockedBody, isBlockedCode, supportFrom } from './account-block.js';
 import { createServiceClient } from './client.js';
 import { ServiceError } from './errors.js';
 import { signServiceToken } from './jwt.js';
@@ -28,6 +29,10 @@ import { createSessionCookies } from './operator/session-cookie.js';
 import { probeUpstream } from './proxy.js';
 
 export const STATUS_TTL_MS = 10_000;
+/** A device block is cached this long in the BFF (docs/USERS.md section 3); the lookup FAILS OPEN. */
+export const DEVICE_TTL_MS = 30_000;
+/** The support contact shown on a blocked screen (settings table): cached this long. */
+export const SUPPORT_TTL_MS = 60_000;
 const MAX_PASSWORD_LENGTH = 256;
 const NS = '/internal/identity';
 
@@ -103,11 +108,70 @@ export function createIdentityMobileMount(config, { logger, fetchImpl, verifyIdT
     return inflight.get(uid);
   }
 
+  /* The device block (docs/USERS.md section 3): keyed by X-Device-Id, cached DEVICE_TTL_MS, concurrent asks share one call. Unlike the
+     account check this FAILS OPEN - a device block is a deterrent against re-registering, the account block is the control. */
+  const devices = new Map(); // deviceId -> { at, value|null }
+  const deviceInflight = new Map();
+  async function deviceBlockOf(req) {
+    const raw = req.headers['x-device-id'];
+    const id = (Array.isArray(raw) ? raw[0] : raw)?.trim?.().slice(0, 120);
+    if (!id) return null;
+    const hit = devices.get(id);
+    if (hit && now() - hit.at < (hit.failed ? 5000 : DEVICE_TTL_MS)) return hit.value;
+    if (!deviceInflight.has(id)) {
+      deviceInflight.set(
+        id,
+        client
+          .get(`${NS}/devices/${encodeURIComponent(id)}/status`, { reqId: req.id, timeoutMs: 1500 })
+          .then((v) => {
+            const value = v?.blocked === true ? { message: v.message, messageHi: v.messageHi, until: v.until ?? null } : null;
+            if (devices.size > 5000) devices.clear();
+            devices.set(id, { at: now(), value });
+            return value;
+          })
+          .catch((e) => {
+            logger?.warn(`device-block lookup failed (${e?.code || e?.message}): failing open`, { reqId: req.id });
+            devices.set(id, { at: now(), value: null, failed: true });
+            return null;
+          })
+          .finally(() => deviceInflight.delete(id)),
+      );
+    }
+    return deviceInflight.get(id);
+  }
+
+  /* The support contact (settings `supportEmail` / `supportPhone`) for a blocked screen. Best effort: unreachable engagement = no buttons. */
+  const settingsClient = config.engagementUrl
+    ? createServiceClient({
+        service: 'engagement', baseUrl: config.engagementUrl, iss: 'mobile-bff', secret, timeoutMs: config.serviceTimeoutMs,
+        ...(fetchImpl ? { fetchImpl } : {}),
+      })
+    : null;
+  let supportCache = { at: -Infinity, value: {} };
+  async function supportContact(reqId) {
+    if (!settingsClient) return {};
+    if (now() - supportCache.at < SUPPORT_TTL_MS) return supportCache.value;
+    try {
+      const out = await settingsClient.get('/internal/engagement/settings/map', { reqId, timeoutMs: 1500 });
+      supportCache = { at: now(), value: supportFrom(out?.settings) };
+    } catch (e) {
+      logger?.warn(`support contact unavailable (${e?.code || e?.message})`);
+      supportCache = { at: now() - SUPPORT_TTL_MS + 10_000, value: supportCache.value }; // keep the last good one, retry in 10 s
+    }
+    return supportCache.value;
+  }
+
+  /** The 403 the phone shows the blocked screen for. */
+  async function sendBlocked(req, res, a) {
+    const kind = a.error === 'device_blocked' ? 'device' : 'account';
+    res.status(403).json(blockedBody(kind, a.block, await supportContact(req.id)));
+  }
+
   /**
    * Sets `req.deviceAuth` for any request that presents a Bearer token; never answers (public routes ignore a bad token,
    * exactly as the monolith's requireAuth is only run by the routes that want it):
    *   { ok:true, uid, name, role, tok }   verified, not blocked
-   *   { error:'invalid'|'blocked'|'unavailable', detail }
+   *   { error:'invalid'|'blocked'|'device_blocked'|'unavailable', detail, block? }
    */
   async function deviceAuth(req, _res, next) {
     // Idempotent: the version gate may already have asked (to honour a maintenance allow-list) before the `/api` edge runs.
@@ -134,9 +198,11 @@ export function createIdentityMobileMount(config, { logger, fetchImpl, verifyIdT
       req.deviceAuth = { error: 'invalid', detail: e?.message };
       return next();
     }
+    let devBlock = null;
     try {
       const st = await statusOf(decoded.uid, req.id);
-      if (st.blocked) req.deviceAuth = { error: 'blocked' };
+      if (st.blocked) req.deviceAuth = { error: 'blocked', block: st.block };
+      else if ((devBlock = await deviceBlockOf(req))) req.deviceAuth = { error: 'device_blocked', block: devBlock };
       else {
         req.deviceAuth = {
           ok: true,
@@ -157,13 +223,33 @@ export function createIdentityMobileMount(config, { logger, fetchImpl, verifyIdT
   }
 
   /** requireAuth's exact answers, for the routes this BFF serves itself. */
-  const requireDevotee = (req, res, next) => {
+  const requireDevotee = async (req, res, next) => {
     const a = req.deviceAuth;
     if (!a) return res.status(401).json({ error: 'missing bearer token' });
     if (a.error === 'unavailable') return res.status(503).json({ error: 'auth unavailable', detail: a.detail });
     if (a.error === 'invalid') return res.status(401).json({ error: 'invalid token', detail: a.detail });
-    if (a.error === 'blocked') return res.status(403).json({ error: 'account blocked' });
+    if (a.error === 'blocked' || a.error === 'device_blocked') {
+      try {
+        return await sendBlocked(req, res, a);
+      } catch (e) {
+        return next(e);
+      }
+    }
     next();
+  };
+
+  /**
+   * Every OTHER route (the ones streamed to the monolith): a blocked account / device gets the same 403 here instead of the monolith's generic one.
+   * The routes the monolith serves WITHOUT a session (its PUBLIC allowlist: content, flags, ...) stay open, as before.
+   */
+  const blockGate = async (req, res, next) => {
+    const a = req.deviceAuth;
+    if (!a || (a.error !== 'blocked' && a.error !== 'device_blocked') || isPublic(req.method, req.path)) return next();
+    try {
+      await sendBlocked(req, res, a);
+    } catch (e) {
+      next(e);
+    }
   };
 
   const asDevotee = (a) => ({ sub: a.uid, role: a.role, ctx: { name: a.name, role: a.role, tok: a.tok } });
@@ -175,7 +261,7 @@ export function createIdentityMobileMount(config, { logger, fetchImpl, verifyIdT
     return signServiceToken(
       a.ok
         ? { iss: 'mobile-bff', reqId: req.id, ...asDevotee(a) }
-        : { iss: 'mobile-bff', reqId: req.id, sub: null, ctx: { authError: a.error, detail: a.detail } },
+        : { iss: 'mobile-bff', reqId: req.id, sub: null, ctx: { authError: a.error === 'device_blocked' ? 'blocked' : a.error, detail: a.detail } },
       { secret },
     );
   }
@@ -184,6 +270,7 @@ export function createIdentityMobileMount(config, { logger, fetchImpl, verifyIdT
 
   function mount(app) {
     app.use('/api', deviceAuth);
+    app.use('/api', blockGate);
     const r = express.Router();
     const forward = (method, apiPath, to, { auth = true } = {}) => {
       const chain = [...(auth ? [requireDevotee] : []), json, async (req, res) => {
@@ -193,6 +280,10 @@ export function createIdentityMobileMount(config, { logger, fetchImpl, verifyIdT
           const out = method === 'get' ? await client.get(`${NS}${suffix}`, opts) : await client.request(method.toUpperCase(), `${NS}${suffix}`, { ...opts, body: req.body ?? {} });
           res.json(out);
         } catch (e) {
+          if (e instanceof ServiceError && e.status === 403 && isBlockedCode(e.body?.code)) {
+            // Identity's own second-line refusal (the BFF normally answers first): add the support contact it cannot know.
+            return res.status(403).json({ ...e.body, support: await supportContact(req.id) });
+          }
           relayError(res, e, logger);
         }
       }];
@@ -257,6 +348,7 @@ export function createIdentityMobileMount(config, { logger, fetchImpl, verifyIdT
       }
     },
     _statusCacheSize: () => statuses.size,
+    _deviceCacheSize: () => devices.size,
   };
 }
 

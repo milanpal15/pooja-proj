@@ -130,10 +130,13 @@ describe('requireAuth semantics, now at the edge (same statuses and bodies as po
     assert.equal((await call('GET', '/api/auth/me')).status, 401);
   });
 
-  test('a blocked devotee -> 403 "account blocked" (on served routes AND signed through to the monolith)', async () => {
+  test('a blocked devotee -> 403 account_blocked on served routes AND on the routes streamed to the monolith (which is not asked); the monolith\'s open routes stay open', async () => {
     const r = await call('GET', '/api/auth/me', { token: 'good-blocked' });
-    assert.deepEqual([r.status, r.body], [403, { error: 'account blocked' }]);
-    await call('GET', '/api/bookings', { token: 'good-blocked' });
+    assert.deepEqual([r.status, r.body.code, r.body.error], [403, 'account_blocked', 'account blocked']);
+    const b = await call('GET', '/api/bookings', { token: 'good-blocked' });
+    assert.deepEqual([b.status, b.body.code], [403, 'account_blocked']);
+    assert.equal(monoSeen.length, 0, 'the monolith never sees a blocked caller on a private route');
+    await call('GET', '/api/content', { token: 'good-blocked' }); // PUBLIC in the monolith's allowlist: content for everyone, as before
     assert.equal(monoSeen[0].claims.ctx.authError, 'blocked');
     assert.equal(monoSeen[0].claims.sub, null);
   });

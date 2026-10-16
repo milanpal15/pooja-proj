@@ -5,6 +5,7 @@ import { createLogger } from '@bhakti/common';
 import { createApp } from './app.js';
 import { config as loadConfig } from './config.js';
 import { connectDb, pingDb } from './db.js';
+import { startJobs } from './jobs.js';
 import { seedIdentity } from './seed.js';
 
 const log = createLogger('identity');
@@ -34,6 +35,7 @@ async function seedUntilDone() {
       }
       log.info('seeded defaults');
       ready = true;
+      startJobs(config, { logger: log });
       return;
     } catch (e) {
       log.error(`seeding failed, retrying in 5 s: ${e.message}`);

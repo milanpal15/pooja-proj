@@ -19,6 +19,8 @@ const FORBIDDEN = "You don't have permission for that.";
  */
 const EDGES = [
   { re: /^\/directory\/astrologers\/(claim|active)$/, from: ['identity'] },
+  // A devotee's / astrologer's call history, read-only (Users 360, docs/USERS.md).
+  { re: /^\/directory\/users\/[^/]+\/calls$/, from: ['identity'] },
   // The public astrologer list / profile: either BFF serves it (the dashboard's smoke test reads it too).
   { re: /^\/astrologers(\/[^/]+)?$/, from: ['mobile-bff', 'admin-bff'] },
   { re: /^\/(calls|astrologer\/me)(\/|$)/, from: ['mobile-bff'] },

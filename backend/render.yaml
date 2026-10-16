@@ -113,6 +113,27 @@ services:
           type: pserv
           name: bhakti-calls
           property: hostport
+      # Users 360 (docs/USERS.md): read-only by-uid lookups of a devotee's devices, wallet, bookings and events. Each unreachable = that section reads "unavailable".
+      - key: ENGAGEMENT_URL
+        fromService:
+          type: pserv
+          name: bhakti-engagement
+          property: hostport
+      - key: WALLET_URL
+        fromService:
+          type: pserv
+          name: bhakti-wallet
+          property: hostport
+      - key: ORDERS_URL
+        fromService:
+          type: pserv
+          name: bhakti-orders
+          property: hostport
+      - key: EVENTS_URL
+        fromService:
+          type: pserv
+          name: bhakti-events
+          property: hostport
       # Only used while CALLS_URL is unset (rollback). Type https://pooja-api.onrender.com or leave it blank.
       - key: MONOLITH_URL
         sync: false

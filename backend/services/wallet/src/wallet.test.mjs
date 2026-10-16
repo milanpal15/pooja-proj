@@ -101,7 +101,7 @@ describe('auth: nothing without a valid service token, and each route family has
   });
 
   test('an issuer that is not on the allow-list is refused even with a valid signature', async () => {
-    for (const iss of ['some-other-service', 'catalog', 'identity', 'engagement']) {
+    for (const iss of ['some-other-service', 'catalog', 'engagement']) {
       const r = await h.call('GET', '/coins/packs', { tok: sign({ iss }) });
       assert.deepEqual([r.status, r.body.code], [401, 'wrong_issuer'], iss);
     }
@@ -950,7 +950,7 @@ describe('config', () => {
     assert.throws(() => loadConfig({ ...need, INTERNAL_JWT_SECRET: 'short' }), /16 characters/);
     const c = loadConfig(need);
     assert.deepEqual([c.port, c.dbName, c.engagementUrl, c.identityUrl, c.isProduction, c.reconcileEveryMs], [4060, 'wallet', 'http://e', 'http://i', false, 15000]);
-    assert.deepEqual(c.allowedIssuers, ['mobile-bff', 'admin-bff', 'monolith', 'pooja-api', 'orders', 'calls', 'events']);
+    assert.deepEqual(c.allowedIssuers, ['mobile-bff', 'admin-bff', 'monolith', 'pooja-api', 'orders', 'calls', 'events', 'identity']);
     const o = loadConfig({ ...need, PORT: '5000', DB_NAME: 'w2', ALLOWED_ISSUERS: 'a, b', NODE_ENV: 'production', GIT_COMMIT: 'abc', RECONCILE_EVERY_MS: '0' });
     assert.deepEqual([o.port, o.dbName, o.allowedIssuers, o.isProduction, o.commit, o.reconcileEveryMs], [5000, 'w2', ['a', 'b'], true, 'abc', 0]);
     assert.throws(() => { o.port = 1; }, TypeError, 'frozen');

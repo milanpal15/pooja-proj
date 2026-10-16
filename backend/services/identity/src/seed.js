@@ -1,7 +1,9 @@
 
 
+import { DEFAULT_BLOCK_MESSAGE, DEFAULT_BLOCK_MESSAGE_HI } from '@bhakti/common';
+
 import { hashPassword } from './lib/passwords.js';
-import { Operator, Policy, Role } from './models/index.js';
+import { Operator, Policy, Role, User } from './models/index.js';
 
 const DEFAULT_TERMS = `## Rules & Regulations
 
@@ -60,6 +62,7 @@ export async function seedIdentity(config) {
     { upsert: true },
   );
   await migrateOperatorRoles();
+  await migrateUserBlocks();
   return ensureFirstOperator(config);
 }
 
@@ -77,3 +80,38 @@ export async function migrateOperatorRoles() {
   await Role.init();
 }
 
+
+const LEGACY_REASON = 'Blocked before block reasons were recorded';
+
+/**
+ * In-place upgrade of existing databases (docs/USERS.md section 1). Idempotent; never touches a row it has already upgraded.
+ *   1. A user with the old bare `blocked: true` and no `block` gets a real one (stock message, no end date) and a history row, so it explains itself.
+ *   2. The lower-cased `nameLower` / `emailLower` the list's prefix search runs on are filled in for rows that predate them.
+ * Done with native pipeline updates (one round trip each), not row by row: the collection may be large.
+ */
+export async function migrateUserBlocks() {
+  const at = { $ifNull: ['$updatedAt', '$$NOW'] };
+  await User.collection.updateMany({ blocked: true, block: null }, [
+    {
+      $set: {
+        block: { active: true, scope: 'account', reason: LEGACY_REASON, message: DEFAULT_BLOCK_MESSAGE, messageHi: DEFAULT_BLOCK_MESSAGE_HI, until: null, at, by: 'migration' },
+        blockHistory: {
+          $concatArrays: [
+            { $ifNull: ['$blockHistory', []] },
+            [{ action: 'block', at, by: 'migration', reason: LEGACY_REASON, message: DEFAULT_BLOCK_MESSAGE, until: null }],
+          ],
+        },
+      },
+    },
+  ]);
+  await User.collection.updateMany({ nameLower: { $exists: false } }, [
+    {
+      $set: {
+        nameLower: { $toLower: { $trim: { input: { $convert: { input: '$name', to: 'string', onError: '', onNull: '' } } } } },
+        emailLower: {
+          $cond: [{ $gt: [{ $strLenCP: { $convert: { input: '$email', to: 'string', onError: '', onNull: '' } } }, 0] }, { $toLower: '$email' }, '$$REMOVE'],
+        },
+      },
+    },
+  ]);
+}

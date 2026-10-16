@@ -4,10 +4,13 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import { after, before, beforeEach, describe, test } from 'node:test';
 
-import { CONTENT_KEYS, CONTENT_STALE_MS, FALLBACK_SETTINGS, HOME_STALE_MS, verifyServiceToken } from '@bhakti/common';
+import { CONTENT_KEYS, CONTENT_STALE_MS, DEFAULT_BLOCK_MESSAGE, DEFAULT_BLOCK_MESSAGE_HI, FALLBACK_SETTINGS, HOME_STALE_MS, verifyServiceToken } from '@bhakti/common';
 
 import { createApp } from './app.js';
 import { loadConfig } from './config.js';
+
+// docs/USERS.md section 3: what a blocked account is told (the status stand-in here sends no operator message, so the stock one).
+const BLOCKED = { error: 'account blocked', code: 'account_blocked', message: DEFAULT_BLOCK_MESSAGE, messageHi: DEFAULT_BLOCK_MESSAGE_HI, until: null, support: {} };
 
 const SECRET = 'test-secret-test-secret-1234';
 const MEDIA = Buffer.from('0123456789abcdefghijklmnopqrstuvwxyz');
@@ -279,7 +282,7 @@ describe('POST /api/live/:slug/jai (needs a devotee; the uid is the signed sub)'
     assert.equal((await call('POST', '/api/live/kashi/jai', { token: 'junk' })).status, 401);
     blocked = true;
     clock += 3_600_000;
-    assert.deepEqual((await call('POST', '/api/live/kashi/jai', { token: 'good-devotee1' })).body, { error: 'account blocked' });
+    assert.deepEqual((await call('POST', '/api/live/kashi/jai', { token: 'good-devotee1' })).body, { ...BLOCKED, support: { email: 'a@b.c' } }, 'the support contact comes from the settings table the stand-in serves');
     assert.equal(catCalls.length, 0);
   });
 

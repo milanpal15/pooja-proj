@@ -2,6 +2,7 @@ import { asyncRouter } from '../lib/async-handler.js';
 import { HttpError } from '../lib/http-error.js';
 import { devoteeOf, onlyFrom } from '../lib/perms.js';
 import { cleanDob, cleanEmail, cleanGender, emailUpdate, handleFor, methodFor, toProfile } from '../lib/profile.js';
+import { isBlocked, phoneBlock } from '../lib/blocks.js';
 import { User } from '../models/index.js';
 
 const str = (v) => (typeof v === 'string' ? v : undefined);
@@ -11,7 +12,7 @@ const str = (v) => (typeof v === 'string' ? v : undefined);
  * Every route here is mobile-bff only; the devotee is the token's `sub`, never anything in a body.
  * (The BFF has already refused a blocked uid; the checks below are the second line.)
  */
-export function authRoutes({ astrologers }) {
+export function authRoutes({ astrologers, now = () => new Date() }) {
   const r = asyncRouter();
   r.use(onlyFrom('mobile-bff'));
 
@@ -44,7 +45,8 @@ export function authRoutes({ astrologers }) {
     };
 
     const existing = (await User.findOne({ uid: decoded.uid })) ?? (await User.findOne({ contact: identity.contact }));
-    if (existing?.blocked) throw new HttpError(403, 'blocked', 'account blocked');
+    // The same 403 body the BFF answers with (docs/USERS.md section 3); the BFF adds the support contact it reads from the settings table.
+    if (existing && isBlocked(existing, now())) throw new HttpError(403, 'account_blocked', 'account blocked', { ...phoneBlock(existing.block), support: {} });
 
     const $set = { ...identity, ...emailUpdate(existing, decoded, cleanEmail(b.email)) };
     if (name?.trim()) $set.name = name.trim();

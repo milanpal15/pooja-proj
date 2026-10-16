@@ -11,7 +11,7 @@ import { asyncRouter } from './lib/async-handler.js';
 import { callerGate, operatorGate } from './lib/perms.js';
 import { createRedactor } from './lib/redact.js';
 import { coinsRouters, webhookRoute } from './modules/coins/index.js';
-import { ledgerRoutes, walletRouters } from './modules/wallet/index.js';
+import { directoryRoutes, ledgerRoutes, walletRouters } from './modules/wallet/index.js';
 
 /**
  * @param {object} config  see config.js
@@ -52,6 +52,7 @@ export function createApp(config, { isReady, dbPing = async () => {}, logger = c
   internal.use(express.json({ limit: '256kb' }));
   internal.use(operatorGate); // /admin/...: the area gate, re-checked from the signed perms
 
+  internal.use(directoryRoutes()); // identity only: a devotee's balance + latest movements (Users 360)
   internal.use(ledgerRoutes()); // debit / refund / credit / txn / balance / reconcile - the order-side callers
 
   const w = walletRouters();

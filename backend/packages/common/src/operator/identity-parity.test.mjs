@@ -66,8 +66,11 @@ test('every identity-owned operator route resolves to a MAPPED area, the one the
 
 test('the router registers exactly the table; devotees/operators are admin-only, policies readable by editors', () => {
   const router = identityAdminRouter({ sessions: {}, client: {} });
-  const registered = router.stack.filter((l) => l.route).flatMap((l) => Object.keys(l.route.methods).map((m) => `${m.toUpperCase()} ${l.route.path}`));
+  // The router nests: the CSV export route first (it must not be read as `/admin/users/:id`), then the generic table.
+  const routesOf = (stack) => stack.flatMap((l) => (l.route ? Object.keys(l.route.methods).map((m) => `${m.toUpperCase()} ${l.route.path}`) : l.handle?.stack ? routesOf(l.handle.stack) : []));
+  const registered = routesOf(router.stack);
   assert.deepEqual([...registered].sort(), IDENTITY_ADMIN_ROUTES.map((r) => `${r.method} /api${r.path}`).sort());
+  assert.ok(registered.indexOf('GET /api/admin/users/export') < registered.indexOf('GET /api/admin/users/:id'), 'export is registered before :id');
   const ok = (role, r) => { const a = areaFor(r.method, r.sample ?? r.path); return hasPermission(permissionsFor(role), `${a.area}:${a.level}`); };
   for (const r of IDENTITY_ADMIN_ROUTES) {
     assert.ok(ok('admin', r));

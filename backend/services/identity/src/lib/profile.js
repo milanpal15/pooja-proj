@@ -1,3 +1,5 @@
+import { isBlocked } from './blocks.js';
+
 /**
  * Turn a verified Firebase token into the handle the dashboard shows. (Moved from pooja-api/modules/auth/profile.js.)
  *
@@ -37,7 +39,7 @@ export function toProfile(doc, astrologer = null) {
     bio: doc.bio || '',
     gender: doc.gender || null,
     dob: doc.dob || null,
-    blocked: !!doc.blocked,
+    blocked: isBlocked(doc),
     // When the account was first created: the app uses it for the "new user" Home audience (decided on the device).
     createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString() : null,
     role: astrologer ? 'astrologer' : 'devotee',

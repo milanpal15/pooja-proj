@@ -11,7 +11,7 @@ import { callerGate, operatorGate } from './lib/perms.js';
 import { createPush } from './lib/push.js';
 import { createRedactor } from './lib/redact.js';
 import { createWalletClient } from './lib/wallet.js';
-import { bookingsRouters } from './modules/bookings/index.js';
+import { bookingDirectoryRoutes, bookingsRouters } from './modules/bookings/index.js';
 import { chadhavaRouters } from './modules/chadhava/index.js';
 import { reviewsRouters } from './modules/reviews/index.js';
 
@@ -54,6 +54,7 @@ export function createApp(config, { isReady, dbPing = async () => {}, logger = c
   const bookings = bookingsRouters();
   const chadhava = chadhavaRouters();
   const reviews = reviewsRouters();
+  internal.use(bookingDirectoryRoutes()); // identity only: a devotee's bookings, read-only (Users 360)
   for (const r of [reviews.public, chadhava.public, bookings.devotee, chadhava.devotee, bookings.admin, reviews.admin, chadhava.admin]) internal.use(r);
   internal.use((_req, res) => res.status(404).json({ error: 'not found', code: 'not_found' }));
 

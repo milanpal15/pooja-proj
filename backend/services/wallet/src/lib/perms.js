@@ -26,6 +26,8 @@ const EDGES = [
   { re: /^\/wallet(\/|$)/, from: ['mobile-bff'] },
   { re: /^\/(coins\/packs|webhooks\/razorpay)$/, from: ['mobile-bff', 'admin-bff'] },
   { re: /^\/admin(\/|$)/, from: ['admin-bff'] },
+  // The identity service's read-only by-uid view of a devotee (Users 360, docs/USERS.md): a balance and the latest movements, nothing that writes.
+  { re: /^\/directory\/users\/[^/]+$/, from: ['identity'] },
   { re: /./, from: [] },
 ];
 

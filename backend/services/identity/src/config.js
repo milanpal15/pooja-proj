@@ -17,6 +17,18 @@ export const loadConfig = (env = process.env) => ({
     callsUrl: { name: 'CALLS_URL', default: '', parse: serviceUrl },
     monolithUrl: { name: 'MONOLITH_URL', default: 'http://127.0.0.1:4000', parse: serviceUrl },
     serviceTimeoutMs: { name: 'SERVICE_TIMEOUT_MS', default: 5000, parse: Number },
+    // The Users 360 view (docs/USERS.md): identity asks these services (read-only, by uid) for a devotee's devices, wallet, bookings, events and calls.
+    // Each one UNSET = that section of the 360 answers { unavailable:true, reason:'not_configured' }; the rest still load. CALLS_URL is the one above.
+    engagementUrl: { name: 'ENGAGEMENT_URL', default: '', parse: serviceUrl },
+    walletUrl: { name: 'WALLET_URL', default: '', parse: serviceUrl },
+    ordersUrl: { name: 'ORDERS_URL', default: '', parse: serviceUrl },
+    eventsUrl: { name: 'EVENTS_URL', default: '', parse: serviceUrl },
+    // How long one 360 section may take before it is shown as unavailable, ms.
+    sectionTimeoutMs: { name: 'USER360_SECTION_TIMEOUT_MS', default: 1500, parse: Number },
+    // How often (ms, 0 = off) a timed block that has run out is written back as an `auto_unblock` history row. The block stops applying the moment `until` passes either way.
+    blockSweepEveryMs: { name: 'BLOCK_SWEEP_EVERY_MS', default: 60000, parse: Number },
+    // Derives the devotee pseudonyms (`Devotee ••4821`) shown to a role without `devotees:view` (same value as the admin BFF / other services). Unset = random per boot.
+    sessionSecret: { name: 'ADMIN_SESSION_SECRET', default: '' },
     adminUsername: { name: 'ADMIN_USERNAME', default: 'admin', parse: (v) => v.toLowerCase() },
     adminPassword: { name: 'ADMIN_PASSWORD', default: '' },
     firebaseServiceAccount: { name: 'FIREBASE_SERVICE_ACCOUNT', default: '' },

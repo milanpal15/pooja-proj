@@ -4,14 +4,18 @@
 // bytes byte for byte, and a body altered by a single byte is refused.
 // Run: node --test --test-concurrency=1 src/wallet.test.mjs   (no database, no Firebase)
 import assert from 'node:assert/strict';
+
 import { createHmac } from 'node:crypto';
 import http from 'node:http';
 import { after, before, beforeEach, describe, test } from 'node:test';
 
-import { verifyServiceToken } from '@bhakti/common';
+import { DEFAULT_BLOCK_MESSAGE, DEFAULT_BLOCK_MESSAGE_HI, verifyServiceToken } from '@bhakti/common';
 
 import { createApp } from './app.js';
 import { loadConfig } from './config.js';
+
+// docs/USERS.md section 3: what a blocked account is told (the status stand-in here sends no operator message, so the stock one).
+const BLOCKED = { error: 'account blocked', code: 'account_blocked', message: DEFAULT_BLOCK_MESSAGE, messageHi: DEFAULT_BLOCK_MESSAGE_HI, until: null, support: {} };
 
 const SECRET = 'test-secret-test-secret-1234';
 const WEBHOOK_SECRET = 'whsec_test_fixture_value';
@@ -132,7 +136,7 @@ describe('the devotee routes (the uid is the signed sub; nothing reaches the mon
     clock += 3_600_000;
     for (const [m, p] of [['GET', '/api/wallet'], ['POST', '/api/wallet/orders']]) {
       const r = await call(m, p, { token: 'good-devotee1', body: m === 'POST' ? {} : undefined });
-      assert.deepEqual([r.status, r.body], [403, { error: 'account blocked' }]);
+      assert.deepEqual([r.status, r.body], [403, BLOCKED]);
     }
     assert.equal(walCalls.length, 0);
   });

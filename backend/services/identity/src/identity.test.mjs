@@ -194,6 +194,8 @@ describe('auth sync', () => {
     const r = await call('POST', '/auth/sync', { headers: devotee('uid-1'), body: {} });
     assert.equal(r.status, 403);
     assert.equal(r.body.error, 'account blocked');
+    assert.equal(r.body.code, 'account_blocked', 'docs/USERS.md section 3: the phone-facing code');
+    assert.ok(r.body.message, 'a bare blocked flag still explains itself with the stock message');
     await User.updateOne({ uid: 'uid-1' }, { $set: { blocked: false } });
   });
 });
@@ -319,7 +321,11 @@ describe('devotee administration', () => {
     const u = await User.findOne({ uid: 'uid-del' });
     fb.deleted = [];
     assert.equal((await call('DELETE', `/admin/users/${u._id}`, { headers: admin(EDITOR) })).status, 403);
-    assert.equal((await call('DELETE', `/admin/users/${u._id}`, { headers: admin() })).status, 200);
+    const nope = await call('DELETE', `/admin/users/${u._id}`, { headers: admin() });
+    assert.deepEqual([nope.status, nope.body.code], [400, 'confirm_mismatch'], 'docs/USERS.md: a delete needs the typed confirmation');
+    assert.equal((await call('DELETE', `/admin/users/${u._id}`, { headers: admin(), body: { confirm: 'wrong' } })).status, 400);
+    assert.equal(await User.countDocuments({ uid: 'uid-del' }), 1);
+    assert.equal((await call('DELETE', `/admin/users/${u._id}`, { headers: admin(), body: { confirm: 'uid-del'.slice(-6) } })).status, 200);
     assert.equal(await User.countDocuments({ uid: 'uid-del' }), 0);
     assert.deepEqual(fb.deleted, ['uid-del']);
     assert.equal((await call('DELETE', `/admin/users/${u._id}`, { headers: admin() })).status, 200, 'idempotent');

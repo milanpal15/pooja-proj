@@ -5,10 +5,13 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import { after, before, beforeEach, describe, test } from 'node:test';
 
-import { ORDERS_DEVOTEE_ROUTES, ORDERS_PUBLIC_GETS, verifyServiceToken } from '@bhakti/common';
+import { DEFAULT_BLOCK_MESSAGE, DEFAULT_BLOCK_MESSAGE_HI, ORDERS_DEVOTEE_ROUTES, ORDERS_PUBLIC_GETS, verifyServiceToken } from '@bhakti/common';
 
 import { createApp } from './app.js';
 import { loadConfig } from './config.js';
+
+// docs/USERS.md section 3: what a blocked account is told (the status stand-in here sends no operator message, so the stock one).
+const BLOCKED = { error: 'account blocked', code: 'account_blocked', message: DEFAULT_BLOCK_MESSAGE, messageHi: DEFAULT_BLOCK_MESSAGE_HI, until: null, support: {} };
 
 const SECRET = 'test-secret-test-secret-1234';
 const logger = { info() {}, warn() {}, error() {} };
@@ -152,7 +155,7 @@ describe('the devotee routes (the uid is the signed sub, the name rides as ctx.n
     clock += 3_600_000;
     for (const [m, p] of [['GET', '/api/bookings'], ['POST', '/api/bookings'], ['POST', '/api/chadhava/orders']]) {
       const r = await call(m, p, { token: 'good-devotee1', body: m === 'POST' ? {} : undefined });
-      assert.deepEqual([r.status, r.body], [403, { error: 'account blocked' }]);
+      assert.deepEqual([r.status, r.body], [403, BLOCKED]);
     }
     assert.equal(ordCalls.length, 0);
   });

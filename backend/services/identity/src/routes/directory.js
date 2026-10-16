@@ -3,6 +3,7 @@ import { HttpError } from '../lib/http-error.js';
 import { can, onlyFrom } from '../lib/perms.js';
 import { permissionsOfRole } from '../lib/roles.js';
 import { hasPermission } from '../lib/perms.js';
+import { isBlocked, phoneBlock } from '../lib/blocks.js';
 import { Operator, User } from '../models/index.js';
 
 const SERVICES = ['monolith', 'catalog', 'wallet', 'orders', 'calls'];
@@ -66,11 +67,19 @@ export function directoryRoutes() {
 }
 
 /** What the mobile BFF asks on EVERY authenticated request: is this uid blocked, and what should the token vouch for? */
-export function statusRoutes() {
+export function statusRoutes({ now = () => new Date() } = {}) {
   const r = asyncRouter();
   r.get('/users/:uid/status', onlyFrom('mobile-bff', ...SERVICES), async (req, res) => {
-    const u = await User.findOne({ uid: req.params.uid }).select('blocked name role').lean();
-    res.json({ exists: !!u, blocked: !!u?.blocked, name: u?.name || '', role: u?.role === 'astrologer' ? 'astrologer' : 'devotee' });
+    const u = await User.findOne({ uid: req.params.uid }).select('blocked block name role').lean();
+    // A timed block that has run out is NOT blocked, immediately (docs/USERS.md section 1). A blocked answer carries only the words the person reads.
+    const blocked = isBlocked(u, now());
+    res.json({
+      exists: !!u,
+      blocked,
+      name: u?.name || '',
+      role: u?.role === 'astrologer' ? 'astrologer' : 'devotee',
+      ...(blocked ? { block: phoneBlock(u.block) } : {}),
+    });
   });
   return r;
 }

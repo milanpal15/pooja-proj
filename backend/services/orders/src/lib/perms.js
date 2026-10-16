@@ -24,6 +24,8 @@ const EDGES = [
   { re: /^\/chadhava$/, from: ['mobile-bff', 'admin-bff'] },
   { re: /^\/poojas\/[^/]+\/reviews$/, from: ['mobile-bff', 'admin-bff'] },
   { re: /^\/admin(\/|$)/, from: ['admin-bff'] },
+  // The identity service's read-only by-uid view of a devotee's bookings (Users 360, docs/USERS.md).
+  { re: /^\/directory\/users\/[^/]+$/, from: ['identity'] },
   { re: /./, from: [] },
 ];
 

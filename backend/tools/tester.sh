@@ -9,7 +9,7 @@
 #   tools/tester.sh logs [x]  tail a service log (default: mobile-bff)
 #
 # Everything lives OUTSIDE the repo in $TESTER_HOME (default ~/.bhakti-tester): the mongod data, the generated secrets
-# (secrets.env, mode 600), the logs and pids. Nothing here touches Atlas, the throwaway test stacks, or your own Metro.
+# (mongod data, logs, pids; secrets live in backend/.env), the logs and pids. Nothing here touches Atlas, the throwaway test stacks, or your own Metro.
 #
 # Only the MOBILE BFF is published. The dashboard stays on your machine (see docs/TESTER_DEPLOY.md), so the admin API is never
 # reachable from the internet. The stack runs in development mode: the mock payment and mock call providers are allowed, which is
@@ -21,7 +21,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND="$(cd "$HERE/.." && pwd)"
 REPO="$(cd "$BACKEND/.." && pwd)"
 TESTER_HOME="${TESTER_HOME:-$HOME/.bhakti-tester}"
-SECRETS="$TESTER_HOME/secrets.env"
+SECRETS="${TESTER_ENV:-$BACKEND/.env}"            # gitignored (backend/.gitignore); override with TESTER_ENV
 RUN="$TESTER_HOME/run"
 MONGO_DIR="$TESTER_HOME/mongo"
 MONGO_PORT="${TESTER_MONGO_PORT:-27500}"
@@ -40,7 +40,7 @@ gen_secrets() {
   need openssl
   umask 077
   {
-    echo "# Generated $(date -u +%FT%TZ) by tools/tester.sh. Keep private; it is outside the repo."
+    echo "# Generated $(date -u +%FT%TZ) by tools/tester.sh. Keep private; backend/.env is gitignored, never commit it."
     echo "INTERNAL_JWT_SECRET=$(openssl rand -hex 24)"
     echo "ADMIN_SESSION_SECRET=$(openssl rand -hex 24)"
     echo "# The first dashboard admin is created from this on the FIRST start only (an empty operators collection)."

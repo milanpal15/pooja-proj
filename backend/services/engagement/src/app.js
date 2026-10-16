@@ -5,6 +5,7 @@ import { createLogger } from '@bhakti/common';
 import { createApprovers } from './lib/approvers.js';
 import { HttpError } from './lib/http-error.js';
 import { analyticsRoutes } from './routes/analytics.js';
+import { deviceRoutes } from './routes/devices.js';
 import { appPolicyRoutes } from './routes/app-policy.js';
 import { announcementAdminRoutes, announcementPushRoutes, announcementRoutes } from './routes/announcements.js';
 import { flagRoutes } from './routes/flags.js';
@@ -36,6 +37,7 @@ export function createApp(config, { isReady, dbPing = async () => {}, logger = c
   internal.use('/admin/announcements', announcementAdminRoutes);
   internal.use(announcementPushRoutes({ expoPushUrl: config.expoPushUrl, fetchImpl }));
   internal.use(analyticsRoutes);
+  internal.use('/devices', deviceRoutes()); // identity only: the device registry, read-only (Users 360)
   internal.use('/policy', appPolicyRoutes({ now })); // the mobile BFF: the gate's policy, the public policy answer, blocked counters
   internal.use('/admin/releases', releaseRoutes({ now }));
   internal.use('/admin/versions', versionRoutes({ now }));

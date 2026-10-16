@@ -25,6 +25,9 @@ export const ROUTE_AREAS = [
   { path: /^\/flags(\/|$)/, area: 'flags' },
   { path: /^\/admin\/policies(\/|$)/, area: 'policies' },
   { path: /^\/users(\/|$)/, area: 'devotees' },
+  // Users 360 and blocking (identity; BFF-only, docs/USERS.md). The CSV export is a bulk copy of personal data, so reading it also needs `devotees:edit`.
+  { path: /^\/admin\/users\/export$/, area: 'devotees', also: 'devotees:edit' },
+  { path: /^\/admin\/(users|blocked-devices)(\/|$)/, area: 'devotees' },
   { path: /^\/admin\/operators(\/|$)/, area: 'operators' },
   // The audit log has its own area here (admin only): docs/RELEASES.md section 5. pooja-api still maps it to `operators`; the parity test knows.
   { path: /^\/admin\/audit-log$/, area: 'audit' },

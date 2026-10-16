@@ -96,7 +96,7 @@ describe('auth: nothing without a valid service token, and each route family has
   });
 
   test('an issuer that is not on the allow-list is refused even with a valid signature', async () => {
-    for (const iss of ['some-other-service', 'wallet', 'identity', 'monolith', 'calls']) {
+    for (const iss of ['some-other-service', 'wallet', 'engagement', 'monolith', 'calls']) {
       const r = await h.call('GET', '/bookings', { tok: sign({ iss, sub: 'u1' }) });
       assert.deepEqual([r.status, r.body.code], [401, 'wrong_issuer'], iss);
     }
@@ -695,7 +695,7 @@ describe('config', () => {
     const base = { INTERNAL_JWT_SECRET: 'x'.repeat(16), WALLET_URL: 'http://w/', CATALOG_URL: 'http://c//', IDENTITY_URL: ' http://i ', ENGAGEMENT_URL: 'http://e' };
     const c = loadConfig(base);
     assert.deepEqual([c.port, c.dbName, c.walletUrl, c.catalogUrl, c.identityUrl, c.engagementUrl], [4070, 'orders', 'http://w', 'http://c', 'http://i', 'http://e']);
-    assert.deepEqual([c.allowedIssuers, c.walletTimeoutMs, c.sweepEveryMs, c.intentMinAgeMs, c.intentGraceMs, c.intentRetentionDays, c.pruneEveryMs], [['mobile-bff', 'admin-bff', 'catalog'], 5000, 5000, 10000, 120000, 30, 3600000]);
+    assert.deepEqual([c.allowedIssuers, c.walletTimeoutMs, c.sweepEveryMs, c.intentMinAgeMs, c.intentGraceMs, c.intentRetentionDays, c.pruneEveryMs], [['mobile-bff', 'admin-bff', 'catalog', 'identity'], 5000, 5000, 10000, 120000, 30, 3600000]);
     assert.ok(Object.isFrozen(c));
     for (const k of ['INTERNAL_JWT_SECRET', 'WALLET_URL', 'CATALOG_URL', 'IDENTITY_URL', 'ENGAGEMENT_URL']) {
       const { [k]: _gone, ...rest } = base;
