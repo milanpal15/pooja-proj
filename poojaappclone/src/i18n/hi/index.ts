@@ -18,6 +18,7 @@ import { homeV2 } from './home-v2';
 import { search } from './search';
 import { poojaSeva } from './pooja-seva';
 import { chadhavaSeva } from './chadhava-seva';
+import { appPolicy } from './app-policy';
 import { bhajanProfile } from './bhajan-profile';
 
 /** Every Hindi string, merged from its namespaces. */
@@ -43,4 +44,5 @@ export const hi = {
   ...homeLayout,
   ...homeV2,
   ...search,
+  ...appPolicy,
 } as const;

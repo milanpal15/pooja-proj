@@ -1,5 +1,8 @@
 import { ADMIN_API } from '@/constants/config';
+import { appHeaders } from '@/lib/app-info';
 import { getIdToken } from '@/lib/firebase-auth';
+
+import { emitGateSignal, isGateResponse } from './gate-signal';
 
 /** Raised when the backend rejects the caller; `status` drives what the UI does. */
 export class ApiError extends Error {
@@ -28,6 +31,29 @@ export function isOffline(e: unknown): boolean {
 }
 
 /**
+ * THE one fetch to our API. Every call to `ADMIN_API` goes through here so it carries the build
+ * telemetry headers (`X-App-Version`, …; docs/RELEASES.md §1) and so a `426 app_outdated` /
+ * `503 maintenance` answer from ANY endpoint reaches the policy gate. `path` is host-relative, so the
+ * headers can never reach another host. The response is returned untouched (its body is still readable).
+ */
+export async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  const res = await fetch(`${ADMIN_API}${path}`, {
+    ...init,
+    headers: { ...(init.headers as Record<string, string> | undefined), ...(await appHeaders()) },
+  });
+  if (res.status === 426 || res.status === 503) {
+    res
+      .clone()
+      .json()
+      .then((body: unknown) => {
+        if (isGateResponse(res.status, body)) emitGateSignal({ httpStatus: res.status, body });
+      })
+      .catch(() => {});
+  }
+  return res;
+}
+
+/**
  * Call the admin backend with the devotee's Firebase ID token attached.
  *
  * On a 401 it retries once with a force-refreshed token, which covers the
@@ -46,7 +72,7 @@ export async function authedFetch(path: string, init: RequestInit = {}, timeoutM
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      return await fetch(`${ADMIN_API}${path}`, {
+      return await apiFetch(path, {
         ...init,
         signal: controller.signal,
         headers: {
@@ -88,7 +114,7 @@ export async function publicFetch<T>(path: string, timeoutMs = 10_000): Promise<
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(`${ADMIN_API}${path}`, { signal: controller.signal });
+    const res = await apiFetch(path, { signal: controller.signal });
     if (!res.ok) throw new ApiError(res.status, `${res.status} ${res.statusText}`);
     return (await res.json()) as T;
   } finally {
@@ -101,7 +127,7 @@ export async function publicGet<T>(path: string, timeoutMs = 8_000): Promise<T> 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(`${ADMIN_API}${path}`, { signal: controller.signal });
+    const res = await apiFetch(path, { signal: controller.signal });
     if (!res.ok) throw new ApiError(res.status, `${res.status} ${res.statusText}`);
     return (await res.json()) as T;
   } finally {

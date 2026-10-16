@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { ADMIN_API } from '@/constants/config';
+import { apiFetch } from '@/lib/api/client';
 import { computePanchang } from '@/lib/panchang';
 
 import { dayKey } from '../lib/day-key';
@@ -44,7 +44,7 @@ export function usePanchangDay(place: { lat: number; lng: number }, hi: boolean)
     const timer = setTimeout(() => controller.abort(), 8000);
     const key = dayKey(date);
 
-    fetch(`${ADMIN_API}/api/panchang?date=${key}`, { signal: controller.signal })
+    apiFetch(`/api/panchang?date=${key}`, { signal: controller.signal })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
       .then((d: { override?: Record<string, string> | null }) => {
         if (alive) setFetched({ key, data: d.override ?? null });

@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useMemo, useState } from 'react';
 
-import { ADMIN_API } from '@/constants/config';
+import { apiFetch } from '@/lib/api/client';
 
 import { buildContentValue } from './build-value';
 import { CACHE_KEY, normalise } from './cache';
@@ -39,7 +39,7 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 5000);
-    fetch(`${ADMIN_API}/api/content`, { signal: controller.signal })
+    apiFetch('/api/content', { signal: controller.signal })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (!data || !alive) return;

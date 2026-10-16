@@ -16,6 +16,7 @@ import { Radius, Sacred, Space } from '@/constants/sacred';
 
 import { ConfirmProvider, ToastProvider } from '@/components/ui';
 import { AstrologerShell } from '@/features/astrologer-mode';
+import { PolicyGate } from '@/features/app-policy';
 import { AuthGate } from '@/features/auth';
 import { usePushRegistration } from '@/hooks/use-push-registration';
 import { AdminProvider, useAdmin } from '@/providers/admin';
@@ -45,7 +46,9 @@ export default function TabLayout() {
                       provider below could raise one during its own setup. */}
                   <ToastProvider>
                     <ConfirmProvider>
-                      <RootGate />
+                      <PolicyGate>
+                        <RootGate />
+                      </PolicyGate>
                     </ConfirmProvider>
                   </ToastProvider>
                 </ContentProvider>

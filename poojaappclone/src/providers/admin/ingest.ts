@@ -1,11 +1,11 @@
-import { ADMIN_API } from '@/constants/config';
+import { apiFetch } from '@/lib/api/client';
 
 /** Fire-and-forget POST to the admin backend (ignores failures/offline). */
 export async function post(path: string, body: unknown) {
   try {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 4000);
-    await fetch(`${ADMIN_API}${path}`, {
+    await apiFetch(path, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),

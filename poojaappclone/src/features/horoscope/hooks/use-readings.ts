@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { ADMIN_API } from '@/constants/config';
+import { apiFetch } from '@/lib/api/client';
 
 import { todayKey } from '../lib/today-key';
 import type { Reading } from '../types';
@@ -15,7 +15,7 @@ export function useReadings() {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 8000);
 
-    fetch(`${ADMIN_API}/api/horoscope?date=${todayKey()}`, { signal: controller.signal })
+    apiFetch(`/api/horoscope?date=${todayKey()}`, { signal: controller.signal })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
       .then((data: { readings?: Reading[] }) => {
         if (alive) setReadings(data.readings ?? []);

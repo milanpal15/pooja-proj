@@ -3,11 +3,12 @@ import * as Device from 'expo-device';
 import type { MutableRefObject } from 'react';
 import { Platform } from 'react-native';
 
-import { ADMIN_API } from '@/constants/config';
+import { apiFetch } from '@/lib/api/client';
+import { APP_VERSION_NAME, APP_VERSION_CODE, getDeviceId } from '@/lib/app-info';
 
 import { type Analytics, EMPTY_ANALYTICS } from './analytics';
 import { DEFAULT_FLAGS, type FeatureKey, type Flags } from './flags';
-import { hashStr, post } from './ingest';
+import { post } from './ingest';
 import { ADMIN_KEY, ANALYTICS_KEY, FLAGS_KEY } from './storage';
 
 /**
@@ -26,22 +27,17 @@ export async function bootstrapAdmin({
   loaded: MutableRefObject<boolean>;
   deviceId: MutableRefObject<string>;
 }) {
-  const [rawF, rawA, rawAdmin, rawDev] = await Promise.all([
+  const [rawF, rawA, rawAdmin] = await Promise.all([
     AsyncStorage.getItem(FLAGS_KEY),
     AsyncStorage.getItem(ANALYTICS_KEY),
     AsyncStorage.getItem(ADMIN_KEY),
-    AsyncStorage.getItem('pooja.deviceId'),
-  ]).catch(() => [null, null, null, null] as const);
+  ]).catch(() => [null, null, null] as const);
 
   if (rawF) setFlags({ ...DEFAULT_FLAGS, ...JSON.parse(rawF) });
   if (rawAdmin === '1') setIsAdmin(true);
 
-  // Stable per-install device id.
-  let did = rawDev;
-  if (!did) {
-    did = `dev_${Math.abs(hashStr(String(Date.now()) + Math.random())).toString(36)}`;
-    AsyncStorage.setItem('pooja.deviceId', did).catch(() => {});
-  }
+  // Stable per-install device id — the same one the API headers carry (lib/app-info).
+  const did = (await getDeviceId()) ?? `dev_${Date.now().toString(36)}`;
   deviceId.current = did;
 
   const now = Date.now();
@@ -62,7 +58,8 @@ export async function bootstrapAdmin({
     deviceId: did,
     model: Device.modelName,
     os: `${Platform.OS} ${Platform.Version}`,
-    appVersion: '1.0.0',
+    appVersion: APP_VERSION_NAME,
+    versionCode: APP_VERSION_CODE,
   });
   // Two attempts: a short one, then a long one. A hosted backend that has been idle (Render's free plan sleeps) can take 20-60 s to wake,
   // and a single 4 s try gave up before it answered, leaving a stale cached flag in force (mobile login looked dead). Neither blocks the UI:
@@ -71,7 +68,7 @@ export async function bootstrapAdmin({
     try {
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-      const res = await fetch(`${ADMIN_API}/api/flags`, { signal: ctrl.signal });
+      const res = await apiFetch('/api/flags', { signal: ctrl.signal });
       clearTimeout(timer);
       if (!res.ok) continue;
       const data = (await res.json()) as { flags?: Partial<Record<string, unknown>> };

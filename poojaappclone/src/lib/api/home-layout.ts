@@ -1,6 +1,5 @@
-import { ADMIN_API } from '@/constants/config';
 
-import { ApiError } from './client';
+import { ApiError, apiFetch } from './client';
 
 /** Contract: docs/HOME_LAYOUT.md §4. */
 export type HomeLayoutResponse =
@@ -17,7 +16,7 @@ export async function fetchHomeLayout(lang: 'en' | 'hi', etag?: string | null, t
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(`${ADMIN_API}/api/home?lang=${lang}`, {
+    const res = await apiFetch(`/api/home?lang=${lang}`, {
       signal: controller.signal,
       headers: etag ? { 'If-None-Match': etag } : undefined,
     });
