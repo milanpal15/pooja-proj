@@ -1,13 +1,14 @@
 /**
  * Strict validation + normalisation of a Home layout document (docs/HOME_LAYOUT.md section 1-3), driven by registry.js.
  *
- * `validateLayout(body)` returns `{ doc }` (the normalised document: every common field present, dates as ISO strings,
- * html sanitised, text trimmed) or `{ fields }` (a map of dotted paths to messages, e.g. `blocks.3.data.source`).
+ * Document v2 (section 9.1): `{schemaVersion: 2, layouts: [Layout]}`. `validateLayout(body)` returns `{ doc }` (the
+ * normalised document: every common field present, dates as ISO strings, html sanitised, text trimmed) or `{ fields }`
+ * (a map of dotted paths to messages, e.g. `layouts.1.blocks.3.audience.0`).
  * Unknown fields are rejected everywhere. It never throws on bad input.
  */
 import { withinHtmlLimit, sanitizeHtmlFragment } from './html-sanitizer.js';
 import {
-  ACTION_TYPES, BADGES, BLOCK_TYPES, ICONS, LANGUAGES, LIMITS, SCHEMA_VERSION, SOURCES, TONES,
+  ACTION_TYPES, AUDIENCE_KEYS, BADGES, BLOCK_TYPES, DEFAULT_LAYOUT_ID, ICONS, LANGUAGES, LIMITS, SCHEMA_VERSION, SOURCES, TONES,
 } from './registry.js';
 
 const MAX_ERRORS = 60;
@@ -85,7 +86,7 @@ function action(v, path, f) {
   return { type: v.type, ref: v.type === 'none' ? '' : ref };
 }
 
-const ITEM_KEYS = ['title', 'titleHi', 'subtitle', 'subtitleHi', 'icon', 'image', 'badge', 'liveBadge', 'flag', 'deitySlug', 'action'];
+const ITEM_KEYS = ['title', 'titleHi', 'subtitle', 'subtitleHi', 'icon', 'image', 'badge', 'badgeUntil', 'liveBadge', 'enabled', 'flag', 'deitySlug', 'action'];
 
 function item(v, path, f) {
   if (!isObj(v)) { f.add(path, 'Each item must be an object.'); return null; }
@@ -96,7 +97,9 @@ function item(v, path, f) {
     icon: oneOf(v.icon, ['', ...ICONS], `${path}.icon`, f, ''),
     image: image(v.image, `${path}.image`, f),
     badge: oneOf(v.badge, ['', ...BADGES], `${path}.badge`, f, ''),
+    badgeUntil: when(v.badgeUntil, `${path}.badgeUntil`, f),
     liveBadge: bool(v.liveBadge, `${path}.liveBadge`, f, false),
+    enabled: bool(v.enabled, `${path}.enabled`, f, true),
     flag: flag(v.flag, `${path}.flag`, f),
     deitySlug: text(v.deitySlug, `${path}.deitySlug`, f, { max: 80 }),
     action: action(v.action, `${path}.action`, f),
@@ -184,10 +187,21 @@ function data(v, def, path, f) {
   return out;
 }
 
-const BLOCK_KEYS = ['id', 'type', 'enabled', 'startsAt', 'endsAt', 'language', 'flag', 'title', 'titleHi', 'subtitle', 'subtitleHi', 'tone', 'action', 'actionLabel', 'actionLabelHi', 'props', 'data'];
+/** `[segment]` from the closed registry list; duplicates collapse. An unknown segment is an error, never "everyone". */
+function audience(v, path, f) {
+  if (v === undefined || v === null) return [];
+  if (!Array.isArray(v)) { f.add(path, 'Must be a list of audience segments.'); return []; }
+  const out = [];
+  v.forEach((x, i) => {
+    if (typeof x !== 'string' || !AUDIENCE_KEYS.includes(x)) f.add(`${path}.${i}`, `Must be one of: ${AUDIENCE_KEYS.join(', ')}.`);
+    else if (!out.includes(x)) out.push(x);
+  });
+  return out;
+}
 
-function block(v, i, seen, f) {
-  const path = `blocks.${i}`;
+const BLOCK_KEYS = ['id', 'type', 'enabled', 'audience', 'startsAt', 'endsAt', 'language', 'flag', 'title', 'titleHi', 'subtitle', 'subtitleHi', 'tone', 'action', 'actionLabel', 'actionLabelHi', 'props', 'data'];
+
+function block(v, path, seen, f) {
   if (!isObj(v)) { f.add(path, 'Each block must be an object.'); return null; }
   noUnknown(v, BLOCK_KEYS, path, f);
 
@@ -206,6 +220,7 @@ function block(v, i, seen, f) {
     id: typeof v.id === 'string' ? v.id : '',
     type: def ? v.type : '',
     enabled: bool(v.enabled, `${path}.enabled`, f, true),
+    audience: audience(v.audience, `${path}.audience`, f),
     startsAt, endsAt,
     language: oneOf(v.language, LANGUAGES, `${path}.language`, f, 'all'),
     flag: flag(v.flag, `${path}.flag`, f),
@@ -219,17 +234,80 @@ function block(v, i, seen, f) {
   };
 }
 
+/** The two fixed blocks (section 9.1): an enabled `header` then an enabled `search`, unfiltered, in every layout. */
+const FIXED = ['header', 'search'];
+
+function fixedBlocks(blocks, path, f) {
+  FIXED.forEach((type, i) => {
+    const b = blocks[i];
+    if (!b) { f.add(`${path}.${i}`, `The ${i === 0 ? 'first' : 'second'} block must be the ${type} (the fixed top bar and search).`); return; }
+    if (b.type !== type) { f.add(`${path}.${i}.type`, `The ${i === 0 ? 'first' : 'second'} block must be the ${type}.`); return; }
+    if (b.enabled !== true) f.add(`${path}.${i}.enabled`, 'The top bar and search cannot be disabled.');
+    if (b.audience.length) f.add(`${path}.${i}.audience`, 'The top bar and search are shown to everyone.');
+    if (b.startsAt || b.endsAt) f.add(`${path}.${i}.${b.startsAt ? 'startsAt' : 'endsAt'}`, 'The top bar and search cannot be scheduled.');
+    if (b.language !== 'all') f.add(`${path}.${i}.language`, 'The top bar and search are shown in every language.');
+  });
+  blocks.forEach((b, i) => { if (i >= FIXED.length && FIXED.includes(b?.type)) f.add(`${path}.${i}.type`, `The ${b.type} is fixed at the top of the layout and can appear only once.`); });
+}
+
+const LAYOUT_KEYS = ['id', 'name', 'enabled', 'audience', 'startsAt', 'endsAt', 'blocks'];
+
+function layout(v, i, seenIds, f) {
+  const path = `layouts.${i}`;
+  if (!isObj(v)) { f.add(path, 'Each layout must be an object.'); return null; }
+  noUnknown(v, LAYOUT_KEYS, path, f);
+
+  if (typeof v.id !== 'string' || !ID_RE.test(v.id)) f.add(`${path}.id`, 'Required: letters, digits, "-" and "_", at most 40.');
+  else if (seenIds.has(v.id)) f.add(`${path}.id`, 'Duplicate id.');
+  else seenIds.add(v.id);
+  const isDefault = v.id === DEFAULT_LAYOUT_ID;
+
+  let name = '';
+  if (typeof v.name !== 'string' || !v.name.trim()) f.add(`${path}.name`, 'A name is required.');
+  else if (v.name.trim().length > LIMITS.name) f.add(`${path}.name`, `At most ${LIMITS.name} characters.`);
+  else name = v.name.trim();
+
+  const enabled = bool(v.enabled, `${path}.enabled`, f, true);
+  const aud = audience(v.audience, `${path}.audience`, f);
+  const startsAt = when(v.startsAt, `${path}.startsAt`, f);
+  const endsAt = when(v.endsAt, `${path}.endsAt`, f);
+  if (startsAt && endsAt && endsAt <= startsAt) f.add(`${path}.endsAt`, 'Must be after startsAt.');
+  if (isDefault) {
+    if (enabled !== true) f.add(`${path}.enabled`, 'The default layout is always enabled.');
+    if (aud.length) f.add(`${path}.audience`, 'The default layout is shown to everyone.');
+    if (startsAt || endsAt) f.add(`${path}.${startsAt ? 'startsAt' : 'endsAt'}`, 'The default layout has no schedule.');
+  }
+
+  let blocks = [];
+  if (!Array.isArray(v.blocks)) f.add(`${path}.blocks`, 'Must be a list of blocks.');
+  else {
+    if (v.blocks.length > LIMITS.blocks) f.add(`${path}.blocks`, `At most ${LIMITS.blocks} blocks.`);
+    const seen = new Set();
+    blocks = v.blocks.slice(0, LIMITS.blocks).map((b, k) => block(b, `${path}.blocks.${k}`, seen, f));
+    if (blocks.every(Boolean)) fixedBlocks(blocks, `${path}.blocks`, f);
+  }
+  return { id: typeof v.id === 'string' ? v.id : '', name, enabled, audience: aud, startsAt, endsAt, blocks };
+}
+
 export function validateLayout(body) {
   const f = new Fields();
-  if (!isObj(body)) { f.add('body', 'Send {schemaVersion, blocks}.'); return { fields: f.map }; }
-  noUnknown(body, ['schemaVersion', 'blocks'], '', f);
+  if (!isObj(body)) { f.add('body', 'Send {schemaVersion, layouts}.'); return { fields: f.map }; }
+  noUnknown(body, ['schemaVersion', 'layouts'], '', f);
   // noUnknown prefixes "."; tidy the top-level keys
   for (const k of Object.keys(f.map)) if (k.startsWith('.')) { f.map[k.slice(1)] = f.map[k]; delete f.map[k]; }
   if (body.schemaVersion !== SCHEMA_VERSION) f.add('schemaVersion', `Must be ${SCHEMA_VERSION}.`);
-  if (!Array.isArray(body.blocks)) { f.add('blocks', 'Must be a list of blocks.'); return { fields: f.map }; }
-  if (body.blocks.length > LIMITS.blocks) f.add('blocks', `At most ${LIMITS.blocks} blocks.`);
+  if (!Array.isArray(body.layouts)) { f.add('layouts', 'Must be a list of layouts.'); return { fields: f.map }; }
+  if (body.layouts.length > LIMITS.layouts) f.add('layouts', `At most ${LIMITS.layouts} layouts.`);
   const seen = new Set();
-  const blocks = body.blocks.slice(0, LIMITS.blocks).map((b, i) => block(b, i, seen, f));
+  const layouts = body.layouts.slice(0, LIMITS.layouts).map((l, i) => layout(l, i, seen, f));
+  if (!seen.has(DEFAULT_LAYOUT_ID)) f.add('layouts', `There must be a layout with id "${DEFAULT_LAYOUT_ID}" (the fallback).`);
   if (f.any) return { fields: f.map };
-  return { doc: { schemaVersion: SCHEMA_VERSION, blocks } };
+  return { doc: { schemaVersion: SCHEMA_VERSION, layouts } };
+}
+
+/** One block on its own (used to migrate legacy sections); `{ block }` or `{ fields }` keyed `block.…`. */
+export function validateBlock(raw) {
+  const f = new Fields();
+  const b = block(raw, 'block', new Set(), f);
+  return f.any ? { fields: f.map } : { block: b };
 }

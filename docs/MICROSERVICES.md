@@ -219,6 +219,10 @@ unchanged.
      layout for that language with `x-degraded: catalog` for up to 60 min, else 503 `catalog_unavailable` (the app then uses its cache / bundled default).
      Operator routes `/api/admin/home-layout*` (area `content`: editor writes, viewer reads; audited; `bodyLimit 1mb`). The registry
      (`modules/home/registry.js`) drives both validation and `GET /api/admin/home-layout/registry`. `/api/content` `home.sections` is unchanged.
+     **v2.1 (layout sets, HOME_LAYOUT.md section 9):** the two collections now hold a SET (`schemaVersion: 2`, `layouts: [...]`, `blockCount`
+     across layouts, `layoutCount`); stored v1 rows (`blocks`) are upgraded on read and once at catalog boot (idempotent). `GET /api/home` returns
+     `{version, schemaVersion: 2, publishedAt, layouts}` (live layouts only, `default` last; audiences are evaluated on the device). New operator
+     route `POST /api/admin/home-layout/discard` (same area and audit as the rest); `GET /api/admin/home-layout` adds `changes`.
    - **Media**: `/uploads/<id>.<ext>` is streamed by both BFFs from `GET /internal/catalog/media/:file` (Range 206/416, ETag/304, `immutable`,
      `nosniff`, `Content-Security-Policy: sandbox`, type from the extension - the monolith's code, verified byte for byte including 100-199 and
      suffix ranges); catalog down = `503 catalog_unavailable`. Uploads: the admin BFF gates (area `content`), audits and **streams** the multipart

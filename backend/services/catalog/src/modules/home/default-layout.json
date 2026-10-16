@@ -1,526 +1,631 @@
 {
-  "schemaVersion": 1,
-  "blocks": [
+  "schemaVersion": 2,
+  "layouts": [
     {
-      "id": "b-01-header",
-      "type": "header",
+      "id": "default",
+      "name": "Default layout",
       "enabled": true,
+      "audience": [],
       "startsAt": null,
       "endsAt": null,
-      "language": "all",
-      "flag": "",
-      "title": "",
-      "titleHi": "",
-      "subtitle": "",
-      "subtitleHi": "",
-      "tone": "",
-      "action": null,
-      "actionLabel": "",
-      "actionLabelHi": "",
-      "props": {
-        "showWallet": true
-      },
-      "data": null
-    },
-    {
-      "id": "b-02-search",
-      "type": "search",
-      "enabled": true,
-      "startsAt": null,
-      "endsAt": null,
-      "language": "all",
-      "flag": "",
-      "title": "",
-      "titleHi": "",
-      "subtitle": "",
-      "subtitleHi": "",
-      "tone": "",
-      "action": null,
-      "actionLabel": "",
-      "actionLabelHi": "",
-      "props": {
-        "placeholder": "Search poojas, temples, bhajans",
-        "placeholderHi": "पूजा, मंदिर, भजन खोजें"
-      },
-      "data": null
-    },
-    {
-      "id": "b-03-slider",
-      "type": "slider",
-      "enabled": true,
-      "startsAt": null,
-      "endsAt": null,
-      "language": "all",
-      "flag": "",
-      "title": "",
-      "titleHi": "",
-      "subtitle": "",
-      "subtitleHi": "",
-      "tone": "",
-      "action": null,
-      "actionLabel": "",
-      "actionLabelHi": "",
-      "props": {},
-      "data": {
-        "mode": "source",
-        "source": "hero",
-        "params": {},
-        "limit": 8
-      }
-    },
-    {
-      "id": "b-04-astrologer",
-      "type": "astrologer",
-      "enabled": true,
-      "startsAt": null,
-      "endsAt": null,
-      "language": "all",
-      "flag": "astrologerCalls",
-      "title": "",
-      "titleHi": "",
-      "subtitle": "",
-      "subtitleHi": "",
-      "tone": "",
-      "action": null,
-      "actionLabel": "",
-      "actionLabelHi": "",
-      "props": {},
-      "data": {
-        "mode": "source",
-        "source": "astrologers.online",
-        "params": {}
-      }
-    },
-    {
-      "id": "b-05-deityrow",
-      "type": "deity_row",
-      "enabled": true,
-      "startsAt": null,
-      "endsAt": null,
-      "language": "all",
-      "flag": "",
-      "title": "",
-      "titleHi": "",
-      "subtitle": "",
-      "subtitleHi": "",
-      "tone": "",
-      "action": null,
-      "actionLabel": "",
-      "actionLabelHi": "",
-      "props": {},
-      "data": {
-        "mode": "source",
-        "source": "deities",
-        "params": {}
-      }
-    },
-    {
-      "id": "b-06-daily",
-      "type": "daily",
-      "enabled": true,
-      "startsAt": null,
-      "endsAt": null,
-      "language": "all",
-      "flag": "",
-      "title": "",
-      "titleHi": "",
-      "subtitle": "",
-      "subtitleHi": "",
-      "tone": "",
-      "action": null,
-      "actionLabel": "",
-      "actionLabelHi": "",
-      "props": {},
-      "data": {
-        "mode": "source",
-        "source": "daily.today",
-        "params": {}
-      }
-    },
-    {
-      "id": "b-07-featuredpooja",
-      "type": "featured_pooja",
-      "enabled": true,
-      "startsAt": null,
-      "endsAt": null,
-      "language": "all",
-      "flag": "",
-      "title": "",
-      "titleHi": "",
-      "subtitle": "",
-      "subtitleHi": "",
-      "tone": "",
-      "action": null,
-      "actionLabel": "",
-      "actionLabelHi": "",
-      "props": {},
-      "data": {
-        "mode": "source",
-        "source": "poojas.featured",
-        "params": {}
-      }
-    },
-    {
-      "id": "b-08-quickgrid",
-      "type": "quick_grid",
-      "enabled": true,
-      "startsAt": null,
-      "endsAt": null,
-      "language": "all",
-      "flag": "",
-      "title": "",
-      "titleHi": "",
-      "subtitle": "",
-      "subtitleHi": "",
-      "tone": "",
-      "action": null,
-      "actionLabel": "",
-      "actionLabelHi": "",
-      "props": {
-        "columns": 4
-      },
-      "data": {
-        "mode": "inline",
-        "items": [
-          {
-            "title": "Book Pooja",
-            "titleHi": "पूजा बुक करें",
-            "subtitle": "",
-            "subtitleHi": "",
-            "icon": "diya",
-            "image": "",
-            "badge": "",
-            "liveBadge": false,
-            "flag": "",
-            "deitySlug": "",
-            "action": {
-              "type": "route",
-              "ref": "/poojas"
-            }
+      "blocks": [
+        {
+          "id": "b-01-header",
+          "type": "header",
+          "enabled": true,
+          "audience": [],
+          "startsAt": null,
+          "endsAt": null,
+          "language": "all",
+          "flag": "",
+          "title": "",
+          "titleHi": "",
+          "subtitle": "",
+          "subtitleHi": "",
+          "tone": "",
+          "action": null,
+          "actionLabel": "",
+          "actionLabelHi": "",
+          "props": {
+            "showWallet": true
           },
-          {
-            "title": "Chadhava",
-            "titleHi": "चढ़ावा",
-            "subtitle": "",
-            "subtitleHi": "",
-            "icon": "marigold",
-            "image": "",
-            "badge": "",
-            "liveBadge": false,
-            "flag": "chadhava",
-            "deitySlug": "",
-            "action": {
-              "type": "chadhava",
-              "ref": ""
-            }
+          "data": null
+        },
+        {
+          "id": "b-02-search",
+          "type": "search",
+          "enabled": true,
+          "audience": [],
+          "startsAt": null,
+          "endsAt": null,
+          "language": "all",
+          "flag": "",
+          "title": "",
+          "titleHi": "",
+          "subtitle": "",
+          "subtitleHi": "",
+          "tone": "",
+          "action": null,
+          "actionLabel": "",
+          "actionLabelHi": "",
+          "props": {
+            "placeholder": "Search poojas, temples, bhajans",
+            "placeholderHi": "पूजा, मंदिर, भजन खोजें"
           },
-          {
-            "title": "Live Darshan",
-            "titleHi": "लाइव दर्शन",
-            "subtitle": "",
-            "subtitleHi": "",
-            "icon": "play",
-            "image": "",
-            "badge": "",
-            "liveBadge": true,
-            "flag": "liveDarshan",
-            "deitySlug": "",
-            "action": {
-              "type": "live",
-              "ref": ""
-            }
-          },
-          {
-            "title": "Temples Near Me",
-            "titleHi": "पास के मंदिर",
-            "subtitle": "",
-            "subtitleHi": "",
-            "icon": "temple",
-            "image": "",
-            "badge": "",
-            "liveBadge": false,
-            "flag": "",
-            "deitySlug": "",
-            "action": {
-              "type": "route",
-              "ref": "/temples"
-            }
-          },
-          {
-            "title": "Panchang",
-            "titleHi": "पंचांग",
-            "subtitle": "",
-            "subtitleHi": "",
-            "icon": "calendar",
-            "image": "",
-            "badge": "",
-            "liveBadge": false,
-            "flag": "",
-            "deitySlug": "",
-            "action": {
-              "type": "panchang",
-              "ref": ""
-            }
-          },
-          {
-            "title": "Rashifal",
-            "titleHi": "राशिफल",
-            "subtitle": "",
-            "subtitleHi": "",
-            "icon": "star",
-            "image": "",
-            "badge": "",
-            "liveBadge": false,
-            "flag": "",
-            "deitySlug": "",
-            "action": {
-              "type": "horoscope",
-              "ref": ""
-            }
-          },
-          {
-            "title": "Bhajan & Aarti",
-            "titleHi": "भजन व आरती",
-            "subtitle": "",
-            "subtitleHi": "",
-            "icon": "music",
-            "image": "",
-            "badge": "",
-            "liveBadge": false,
-            "flag": "bhajan",
-            "deitySlug": "",
-            "action": {
-              "type": "bhajan",
-              "ref": ""
-            }
-          },
-          {
-            "title": "Events",
-            "titleHi": "कार्यक्रम",
-            "subtitle": "",
-            "subtitleHi": "",
-            "icon": "sparkle",
-            "image": "",
-            "badge": "",
-            "liveBadge": false,
-            "flag": "events",
-            "deitySlug": "",
-            "action": {
-              "type": "events",
-              "ref": ""
-            }
-          },
-          {
-            "title": "Katha & Chalisa",
-            "titleHi": "कथा व चालीसा",
-            "subtitle": "",
-            "subtitleHi": "",
-            "icon": "lotus",
-            "image": "",
-            "badge": "",
-            "liveBadge": false,
-            "flag": "bhajan",
-            "deitySlug": "",
-            "action": {
-              "type": "bhajan",
-              "ref": ""
-            }
+          "data": null
+        },
+        {
+          "id": "b-03-slider",
+          "type": "slider",
+          "enabled": true,
+          "audience": [],
+          "startsAt": null,
+          "endsAt": null,
+          "language": "all",
+          "flag": "",
+          "title": "",
+          "titleHi": "",
+          "subtitle": "",
+          "subtitleHi": "",
+          "tone": "",
+          "action": null,
+          "actionLabel": "",
+          "actionLabelHi": "",
+          "props": {},
+          "data": {
+            "mode": "source",
+            "source": "hero",
+            "params": {},
+            "limit": 8
           }
-        ]
-      }
-    },
-    {
-      "id": "b-09-nextseva",
-      "type": "next_seva",
-      "enabled": true,
-      "startsAt": null,
-      "endsAt": null,
-      "language": "all",
-      "flag": "",
-      "title": "",
-      "titleHi": "",
-      "subtitle": "",
-      "subtitleHi": "",
-      "tone": "",
-      "action": null,
-      "actionLabel": "",
-      "actionLabelHi": "",
-      "props": {},
-      "data": {
-        "mode": "source",
-        "source": "bookings.next",
-        "params": {}
-      }
-    },
-    {
-      "id": "b-10-shelf",
-      "type": "shelf",
-      "enabled": true,
-      "startsAt": null,
-      "endsAt": null,
-      "language": "all",
-      "flag": "",
-      "title": "Upcoming poojas",
-      "titleHi": "आने वाली पूजाएँ",
-      "subtitle": "",
-      "subtitleHi": "",
-      "tone": "",
-      "action": {
-        "type": "route",
-        "ref": "/poojas"
-      },
-      "actionLabel": "See all",
-      "actionLabelHi": "सभी देखें",
-      "props": {
-        "layout": "photo3"
-      },
-      "data": {
-        "mode": "source",
-        "source": "poojas.upcoming",
-        "params": {},
-        "limit": 8
-      }
-    },
-    {
-      "id": "b-11-shelf",
-      "type": "shelf",
-      "enabled": true,
-      "startsAt": null,
-      "endsAt": null,
-      "language": "all",
-      "flag": "chadhava",
-      "title": "Offer chadhava",
-      "titleHi": "चढ़ावा चढ़ाएँ",
-      "subtitle": "",
-      "subtitleHi": "",
-      "tone": "",
-      "action": {
-        "type": "chadhava",
-        "ref": ""
-      },
-      "actionLabel": "See all",
-      "actionLabelHi": "सभी देखें",
-      "props": {
-        "layout": "photo3"
-      },
-      "data": {
-        "mode": "source",
-        "source": "chadhava.listings",
-        "params": {},
-        "limit": 8
-      }
-    },
-    {
-      "id": "b-12-templesnear",
-      "type": "temples_near",
-      "enabled": true,
-      "startsAt": null,
-      "endsAt": null,
-      "language": "all",
-      "flag": "",
-      "title": "",
-      "titleHi": "",
-      "subtitle": "",
-      "subtitleHi": "",
-      "tone": "",
-      "action": null,
-      "actionLabel": "",
-      "actionLabelHi": "",
-      "props": {},
-      "data": {
-        "mode": "source",
-        "source": "temples.near_me",
-        "params": {}
-      }
-    },
-    {
-      "id": "b-13-rashirow",
-      "type": "rashi_row",
-      "enabled": true,
-      "startsAt": null,
-      "endsAt": null,
-      "language": "all",
-      "flag": "",
-      "title": "",
-      "titleHi": "",
-      "subtitle": "",
-      "subtitleHi": "",
-      "tone": "",
-      "action": null,
-      "actionLabel": "",
-      "actionLabelHi": "",
-      "props": {},
-      "data": {
-        "mode": "source",
-        "source": "horoscope.today",
-        "params": {}
-      }
-    },
-    {
-      "id": "b-14-listen",
-      "type": "listen",
-      "enabled": true,
-      "startsAt": null,
-      "endsAt": null,
-      "language": "all",
-      "flag": "bhajan",
-      "title": "",
-      "titleHi": "",
-      "subtitle": "",
-      "subtitleHi": "",
-      "tone": "",
-      "action": null,
-      "actionLabel": "",
-      "actionLabelHi": "",
-      "props": {},
-      "data": {
-        "mode": "source",
-        "source": "bhajans.featured",
-        "params": {}
-      }
-    },
-    {
-      "id": "b-15-share",
-      "type": "share",
-      "enabled": true,
-      "startsAt": null,
-      "endsAt": null,
-      "language": "all",
-      "flag": "",
-      "title": "",
-      "titleHi": "",
-      "subtitle": "",
-      "subtitleHi": "",
-      "tone": "",
-      "action": null,
-      "actionLabel": "",
-      "actionLabelHi": "",
-      "props": {},
-      "data": null
-    },
-    {
-      "id": "b-16-fab",
-      "type": "fab",
-      "enabled": true,
-      "startsAt": null,
-      "endsAt": null,
-      "language": "all",
-      "flag": "bhajan",
-      "title": "Listen now",
-      "titleHi": "अभी सुनें",
-      "subtitle": "",
-      "subtitleHi": "",
-      "tone": "",
-      "action": {
-        "type": "bhajan",
-        "ref": ""
-      },
-      "actionLabel": "",
-      "actionLabelHi": "",
-      "props": {
-        "icon": "music"
-      },
-      "data": null
+        },
+        {
+          "id": "b-04-astrologer",
+          "type": "astrologer",
+          "enabled": true,
+          "audience": [],
+          "startsAt": null,
+          "endsAt": null,
+          "language": "all",
+          "flag": "astrologerCalls",
+          "title": "",
+          "titleHi": "",
+          "subtitle": "",
+          "subtitleHi": "",
+          "tone": "",
+          "action": null,
+          "actionLabel": "",
+          "actionLabelHi": "",
+          "props": {},
+          "data": {
+            "mode": "source",
+            "source": "astrologers.online",
+            "params": {}
+          }
+        },
+        {
+          "id": "b-05-deityrow",
+          "type": "deity_row",
+          "enabled": true,
+          "audience": [],
+          "startsAt": null,
+          "endsAt": null,
+          "language": "all",
+          "flag": "",
+          "title": "",
+          "titleHi": "",
+          "subtitle": "",
+          "subtitleHi": "",
+          "tone": "",
+          "action": null,
+          "actionLabel": "",
+          "actionLabelHi": "",
+          "props": {},
+          "data": {
+            "mode": "source",
+            "source": "deities",
+            "params": {}
+          }
+        },
+        {
+          "id": "b-06-daily",
+          "type": "daily",
+          "enabled": true,
+          "audience": [],
+          "startsAt": null,
+          "endsAt": null,
+          "language": "all",
+          "flag": "",
+          "title": "",
+          "titleHi": "",
+          "subtitle": "",
+          "subtitleHi": "",
+          "tone": "",
+          "action": null,
+          "actionLabel": "",
+          "actionLabelHi": "",
+          "props": {},
+          "data": {
+            "mode": "source",
+            "source": "daily.today",
+            "params": {}
+          }
+        },
+        {
+          "id": "b-07-featuredpooja",
+          "type": "featured_pooja",
+          "enabled": true,
+          "audience": [],
+          "startsAt": null,
+          "endsAt": null,
+          "language": "all",
+          "flag": "",
+          "title": "",
+          "titleHi": "",
+          "subtitle": "",
+          "subtitleHi": "",
+          "tone": "",
+          "action": null,
+          "actionLabel": "",
+          "actionLabelHi": "",
+          "props": {},
+          "data": {
+            "mode": "source",
+            "source": "poojas.featured",
+            "params": {}
+          }
+        },
+        {
+          "id": "b-08-quickgrid",
+          "type": "quick_grid",
+          "enabled": true,
+          "audience": [],
+          "startsAt": null,
+          "endsAt": null,
+          "language": "all",
+          "flag": "",
+          "title": "",
+          "titleHi": "",
+          "subtitle": "",
+          "subtitleHi": "",
+          "tone": "",
+          "action": null,
+          "actionLabel": "",
+          "actionLabelHi": "",
+          "props": {
+            "columns": 4,
+            "tileStyle": "icon"
+          },
+          "data": {
+            "mode": "inline",
+            "items": [
+              {
+                "title": "Book Pooja",
+                "titleHi": "पूजा बुक करें",
+                "subtitle": "",
+                "subtitleHi": "",
+                "icon": "diya",
+                "image": "",
+                "badge": "",
+                "badgeUntil": null,
+                "liveBadge": false,
+                "enabled": true,
+                "flag": "",
+                "deitySlug": "",
+                "action": {
+                  "type": "route",
+                  "ref": "/poojas"
+                }
+              },
+              {
+                "title": "Chadhava",
+                "titleHi": "चढ़ावा",
+                "subtitle": "",
+                "subtitleHi": "",
+                "icon": "marigold",
+                "image": "",
+                "badge": "",
+                "badgeUntil": null,
+                "liveBadge": false,
+                "enabled": true,
+                "flag": "chadhava",
+                "deitySlug": "",
+                "action": {
+                  "type": "chadhava",
+                  "ref": ""
+                }
+              },
+              {
+                "title": "Live Darshan",
+                "titleHi": "लाइव दर्शन",
+                "subtitle": "",
+                "subtitleHi": "",
+                "icon": "play",
+                "image": "",
+                "badge": "",
+                "badgeUntil": null,
+                "liveBadge": true,
+                "enabled": true,
+                "flag": "liveDarshan",
+                "deitySlug": "",
+                "action": {
+                  "type": "live",
+                  "ref": ""
+                }
+              },
+              {
+                "title": "Temples Near Me",
+                "titleHi": "पास के मंदिर",
+                "subtitle": "",
+                "subtitleHi": "",
+                "icon": "temple",
+                "image": "",
+                "badge": "",
+                "badgeUntil": null,
+                "liveBadge": false,
+                "enabled": true,
+                "flag": "",
+                "deitySlug": "",
+                "action": {
+                  "type": "route",
+                  "ref": "/temples"
+                }
+              },
+              {
+                "title": "Panchang",
+                "titleHi": "पंचांग",
+                "subtitle": "",
+                "subtitleHi": "",
+                "icon": "calendar",
+                "image": "",
+                "badge": "",
+                "badgeUntil": null,
+                "liveBadge": false,
+                "enabled": true,
+                "flag": "",
+                "deitySlug": "",
+                "action": {
+                  "type": "panchang",
+                  "ref": ""
+                }
+              },
+              {
+                "title": "Rashifal",
+                "titleHi": "राशिफल",
+                "subtitle": "",
+                "subtitleHi": "",
+                "icon": "star",
+                "image": "",
+                "badge": "",
+                "badgeUntil": null,
+                "liveBadge": false,
+                "enabled": true,
+                "flag": "",
+                "deitySlug": "",
+                "action": {
+                  "type": "horoscope",
+                  "ref": ""
+                }
+              },
+              {
+                "title": "Bhajan & Aarti",
+                "titleHi": "भजन व आरती",
+                "subtitle": "",
+                "subtitleHi": "",
+                "icon": "music",
+                "image": "",
+                "badge": "",
+                "badgeUntil": null,
+                "liveBadge": false,
+                "enabled": true,
+                "flag": "bhajan",
+                "deitySlug": "",
+                "action": {
+                  "type": "bhajan",
+                  "ref": ""
+                }
+              },
+              {
+                "title": "Events",
+                "titleHi": "कार्यक्रम",
+                "subtitle": "",
+                "subtitleHi": "",
+                "icon": "sparkle",
+                "image": "",
+                "badge": "",
+                "badgeUntil": null,
+                "liveBadge": false,
+                "enabled": true,
+                "flag": "events",
+                "deitySlug": "",
+                "action": {
+                  "type": "events",
+                  "ref": ""
+                }
+              },
+              {
+                "title": "Katha & Chalisa",
+                "titleHi": "कथा व चालीसा",
+                "subtitle": "",
+                "subtitleHi": "",
+                "icon": "lotus",
+                "image": "",
+                "badge": "",
+                "badgeUntil": null,
+                "liveBadge": false,
+                "enabled": true,
+                "flag": "bhajan",
+                "deitySlug": "",
+                "action": {
+                  "type": "bhajan",
+                  "ref": ""
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "b-09-nextseva",
+          "type": "next_seva",
+          "enabled": true,
+          "audience": [],
+          "startsAt": null,
+          "endsAt": null,
+          "language": "all",
+          "flag": "",
+          "title": "",
+          "titleHi": "",
+          "subtitle": "",
+          "subtitleHi": "",
+          "tone": "",
+          "action": null,
+          "actionLabel": "",
+          "actionLabelHi": "",
+          "props": {},
+          "data": {
+            "mode": "source",
+            "source": "bookings.next",
+            "params": {}
+          }
+        },
+        {
+          "id": "b-17-yourevents",
+          "type": "events",
+          "enabled": true,
+          "audience": [
+            "in_event"
+          ],
+          "startsAt": null,
+          "endsAt": null,
+          "language": "all",
+          "flag": "events",
+          "title": "Your events",
+          "titleHi": "आपके इवेंट",
+          "subtitle": "",
+          "subtitleHi": "",
+          "tone": "",
+          "action": {
+            "type": "events",
+            "ref": ""
+          },
+          "actionLabel": "See all",
+          "actionLabelHi": "सभी देखें",
+          "props": {},
+          "data": {
+            "mode": "source",
+            "source": "events.mine",
+            "params": {},
+            "limit": 6
+          }
+        },
+        {
+          "id": "b-10-shelf",
+          "type": "shelf",
+          "enabled": true,
+          "audience": [],
+          "startsAt": null,
+          "endsAt": null,
+          "language": "all",
+          "flag": "",
+          "title": "Upcoming poojas",
+          "titleHi": "आने वाली पूजाएँ",
+          "subtitle": "",
+          "subtitleHi": "",
+          "tone": "",
+          "action": {
+            "type": "route",
+            "ref": "/poojas"
+          },
+          "actionLabel": "See all",
+          "actionLabelHi": "सभी देखें",
+          "props": {
+            "layout": "photo3"
+          },
+          "data": {
+            "mode": "source",
+            "source": "poojas.upcoming",
+            "params": {},
+            "limit": 8
+          }
+        },
+        {
+          "id": "b-11-shelf",
+          "type": "shelf",
+          "enabled": true,
+          "audience": [],
+          "startsAt": null,
+          "endsAt": null,
+          "language": "all",
+          "flag": "chadhava",
+          "title": "Offer chadhava",
+          "titleHi": "चढ़ावा चढ़ाएँ",
+          "subtitle": "",
+          "subtitleHi": "",
+          "tone": "",
+          "action": {
+            "type": "chadhava",
+            "ref": ""
+          },
+          "actionLabel": "See all",
+          "actionLabelHi": "सभी देखें",
+          "props": {
+            "layout": "photo3"
+          },
+          "data": {
+            "mode": "source",
+            "source": "chadhava.listings",
+            "params": {},
+            "limit": 8
+          }
+        },
+        {
+          "id": "b-18-livenow",
+          "type": "shelf",
+          "enabled": true,
+          "audience": [],
+          "startsAt": null,
+          "endsAt": null,
+          "language": "all",
+          "flag": "liveDarshan",
+          "title": "Live darshan",
+          "titleHi": "लाइव दर्शन",
+          "subtitle": "",
+          "subtitleHi": "",
+          "tone": "",
+          "action": {
+            "type": "live",
+            "ref": ""
+          },
+          "actionLabel": "See all",
+          "actionLabelHi": "सभी देखें",
+          "props": {
+            "layout": "photo3"
+          },
+          "data": {
+            "mode": "source",
+            "source": "live.now",
+            "params": {},
+            "limit": 8
+          }
+        },
+        {
+          "id": "b-12-templesnear",
+          "type": "temples_near",
+          "enabled": true,
+          "audience": [],
+          "startsAt": null,
+          "endsAt": null,
+          "language": "all",
+          "flag": "",
+          "title": "",
+          "titleHi": "",
+          "subtitle": "",
+          "subtitleHi": "",
+          "tone": "",
+          "action": null,
+          "actionLabel": "",
+          "actionLabelHi": "",
+          "props": {},
+          "data": {
+            "mode": "source",
+            "source": "temples.near_me",
+            "params": {}
+          }
+        },
+        {
+          "id": "b-13-rashirow",
+          "type": "rashi_row",
+          "enabled": true,
+          "audience": [],
+          "startsAt": null,
+          "endsAt": null,
+          "language": "all",
+          "flag": "",
+          "title": "",
+          "titleHi": "",
+          "subtitle": "",
+          "subtitleHi": "",
+          "tone": "",
+          "action": null,
+          "actionLabel": "",
+          "actionLabelHi": "",
+          "props": {},
+          "data": {
+            "mode": "source",
+            "source": "horoscope.today",
+            "params": {}
+          }
+        },
+        {
+          "id": "b-14-listen",
+          "type": "listen",
+          "enabled": true,
+          "audience": [],
+          "startsAt": null,
+          "endsAt": null,
+          "language": "all",
+          "flag": "bhajan",
+          "title": "",
+          "titleHi": "",
+          "subtitle": "",
+          "subtitleHi": "",
+          "tone": "",
+          "action": null,
+          "actionLabel": "",
+          "actionLabelHi": "",
+          "props": {},
+          "data": {
+            "mode": "source",
+            "source": "bhajans.featured",
+            "params": {}
+          }
+        },
+        {
+          "id": "b-15-share",
+          "type": "share",
+          "enabled": true,
+          "audience": [],
+          "startsAt": null,
+          "endsAt": null,
+          "language": "all",
+          "flag": "",
+          "title": "",
+          "titleHi": "",
+          "subtitle": "",
+          "subtitleHi": "",
+          "tone": "",
+          "action": null,
+          "actionLabel": "",
+          "actionLabelHi": "",
+          "props": {},
+          "data": null
+        },
+        {
+          "id": "b-16-fab",
+          "type": "fab",
+          "enabled": true,
+          "audience": [],
+          "startsAt": null,
+          "endsAt": null,
+          "language": "all",
+          "flag": "bhajan",
+          "title": "Listen now",
+          "titleHi": "अभी सुनें",
+          "subtitle": "",
+          "subtitleHi": "",
+          "tone": "",
+          "action": {
+            "type": "bhajan",
+            "ref": ""
+          },
+          "actionLabel": "",
+          "actionLabelHi": "",
+          "props": {
+            "icon": "music"
+          },
+          "data": null
+        }
+      ]
     }
   ]
 }

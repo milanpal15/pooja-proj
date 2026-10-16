@@ -38,6 +38,8 @@ export function toProfile(doc, astrologer = null) {
     gender: doc.gender || null,
     dob: doc.dob || null,
     blocked: !!doc.blocked,
+    // When the account was first created: the app uses it for the "new user" Home audience (decided on the device).
+    createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString() : null,
     role: astrologer ? 'astrologer' : 'devotee',
     astrologer: astrologer ? { id: String(astrologer.id ?? astrologer._id), name: astrologer.name } : null,
   };

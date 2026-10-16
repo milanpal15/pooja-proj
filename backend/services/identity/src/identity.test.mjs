@@ -145,6 +145,10 @@ describe('auth sync', () => {
     const u = await User.findOne({ uid: 'uid-1' }).lean();
     assert.equal(u.deviceId, 'dev-1');
     assert.equal(u.role, 'devotee');
+    // The account's creation time is handed to the app (the "new user" Home audience is decided on the device), as an ISO string.
+    assert.equal(r.body.createdAt, new Date(u.createdAt).toISOString());
+    const again = await call('POST', '/auth/sync', { headers: devotee('uid-1', { phone_number: '+919800000001' }), body: {} });
+    assert.equal(again.body.createdAt, r.body.createdAt, 'a later sync never moves it');
     assert.equal(await User.countDocuments({ contact: 'evil' }), 0);
   });
 

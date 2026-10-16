@@ -78,7 +78,7 @@ before(async () => {
       res.writeHead(200, { ...base, 'content-length': MEDIA.length });
       return res.end(MEDIA);
     }
-    if (u.pathname === '/internal/catalog/public/home') return json(200, { version: 4, schemaVersion: 1, publishedAt: '2026-01-01T00:00:00.000Z', blocks: [{ id: 'b1', type: 'spacer', lang: u.searchParams.get('lang') }] });
+    if (u.pathname === '/internal/catalog/public/home') return json(200, { version: 4, schemaVersion: 2, publishedAt: '2026-01-01T00:00:00.000Z', layouts: [{ id: 'default', name: 'Default layout', audience: [], startsAt: null, endsAt: null, blocks: [{ id: 'b1', type: 'spacer', lang: u.searchParams.get('lang') }] }] });
     if (u.pathname === '/internal/catalog/poojas') return json(200, { poojas: [{ slug: 'p1' }], q: u.searchParams.get('q') });
     if (u.pathname === '/internal/catalog/poojas/nope') return json(404, { error: 'Pooja not found.', code: 'not_found' });
     if (u.pathname === '/internal/catalog/poojas/p1') return json(200, { pooja: { slug: 'p1', rating: null } });
@@ -180,11 +180,11 @@ describe('GET /api/home (the server-driven Home layout)', () => {
   test('public, no auth: passes lang (en|hi only) to catalog as mobile-bff and returns the body with ETag + Cache-Control', async () => {
     const r = await call('GET', '/api/home?lang=hi');
     assert.equal(r.status, 200);
-    assert.deepEqual([r.body.version, r.body.blocks[0].lang], [4, 'hi']);
+    assert.deepEqual([r.body.version, r.body.layouts[0].blocks[0].lang], [4, 'hi']);
     assert.equal(r.headers.get('cache-control'), 'public, max-age=60');
     assert.match(r.headers.get('etag'), /^W\/"[0-9a-f]{20}"$/);
     assert.deepEqual([catCalls.at(-1).path, catCalls.at(-1).query, catCalls.at(-1).claims.iss], ['/internal/catalog/public/home', { lang: 'hi' }, 'mobile-bff']);
-    assert.equal((await call('GET', '/api/home?lang=<script>')).body.blocks[0].lang, null);
+    assert.equal((await call('GET', '/api/home?lang=<script>')).body.layouts[0].blocks[0].lang, null);
     assert.deepEqual(catCalls.at(-1).query, {}, 'an unknown lang is dropped, not forwarded');
     assert.equal((await call('GET', '/api/home', { token: 'junk' })).status, 200, 'a bad bearer token on a public route changes nothing');
   });
