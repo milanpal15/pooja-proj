@@ -22,6 +22,7 @@ const card = (slug, typeSlug, extra = {}) => ({ slug, typeSlug, title: slug, sta
 
 test('blocks: own order, known names only, once each', () => {
   assert.deepEqual(L.visibleBlocks(['venue', 'hologram', 'schedule', 'venue', 'milestones']), ['venue', 'schedule', 'milestones']);
+  assert.deepEqual(L.visibleBlocks(['venue', 'route', 'milestones']), ['venue', 'route', 'milestones']);
   assert.deepEqual(L.visibleBlocks(undefined), []);
   assert.deepEqual(L.visibleBlocks(['x']), []);
 });

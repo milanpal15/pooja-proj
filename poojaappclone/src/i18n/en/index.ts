@@ -19,6 +19,7 @@ import { search } from './search';
 import { poojaSeva } from './pooja-seva';
 import { chadhavaSeva } from './chadhava-seva';
 import { appPolicy } from './app-policy';
+import { accountBlocked } from './account-blocked';
 import { bhajanProfile } from './bhajan-profile';
 
 /** Every English string, merged from its namespaces. */
@@ -45,4 +46,5 @@ export const en = {
   ...homeV2,
   ...search,
   ...appPolicy,
+  ...accountBlocked,
 } as const;

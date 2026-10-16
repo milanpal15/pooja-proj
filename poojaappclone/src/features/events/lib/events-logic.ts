@@ -10,7 +10,7 @@ import type { EventCard, EventMilestone, EventReward, EventTask } from '@/lib/ap
 /* ─────────────────────────────────────────────────── forward compatibility ── */
 
 /** Block names this build can draw. An unknown block in `event.blocks` is hidden (§0.8). */
-export const SUPPORTED_BLOCKS: readonly string[] = ['schedule', 'registration', 'venue', 'milestones', 'rewards', 'content'];
+export const SUPPORTED_BLOCKS: readonly string[] = ['schedule', 'registration', 'venue', 'route', 'milestones', 'rewards', 'content'];
 
 /** Task kinds this build can show. An unknown kind renders "Update the app to complete this". */
 export const SUPPORTED_TASKS: readonly string[] = [

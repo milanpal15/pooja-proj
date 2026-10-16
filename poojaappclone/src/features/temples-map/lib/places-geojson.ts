@@ -1,14 +1,11 @@
-import { hasCoords, haversineM, type LatLng } from './geometry';
+import { emptyCollection, type PointCollection, type PointFeature, point, singlePoint } from '../../../components/map/geojson';
+import { hasCoords, haversineM } from '../../../components/map/geometry';
 import { type MapLang, placeName } from './format';
 
 /** GeoJSON for the map's sources. Pure; tested in places-geojson.test.mjs. */
 
-export type PointFeature<P> = {
-  type: 'Feature';
-  geometry: { type: 'Point'; coordinates: [number, number] };
-  properties: P;
-};
-export type PointCollection<P> = { type: 'FeatureCollection'; features: PointFeature<P>[] };
+export { emptyCollection, singlePoint };
+export type { PointCollection, PointFeature };
 
 /** The part of a nearby place the map needs (`NearbyTemple` from the API satisfies it). */
 export type PlaceLike = {
@@ -33,14 +30,6 @@ export type ManagedProps = { key: string; id: string; label: string; accent: str
 
 /** Stable feature keys: the OSM id as served, and `temple:<slug>` for dashboard temples. */
 export const managedKey = (id: string) => `temple:${id}`;
-
-const point = <P>(c: LatLng, properties: P): PointFeature<P> => ({
-  type: 'Feature',
-  geometry: { type: 'Point', coordinates: [c.lng, c.lat] },
-  properties,
-});
-
-export const emptyCollection = <P>(): PointCollection<P> => ({ type: 'FeatureCollection', features: [] });
 
 /** Dashboard temples that have a real position. */
 export function mappableTemples<T extends ManagedLike>(temples: readonly T[]): T[] {
@@ -92,6 +81,3 @@ export function buildPlacesCollection(
 }
 
 /** A single point (the selection ring, the user's dot), or an empty collection. */
-export function singlePoint(c: LatLng | null | undefined): PointCollection<Record<string, never>> {
-  return c && hasCoords(c) ? { type: 'FeatureCollection', features: [point(c, {})] } : emptyCollection();
-}

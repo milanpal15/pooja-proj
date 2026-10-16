@@ -16,6 +16,7 @@ import { Radius, Sacred, Space } from '@/constants/sacred';
 
 import { ConfirmProvider, ToastProvider } from '@/components/ui';
 import { AstrologerShell } from '@/features/astrologer-mode';
+import { AccountBlockedGate } from '@/features/account-blocked';
 import { PolicyGate } from '@/features/app-policy';
 import { AuthGate } from '@/features/auth';
 import { usePushRegistration } from '@/hooks/use-push-registration';
@@ -47,7 +48,9 @@ export default function TabLayout() {
                   <ToastProvider>
                     <ConfirmProvider>
                       <PolicyGate>
-                        <RootGate />
+                        <AccountBlockedGate>
+                          <RootGate />
+                        </AccountBlockedGate>
                       </PolicyGate>
                     </ConfirmProvider>
                   </ToastProvider>

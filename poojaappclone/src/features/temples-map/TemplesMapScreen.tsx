@@ -2,10 +2,10 @@ import { useState } from 'react';
 
 import { useLanguage } from '@/i18n';
 
-import { LiveMapBoundary } from './components/LiveMapBoundary';
+import { MapBoundary } from '@/components/map/MapBoundary';
 import { IllustratedMapScreen } from './IllustratedMapScreen';
 import { LiveTemplesMap } from './LiveTemplesMap';
-import { maplibre } from './lib/maplibre';
+import { maplibre } from '@/components/map/maplibre';
 
 /**
  * `/temples-map`. The real map when this build contains the native MapLibre module; otherwise (older
@@ -17,8 +17,8 @@ export function TemplesMapScreen() {
 
   if (!maplibre || failed) return <IllustratedMapScreen note={t('map_needs_update')} />;
   return (
-    <LiveMapBoundary onError={() => setFailed(true)}>
+    <MapBoundary onError={() => setFailed(true)}>
       <LiveTemplesMap />
-    </LiveMapBoundary>
+    </MapBoundary>
   );
 }

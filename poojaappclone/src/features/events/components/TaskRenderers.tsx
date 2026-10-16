@@ -4,11 +4,17 @@ import { StyleSheet, View } from 'react-native';
 
 import { Button, ProgressBar, Type, useToast } from '@/components/ui';
 import { useLanguage } from '@/i18n';
+import { useTheme } from '@/theme';
 import { ApiError, type EventDetail, type EventMilestone, type EventTask, isOffline, postProgress, type ProgressResponse } from '@/lib/api';
 
+import { useCheckIn } from '../hooks/use-check-in';
+import { useForeground } from '../hooks/use-foreground';
+import { useLocationPermission } from '../hooks/use-location-permission';
 import { counterOf, fill, isSupportedTask } from '../lib/events-logic';
 import { needsJoin, taskAction, taskFailure } from '../lib/progress';
+import { locationPlace, placeLabel, stopKey } from '../lib/route';
 import { counterHref } from '../lib/routes';
+import { LocationRationale } from './LocationRationale';
 
 export type TaskRenderProps = {
   event: EventDetail;
@@ -66,6 +72,57 @@ function CounterAction({ event, milestone, task }: TaskRenderProps) {
   );
 }
 
+/**
+ * `location`: the place (from the task's config) and a Check in button that runs the same flow as the
+ * Route map's card — rationale sheet, one fresh fix, the server decides. No watcher here: it is a
+ * manual check-in.
+ */
+function LocationAction({ event, milestone, task, onProgress, reload }: TaskRenderProps) {
+  const { t, lang } = useLanguage();
+  const foreground = useForeground();
+  const perm = useLocationPermission(foreground);
+  const { c } = useTheme();
+  const checkIn = useCheckIn({ event, perm, onProgress, reload });
+  const place = locationPlace(task);
+  if (!place) return <GenericTask event={event} milestone={milestone} task={task} onProgress={onProgress} reload={reload} />;
+  const key = stopKey({ milestoneKey: milestone.key, taskKey: task.key });
+  const busy = checkIn.busyKey === key;
+  const message = checkIn.message && checkIn.message.forKey === key ? checkIn.message : null;
+  return (
+    <View style={styles.note}>
+      <Type v="bodyMd">{fill(t('ev_task_place'), { name: placeLabel(place, lang) })}</Type>
+      {!!place.note && (
+        <Type v="bodySm" tone="onSurfaceVariant">
+          {place.note}
+        </Type>
+      )}
+      {message && (
+        <Type v="bodySm" color={c.error} accessibilityLiveRegion="polite">
+          {fill(t(message.failure.key), message.failure.vars)}
+        </Type>
+      )}
+      {perm.status === 'denied' ? (
+        <>
+          <Type v="bodySm" tone="onSurfaceVariant">
+            {t('ev_loc_denied')}
+          </Type>
+          <Button label={t('ev_loc_open_settings')} variant="outline" size="sm" icon="settings" onPress={perm.openSettings} />
+        </>
+      ) : (
+        <Button
+          label={busy ? t('ev_checking_in') : t('ev_checkin')}
+          size="sm"
+          icon="mapPin"
+          loading={busy}
+          disabled={checkIn.busy}
+          onPress={() => void checkIn.submit({ milestoneKey: milestone.key, taskKey: task.key })}
+        />
+      )}
+      <LocationRationale perm={perm} />
+    </View>
+  );
+}
+
 /** The fallback: a kind this build knows by name but cannot do yet, or one it has never heard of. */
 function GenericTask({ task }: TaskRenderProps) {
   const { t } = useLanguage();
@@ -83,6 +140,7 @@ function GenericTask({ task }: TaskRenderProps) {
 export const TASK_RENDERERS: Partial<Record<string, (p: TaskRenderProps) => React.ReactElement | null>> = {
   self_mark: SelfMarkAction,
   counter: CounterAction,
+  location: LocationAction,
 };
 
 /** What sits under a task row: an action by kind, "Join to take part", or the fallback. Nothing once done. */

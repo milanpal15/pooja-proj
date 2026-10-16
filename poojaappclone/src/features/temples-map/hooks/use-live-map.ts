@@ -1,7 +1,7 @@
 import type { CameraRef, ViewStateChangeEvent } from '@maplibre/maplibre-react-native';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BackHandler, type NativeSyntheticEvent, Linking, Platform } from 'react-native';
+import { BackHandler, type NativeSyntheticEvent } from 'react-native';
 
 import type { Temple } from '@/constants/temples';
 import { useGrantedLocation } from '@/hooks/use-granted-location';
@@ -20,8 +20,8 @@ import {
   SEARCH_MIN_ZOOM,
   VIEW_DEBOUNCE_MS,
 } from '../constants/map';
-import { directionsUrls } from '../lib/directions';
-import { boundsOf, type LatLng, radiusForBounds, type SearchArea, shouldOfferSearch } from '../lib/geometry';
+import { boundsOf, type LatLng, radiusForBounds, type SearchArea, shouldOfferSearch } from '@/components/map/geometry';
+import { openDirections as openMapsApp } from '@/components/map/open-directions';
 import { mappableTemples } from '../lib/places-geojson';
 import { useNearbyPlaces } from './use-nearby-places';
 
@@ -217,15 +217,7 @@ export function useLiveMap() {
 
   const openDirections = useCallback(
     async (p: { lat: number; lng: number; name: string }) => {
-      for (const url of directionsUrls(p, Platform.OS)) {
-        try {
-          await Linking.openURL(url);
-          return;
-        } catch {
-          /* try the next scheme */
-        }
-      }
-      toast.error(t('map_directions_failed'));
+      if (!(await openMapsApp(p))) toast.error(t('map_directions_failed'));
     },
     [toast, t],
   );

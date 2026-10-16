@@ -2,6 +2,7 @@ import { ADMIN_API } from '@/constants/config';
 import { appHeaders } from '@/lib/app-info';
 import { getIdToken } from '@/lib/firebase-auth';
 
+import { emitBlockSignal, parseBlock } from './block-signal';
 import { emitGateSignal, isGateResponse } from './gate-signal';
 
 /** Raised when the backend rejects the caller; `status` drives what the UI does. */
@@ -33,7 +34,8 @@ export function isOffline(e: unknown): boolean {
 /**
  * THE one fetch to our API. Every call to `ADMIN_API` goes through here so it carries the build
  * telemetry headers (`X-App-Version`, …; docs/RELEASES.md §1) and so a `426 app_outdated` /
- * `503 maintenance` answer from ANY endpoint reaches the policy gate. `path` is host-relative, so the
+ * `503 maintenance` answer from ANY endpoint reaches the policy gate, and a `403 account_blocked` /
+ * `device_blocked` reaches the account-blocked gate. `path` is host-relative, so the
  * headers can never reach another host. The response is returned untouched (its body is still readable).
  */
 export async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
@@ -47,6 +49,18 @@ export async function apiFetch(path: string, init: RequestInit = {}): Promise<Re
       .json()
       .then((body: unknown) => {
         if (isGateResponse(res.status, body)) emitGateSignal({ httpStatus: res.status, body });
+      })
+      .catch(() => {});
+  }
+  if (res.status === 403) {
+    // `403 account_blocked|device_blocked` from ANY call (sign-in sync included) reaches the blocked screen.
+    // Clone-read so the caller can still read the body; an uncoded 403 is not a block (parseBlock -> null).
+    res
+      .clone()
+      .json()
+      .then((body: unknown) => {
+        const block = parseBlock(403, body);
+        if (block) emitBlockSignal(block);
       })
       .catch(() => {});
   }

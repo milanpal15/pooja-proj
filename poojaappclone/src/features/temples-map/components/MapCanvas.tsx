@@ -6,7 +6,7 @@ import type { Ref } from 'react';
 import { MAP_STYLE_URL } from '@/constants/config';
 
 import { SOURCE_IDS, TEXT_FONT } from '../constants/map';
-import { maplibre } from '../lib/maplibre';
+import { maplibre } from '@/components/map/maplibre';
 import type { ManagedProps, PlaceProps, PointCollection } from '../lib/places-geojson';
 
 const OSM_COLOR = '#1F7A8C';

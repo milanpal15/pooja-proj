@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { StringKey } from '@/i18n';
+import { isBlockCode } from '@/lib/api/block-signal';
 import { ApiError, type Gender, syncProfile, updateProfile } from '@/lib/api';
 import { firebaseSignOut, watchAuthState } from '@/lib/firebase-auth';
 import { setMyPresence } from '@/lib/api';
@@ -157,12 +158,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         apply(toUser(profile, fu.metadata?.creationTime));
       } catch (e) {
         if (activeUid.current !== fu.uid) return;
-        // 403 means an admin blocked this account — not survivable offline-style,
-        // so drop the session rather than keep serving the cached copy.
+        // 403 + a block code: the central client already raised the AccountBlockedScreen (features/account-blocked)
+        // over whatever is showing. The session is KEPT so "Try again" can re-validate; the screen offers Sign out.
+        // Nothing more to do here (setLoading runs in `finally`).
+        if (e instanceof ApiError && e.status === 403 && isBlockCode(e.code)) return;
+        // A 403 with no block code is the old contract: drop the session with the generic message (fallback only).
         if (e instanceof ApiError && e.status === 403) {
           await hardSignOut('err_blocked');
           return;
         }
+        // A revoked refresh token (force sign-out) fails the 401 retry in authedFetch; Firebase then reports
+        // signed-out through watchAuthState (fu === null) and the devotee simply lands on login. No block screen.
         // Backend unreachable. With a cache, step 1 is already on screen.
         // Without one, Firebase is all we know — enough to hold them at
         // Create Profile, which is the honest state: a new account cannot
@@ -211,7 +217,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       apply(toUser(await syncProfile({})));
     } catch (e) {
-      if (e instanceof ApiError && e.status === 403) await hardSignOut('err_blocked');
+      // A coded block is shown by the AccountBlockedScreen; only the legacy uncoded 403 signs out here.
+      if (e instanceof ApiError && e.status === 403 && !isBlockCode(e.code)) await hardSignOut('err_blocked');
     }
   }, [apply, hardSignOut]);
 

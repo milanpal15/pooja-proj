@@ -13,6 +13,7 @@ import { ContentBlock, RewardsBlock } from './components/ContentBlocks';
 import { CoverArt } from './components/CoverArt';
 import { RegistrationBlock, ScheduleBlock, VenueBlock } from './components/InfoBlocks';
 import { MilestonesBlock } from './components/MilestonesBlock';
+import { RouteBlock } from './components/RouteBlock';
 import { useCompletion } from './hooks/use-completion';
 import { useEventDetail } from './hooks/use-event-detail';
 import { useNow } from './hooks/use-now';
@@ -65,6 +66,7 @@ export function EventDetailScreen() {
     schedule: <ScheduleBlock event={event} />,
     registration: <RegistrationBlock event={event} now={now} setMe={setMe} reload={reload} />,
     venue: <VenueBlock event={event} />,
+    route: <RouteBlock event={event} onProgress={onProgress} reload={reload} />,
     milestones: <MilestonesBlock event={event} onProgress={onProgress} reload={reload} />,
     rewards: <RewardsBlock event={event} />,
     content: <ContentBlock event={event} />,

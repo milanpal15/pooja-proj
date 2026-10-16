@@ -1,4 +1,4 @@
-/** node --test src/features/temples-map/lib/geometry.test.mjs */
+/** node --test src/components/map/geometry.test.mjs */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 

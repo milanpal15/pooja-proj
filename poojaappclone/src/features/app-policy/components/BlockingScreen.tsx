@@ -10,6 +10,8 @@ type Props = {
   /** A small line under the message (minimum version, "back by …"). */
   detail?: string;
   action?: { label: string; onPress: () => void; loading?: boolean };
+  /** Further buttons under the main one (call / email / sign out). */
+  secondaryActions?: { label: string; onPress: () => void; variant?: 'outline' | 'glass' | 'secondary' }[];
 };
 
 /**
@@ -17,7 +19,7 @@ type Props = {
  * sits above sheets and toasts (which are Modals too), and the Android back button is swallowed
  * (`onRequestClose` does nothing) — there is nothing behind it for the devotee to reach.
  */
-export function BlockingScreen({ title, message, detail, action }: Props) {
+export function BlockingScreen({ title, message, detail, action, secondaryActions }: Props) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   return (
@@ -42,6 +44,9 @@ export function BlockingScreen({ title, message, detail, action }: Props) {
           )}
         </ScrollView>
         {action && <Button label={action.label} block size="lg" loading={action.loading} onPress={action.onPress} />}
+        {secondaryActions?.map((a) => (
+          <Button key={a.label} label={a.label} block variant={a.variant ?? 'outline'} onPress={a.onPress} style={styles.secondary} />
+        ))}
       </View>
     </Modal>
   );
@@ -49,5 +54,6 @@ export function BlockingScreen({ title, message, detail, action }: Props) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, paddingHorizontal: Space.lg },
+  secondary: { marginTop: Space.sm },
   body: { flexGrow: 1, justifyContent: 'center', gap: Space.md, paddingVertical: Space.lg },
 });

@@ -126,3 +126,30 @@ test('today row carries the milestone number', () => {
   assert.deepEqual(P.todayRow('m1', items, 'hi'), { index: 1, title: 'दिन 1' });
   assert.equal(P.todayRow('zz', items, 'en'), null);
 });
+
+test('applyProgress marks a reached stop on the route and moves doneKm', () => {
+  const d = {
+    ...detail(),
+    route: {
+      start: { name: 'A', lat: 0, lng: 0 },
+      end: { name: 'B', lat: 0, lng: 0 },
+      path: [],
+      lengthKm: 31,
+      stops: [
+        { milestoneKey: 'm1', taskKey: 't1', order: 1, name: 'One', lat: 1, lng: 1, radiusM: 150, routeKm: 12.4, done: false, locked: false },
+        { milestoneKey: 'm2', taskKey: 't1', order: 2, name: 'Two', lat: 1, lng: 1, radiusM: 150, routeKm: 20, done: false, locked: true },
+      ],
+      progress: { doneKm: 0, totalKm: 31, stopsDone: 0, stopsTotal: 2 },
+    },
+  };
+  const out = P.applyProgress(d, 'm1', { task: { key: 't1', done: true, completedAt: 'x' }, milestone: { key: 'm1', done: true }, event: {}, awarded: { coins: 0 }, completion: null });
+  assert.equal(out.route.stops[0].done, true);
+  assert.equal(out.route.stops[0].state, 'done');
+  assert.equal(out.route.progress.stopsDone, 1);
+  assert.equal(out.route.progress.doneKm, 12.4);
+  assert.equal(out.route.stops[1].done, false);
+  // a not-done answer, or an event without a route, changes nothing about the route
+  const same = P.applyProgress(d, 'm1', { task: { key: 't1', done: false }, milestone: { key: 'm1' }, event: {}, awarded: { coins: 0 }, completion: null });
+  assert.equal(same.route.stops[0].done, false);
+  assert.equal(P.applyProgress(detail(), 'm1', { task: { key: 't1', done: true }, milestone: { key: 'm1' }, event: {}, awarded: { coins: 0 }, completion: null }).route, undefined);
+});

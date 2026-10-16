@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchNearbyTemples, type NearbyTemple } from '@/lib/api';
 
 import { DEFAULT_ATTRIBUTION } from '../constants/map';
-import type { SearchArea } from '../lib/geometry';
+import type { SearchArea } from '@/components/map/geometry';
 
 export type PlacesStatus = 'idle' | 'loading' | 'ready' | 'error';
 

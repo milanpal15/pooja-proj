@@ -5,7 +5,7 @@ import { Component, type ErrorInfo, type ReactNode } from 'react';
  * probe passed but a view manager is missing or the style engine throws), report it so the screen
  * can fall back to the illustrated map instead of the route's error screen.
  */
-export class LiveMapBoundary extends Component<
+export class MapBoundary extends Component<
   { onError: (e: unknown) => void; children: ReactNode },
   { failed: boolean }
 > {

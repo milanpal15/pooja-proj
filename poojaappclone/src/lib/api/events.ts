@@ -110,6 +110,63 @@ export type EventMe = {
   completed?: boolean;
 };
 
+/* ───────────────────────────────────────────── location milestones: the route (docs/EVENTS.md §11) ── */
+
+export type RouteEnd = { name: string; nameHi?: string; lat: number; lng: number };
+
+/** `done` / `next` (first open, not-done stop along the path) / `open` / `locked`. */
+export type RouteStopState = 'done' | 'next' | 'open' | 'locked';
+
+export type RouteStop = {
+  milestoneKey: string;
+  taskKey: string;
+  /** 1-based along the path, by `routeKm`. */
+  order: number;
+  title?: string;
+  titleHi?: string;
+  name: string;
+  nameHi?: string;
+  note?: string;
+  lat: number;
+  lng: number;
+  radiusM: number;
+  /** km from the start along the path. */
+  routeKm: number;
+  done: boolean;
+  completedAt?: string | null;
+  locked: boolean;
+  state?: RouteStopState;
+};
+
+export type RouteProgress = { doneKm: number; totalKm: number; stopsDone: number; stopsTotal: number };
+
+export type EventRoute = {
+  start: RouteEnd;
+  end: RouteEnd;
+  /** `[lat, lng]` points, first/last are start/end. */
+  path: [number, number][];
+  lengthKm: number;
+  mapReveal?: 'all' | 'unlocked' | (string & {});
+  stops: RouteStop[];
+  progress: RouteProgress;
+};
+
+/** The body of a `location` progress report (§11.2). The app only states a fix; the server decides. */
+export type LocationReport = { lat: number; lng: number; accuracyM?: number; mocked: boolean; at: string };
+
+/** Refusal codes of a `location` report (`ApiError.code`), plus the ones every report can get. */
+export type LocationErrorCode =
+  | 'mock_location'
+  | 'bad_report'
+  | 'weak_fix'
+  | 'implausible_move'
+  | 'too_far'
+  | 'too_fast'
+  | 'locked'
+  | 'closed'
+  | 'not_registered'
+  | (string & {});
+
 export type EventDetail = EventCard & {
   schemaVersion?: number;
   language?: string;
@@ -127,6 +184,8 @@ export type EventDetail = EventCard & {
   };
   venue?: { name?: string; city?: string; address?: string; lat?: number | null; lng?: number | null; organiser?: string; onlineUrl?: string };
   milestones?: { order?: string; items?: EventMilestone[] };
+  /** The `route` block (§11.1); null/absent when the event has none. */
+  route?: EventRoute | null;
   rewards?: EventReward[];
   content?: {
     body?: string;
@@ -210,7 +269,7 @@ export type ProgressResponse = {
   me?: EventMe | null;
 };
 
-/** `{}` for self_mark, `{add}` / `{set}` for counter. A 429 `too_fast` rejects with its body — see `lib/counter-queue.ts`. */
+/** `{}` for self_mark, `{add}` / `{set}` for counter, a `LocationReport` for location. A 429 `too_fast` rejects with its body — see `lib/counter-queue.ts`. */
 export async function postProgress(slug: string, milestoneKey: string, taskKey: string, report: Record<string, unknown>): Promise<ProgressResponse> {
   const path = `/api/events/${encodeURIComponent(slug)}/milestones/${encodeURIComponent(milestoneKey)}/tasks/${encodeURIComponent(taskKey)}/progress`;
   return (await post(path, report)) as ProgressResponse;

@@ -1,4 +1,4 @@
-import type { Bounds } from '../lib/geometry';
+export { FIT_PADDING, INDIA_BOUNDS, MIN_FIT_SPAN_DEG, TEXT_FONT } from '@/components/map/constants';
 
 /** Default radius (metres) of a nearby-temples search. The server clamps to 500..25000. */
 export const DEFAULT_RADIUS_M = 8000;
@@ -12,9 +12,6 @@ export const FOCUS_ZOOM = 13.5;
 /** Quiet time after the camera settles before "Search this area" is reconsidered. */
 export const VIEW_DEBOUNCE_MS = 450;
 
-/** Smallest span (degrees) the camera fits to, so one temple does not zoom to the rooftops. */
-export const MIN_FIT_SPAN_DEG = 0.05;
-export const FIT_PADDING = { top: 90, right: 50, bottom: 60, left: 50 } as const;
 
 /** A search offered after moving this far (or 35% of the last radius, whichever is greater). */
 export const MOVE_MIN_M = 800;
@@ -25,13 +22,7 @@ export const DEDUPE_RADIUS_M = 150;
 /** Pins drawn at most (the API caps at 80). */
 export const MAX_PLACES = 80;
 
-/** West, south, east, north — all of India, the last resort for the first view. */
-export const INDIA_BOUNDS: Bounds = [68.1, 6.7, 97.4, 35.7];
-
 export const DEFAULT_ATTRIBUTION = '© OpenStreetMap contributors';
-
-/** Glyph stack the OpenFreeMap styles ship; only affects labels, never the pins. */
-export const TEXT_FONT = ['Noto Sans Regular'];
 
 export const SOURCE_IDS = {
   osm: 'osm-temples',
