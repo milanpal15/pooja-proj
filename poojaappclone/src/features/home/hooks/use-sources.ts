@@ -31,7 +31,7 @@ import type { ViewItem } from '../lib/layout-types';
 import { pickNextSeva } from '../lib/next-seva';
 import { pick } from '../lib/pick';
 import type { HomeSlide } from '../types';
-import { useGrantedLocation } from './use-granted-location';
+import { useGrantedLocation } from '@/hooks/use-granted-location';
 import { useHomeAstrologers, useHomeBookings, useHomeChadhava, useHomePoojas } from './use-home-feeds';
 import { useHomeSlides } from './use-home-slides';
 import { useNow } from './use-now';

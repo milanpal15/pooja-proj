@@ -75,3 +75,11 @@ export const SUPPORT_PHONE = process.env.EXPO_PUBLIC_SUPPORT_PHONE ?? '';
 /** Shown under the helpline heading. Blank hides the line. */
 export const SUPPORT_HOURS_EN = process.env.EXPO_PUBLIC_SUPPORT_HOURS_EN ?? '';
 export const SUPPORT_HOURS_HI = process.env.EXPO_PUBLIC_SUPPORT_HOURS_HI ?? '';
+
+/**
+ * Vector style for the temples map (MapLibre). OpenFreeMap needs no key and has no usage limits; any
+ * MapLibre style URL works, so a provider can be swapped without a code change. Never point this at
+ * `tile.openstreetmap.org` — OSM's tile policy forbids heavy app use. Blank falls back to the default.
+ */
+export const MAP_STYLE_URL =
+  process.env.EXPO_PUBLIC_MAP_STYLE_URL?.trim() || 'https://tiles.openfreemap.org/styles/liberty';

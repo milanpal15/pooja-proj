@@ -95,7 +95,8 @@
           }
         }
       ],
-      "expo-video"
+      "expo-video",
+      "@maplibre/maplibre-react-native"
     ],
     "experiments": {
       "typedRoutes": true,

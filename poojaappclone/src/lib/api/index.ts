@@ -12,6 +12,7 @@ export * from './chadhava';
 export * from './events';
 export * from './home-layout';
 export * from './live';
+export * from './places';
 export * from './poojas';
 export * from './wallet';
 export * from './push';

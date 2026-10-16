@@ -485,9 +485,10 @@ client-generated `requestId` so a retry never double-charges.
   `apksigner verify --print-certs app-debug.apk | grep -i SHA-1`.
 - **`prebuild --clean` deletes `android/local.properties`** — Gradle then
   fails with "SDK location not found". Export `ANDROID_HOME` or rewrite it.
-- **Node ≥ 20.19.4 is required** (nvm default here is v20.1.0, too old).
-  Reading `poojaappclone/.env` needs `util.parseEnv`, so an old Node makes
-  prebuild die with `parseEnv is not a function`. Use `/opt/homebrew/bin`.
+- **Node ≥ 20.19.4 is required.** Reading `poojaappclone/.env` needs `util.parseEnv`, so an
+  old Node makes prebuild die with `parseEnv is not a function`. Login shells use the nvm in
+  `~/.config/nvm` (not `~/.nvm`); its default is now the latest LTS (Node 24, `nvm alias default
+  lts/*`), which is what the builds use. `/opt/homebrew/bin` also has a current Node. CI runs 20.19.4.
 - **Reminders are a list the devotee owns, not a fixed five.** The bundled
   daily cycle lives in `constants/reminders.ts`, but `useReminders()` returns
   `reminders` — the bundle minus a `removed[]` tombstone list, plus the
