@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
  * One command for the local stack (phase 6):
+ *   events (4090) is the Events service (catalog lookups; coin rewards via the wallet, names via identity; USE_EVENTS=0 skips it; its database `events`: EVENTS_MONGODB_URI else MONGODB_URI minus its path).
  *   engagement (4030) + identity (4040) + catalog (4050) + wallet (4060) + orders (4070) + calls (4080)  <-  monolith (../pooja-api, PORT 4100)  <-  mobile-bff (4010) and admin-bff (4020)
  *   (the BFFs call engagement and identity directly; the monolith reads settings/announcements/user facts through them and
  *   TRUSTS the BFFs' signed tokens - mobile-bff verifies Firebase ID tokens, admin-bff owns the operator session cookie)
@@ -52,6 +53,7 @@ const ports = {
   wallet: Number(env.WALLET_PORT) || 4060,
   orders: Number(env.ORDERS_PORT) || 4070,
   calls: Number(env.CALLS_PORT) || 4080,
+  events: Number(env.EVENTS_PORT) || 4090,
 };
 const useEngagement = env.USE_ENGAGEMENT !== '0';
 const useIdentity = env.USE_IDENTITY !== '0';
@@ -59,6 +61,7 @@ const useCatalog = env.USE_CATALOG !== '0';
 const useWallet = env.USE_WALLET !== '0';
 const useOrders = env.USE_ORDERS !== '0';
 const useCalls = env.USE_CALLS !== '0';
+const useEvents = env.USE_EVENTS !== '0';
 if (useCatalog && !(useEngagement && useIdentity)) {
   console.error('The catalog service needs the engagement service (settings) and the identity service (the mobile BFF authenticates live-darshan Jai): run with USE_CATALOG=0, or drop USE_ENGAGEMENT=0 / USE_IDENTITY=0.');
   process.exit(1);
@@ -75,6 +78,10 @@ if (useCalls && !(useEngagement && useIdentity && useWallet)) {
   console.error('The calls service needs the engagement service (the billing rules), the identity service (names, roles; the mobile BFF authenticates the devotee) and the wallet (coins): run with USE_CALLS=0, or drop USE_ENGAGEMENT=0 / USE_IDENTITY=0 / USE_WALLET=0.');
   process.exit(1);
 }
+if (useEvents && !useCatalog) {
+  console.error('The events service checks the streams / listings / poojas an event refers to in the catalog: run with USE_EVENTS=0, or drop USE_CATALOG=0.');
+  process.exit(1);
+}
 const monolithUrl = `http://127.0.0.1:${ports.monolith}`;
 const engagementUrl = `http://127.0.0.1:${ports.engagement}`;
 const identityUrl = `http://127.0.0.1:${ports.identity}`;
@@ -82,6 +89,7 @@ const catalogUrl = `http://127.0.0.1:${ports.catalog}`;
 const walletUrl = `http://127.0.0.1:${ports.wallet}`;
 const ordersUrl = `http://127.0.0.1:${ports.orders}`;
 const callsUrl = `http://127.0.0.1:${ports.calls}`;
+const eventsUrl = `http://127.0.0.1:${ports.events}`;
 const secret = env.INTERNAL_JWT_SECRET && env.INTERNAL_JWT_SECRET.length >= 16 ? env.INTERNAL_JWT_SECRET : randomBytes(24).toString('hex');
 const sessionSecret = env.ADMIN_SESSION_SECRET && env.ADMIN_SESSION_SECRET.length >= 16 ? env.ADMIN_SESSION_SECRET : randomBytes(24).toString('hex');
 const serviceAccount = env.FIREBASE_SERVICE_ACCOUNT_PATH || (existsSync(join(root, '..', 'pooja-api', 'firebase-service-account.json')) ? join(root, '..', 'pooja-api', 'firebase-service-account.json') : '');
@@ -93,13 +101,15 @@ const engagementEnv = {
   ...(useWallet ? { WALLET_URL: walletUrl } : {}),
   ...(useOrders ? { ORDERS_URL: ordersUrl } : {}),
   ...(useCalls ? { CALLS_URL: callsUrl } : {}),
-  ...(useEngagement || useIdentity || useCatalog || useWallet || useOrders || useCalls ? { INTERNAL_JWT_SECRET: secret } : {}),
+  ...(useEvents ? { EVENTS_URL: eventsUrl } : {}),
+  ...(useEngagement || useIdentity || useCatalog || useWallet || useOrders || useCalls || useEvents ? { INTERNAL_JWT_SECRET: secret } : {}),
 };
 /** The server part of MONGODB_URI (engagement picks its own database name). */
 const mongoBaseOf = (uri) => uri.replace(/^([^/]+\/\/[^/?]+)[^?]*(\?.*)?$/, '$1$2');
 const identityMongoBase = mongoBaseOf(env.IDENTITY_MONGODB_URI || env.MONGODB_URI || 'mongodb://127.0.0.1:27017');
 const walletMongoBase = mongoBaseOf(env.WALLET_MONGODB_URI || env.MONGODB_URI || 'mongodb://127.0.0.1:27017');
 const ordersMongoBase = mongoBaseOf(env.ORDERS_MONGODB_URI || env.MONGODB_URI || 'mongodb://127.0.0.1:27017');
+const eventsMongoBase = mongoBaseOf(env.EVENTS_MONGODB_URI || env.MONGODB_URI || 'mongodb://127.0.0.1:27017');
 const callsMongoBase = mongoBaseOf(env.CALLS_MONGODB_URI || env.MONGODB_URI || 'mongodb://127.0.0.1:27017');
 const catalogMongoBase = mongoBaseOf(env.CATALOG_MONGODB_URI || env.MONGODB_URI || 'mongodb://127.0.0.1:27017');
 const mongoBase = (env.ENGAGEMENT_MONGODB_URI || env.MONGODB_URI || 'mongodb://127.0.0.1:27017').replace(/^([^/]+\/\/[^/?]+)[^?]*(\?.*)?$/, '$1$2');
@@ -206,6 +216,18 @@ if (useCalls) {
     ADMIN_SESSION_SECRET: sessionSecret,
   });
 }
+if (useEvents) {
+  run('events', join(root, 'services', 'events'), 'src/server.js', {
+    PORT: String(ports.events),
+    MONGODB_URI: eventsMongoBase,
+    INTERNAL_JWT_SECRET: secret,
+    CATALOG_URL: catalogUrl,
+    // Rewards are credited through the wallet and names come from identity; without them events still runs (coins wait, pseudonyms show).
+    ...(useWallet ? { WALLET_URL: walletUrl } : {}),
+    ...(useIdentity ? { IDENTITY_URL: identityUrl } : {}),
+    ADMIN_SESSION_SECRET: sessionSecret,
+  });
+}
 run('monolith', join(root, '..', 'pooja-api'), 'src/index.js', { PORT: String(ports.monolith), ...engagementEnv });
 for (const [name, dir] of [['mobile', 'mobile'], ['admin', 'admin']]) {
   run(`${name}-bff`, join(root, 'bff', dir), 'src/server.js', { PORT: String(ports[name]), MONOLITH_URL: monolithUrl, ...engagementEnv, ...(name === 'mobile' ? firebaseEnv : {}) });
@@ -220,12 +242,13 @@ for (const [label, url] of [
   ...(useWallet ? [['wallet     ', walletUrl]] : []),
   ...(useOrders ? [['orders     ', ordersUrl]] : []),
   ...(useCalls ? [['calls      ', callsUrl]] : []),
+  ...(useEvents ? [['events     ', eventsUrl]] : []),
   ['monolith   ', monolithUrl],
   ['mobile-bff ', `http://127.0.0.1:${ports.mobile}`],
   ['admin-bff  ', `http://127.0.0.1:${ports.admin}`],
 ]) {
   let status = 'down';
-  const path = label.startsWith('engagement') || label.startsWith('identity') || label.startsWith('catalog') || label.startsWith('wallet') || label.startsWith('orders') || label.startsWith('calls') ? '/health' : '/api/health';
+  const path = label.startsWith('engagement') || label.startsWith('identity') || label.startsWith('catalog') || label.startsWith('wallet') || label.startsWith('orders') || label.startsWith('calls') || label.startsWith('events') ? '/health' : '/api/health';
   try { status = (await fetch(`${url}${path}`)).status; } catch { /* down */ }
   console.log(`  ${label} ${url}   ${path} -> ${status}`);
 }

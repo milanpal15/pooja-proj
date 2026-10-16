@@ -1,11 +1,13 @@
 import mongoose from 'mongoose';
 
+import { TARGET_TYPES } from '../resources/hero-target.js';
+
 const { Schema, model } = mongoose;
 
 /** A slide in the Home carousel. Seasonal copy that should not need a build. */
 /** Where a slide leads. Resolved to `href` on read (resources/hero-target.js). */
 const targetSchema = new Schema(
-  { type: { type: String, enum: ['pooja', 'chadhava', 'temple', 'bhajan', 'astrologer', 'coins', 'link', 'none'], default: 'none' }, ref: { type: String, default: '' } },
+  { type: { type: String, enum: TARGET_TYPES, default: 'none' }, ref: { type: String, default: '' } },
   { _id: false },
 );
 

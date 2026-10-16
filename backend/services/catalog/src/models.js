@@ -17,6 +17,7 @@ export { WallpaperStyle } from './modules/content/models/wallpaper-style.model.j
 export { Horoscope } from './modules/horoscope/horoscope.model.js';
 export { Panchang } from './modules/panchang/panchang.model.js';
 export { HomeSection } from './modules/home/home.model.js';
+export { HomeLayoutDraft, HomeLayoutVersion } from './modules/home/layout.model.js';
 export { Pooja } from './modules/poojas/pooja.model.js';
 export { ChadhavaListing, ChadhavaCategory, Offering } from './modules/chadhava/chadhava.model.js';
 export { LiveCategory, LiveJaiCount, LiveJaiLast, LiveStream } from './modules/live/live.model.js';

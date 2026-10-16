@@ -1,0 +1,19 @@
+{
+  "name": "@bhakti/service-events",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Events service: event types, events (blocks + milestones + task-kind registry), badges. See ../../../docs/EVENTS.md.",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node --test --test-concurrency=1 src/*.test.mjs"
+  },
+  "dependencies": {
+    "@bhakti/common": "0.1.0",
+    "dotenv": "16.6.1",
+    "express": "4.22.3",
+    "mongoose": "8.24.5"
+  },
+  "engines": { "node": ">=20.19.4" }
+}

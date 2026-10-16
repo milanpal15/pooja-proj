@@ -21,6 +21,17 @@ export const DEBIT_TYPES = ['booking_debit', 'chadhava_debit', 'call_debit'];
 const CREDIT_TYPES = ['bonus'];
 
 /*
+ * The events service (event rewards) is the only caller that can only ever GIVE coins, so it is boxed in: type `bonus` (above), a key
+ * that starts with `event-` (a reward key can never collide with, or replay, a purchase / refund / adjustment key), and a sane amount.
+ * It may look up only its own `event-` keys. perms.js already limits it to /credit and /txn.
+ */
+export const EVENTS_CALLER = 'events';
+export const EVENTS_KEY_PREFIX = 'event-';
+export const EVENTS_MAX_CREDIT = 100_000;
+const eventsOnly = (req) => req.auth?.iss === EVENTS_CALLER;
+const eventKey = (key) => typeof key === 'string' && key.startsWith(EVENTS_KEY_PREFIX) && key.length > EVENTS_KEY_PREFIX.length;
+
+/*
  * Refunds (phase 5 hardening). The ledger used to trust its order-side callers: a refund was any positive number for any uid under any
  * fresh key, so a compromised caller could mint coins. Now a refund must name the spend it reverses:
  *
@@ -110,6 +121,10 @@ export function ledgerRoutes() {
   r.post('/credit', async (req, res) => {
     const b = req.body ?? {};
     if (!CREDIT_TYPES.includes(b.type)) throw new HttpError(400, 'bad_type', `type must be one of ${CREDIT_TYPES.join(', ')}.`);
+    if (eventsOnly(req)) {
+      if (!eventKey(b.key)) throw new HttpError(403, 'key_not_allowed', `This caller may only credit with a key starting "${EVENTS_KEY_PREFIX}".`);
+      if (!Number.isInteger(b.amount) || b.amount < 1 || b.amount > EVENTS_MAX_CREDIT) throw new HttpError(400, 'bad_amount', `amount must be a whole number from 1 to ${EVENTS_MAX_CREDIT}.`);
+    }
     const out = await wallet.credit({
       uid: b.uid, amount: b.amount, type: b.type, refType: text(b.refType, 40), refId: text(b.refId, 100), idempotencyKey: b.key, note: text(b.note), createdBy: text(b.createdBy, 80),
     });
@@ -117,6 +132,7 @@ export function ledgerRoutes() {
   });
 
   r.get('/txn', async (req, res) => {
+    if (eventsOnly(req) && !eventKey(req.query.key)) throw new HttpError(403, 'key_not_allowed', `This caller may only look up keys starting "${EVENTS_KEY_PREFIX}".`);
     const txn = await wallet.findByKey(String(req.query.key ?? ''), { uid: req.query.uid ? String(req.query.uid) : undefined });
     res.json({ txn: txnView(txn) });
   });

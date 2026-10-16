@@ -45,11 +45,14 @@ export function createApp(config, { isReady, dbPing = async () => {}, logger = c
   /* Media bytes. Streamed, Range-aware; before the JSON parser (nothing to parse) and open to both BFFs only. */
   internal.use('/media', mediaRoutes({ uploadDir: config.uploadDir }));
 
+  // A Home layout can be a few hundred KB (60 blocks of up to 24 items); only that path gets the larger limit.
+  internal.use('/admin/home-layout', express.json({ limit: '1mb' }));
   internal.use(express.json({ limit: '256kb' }));
 
   /* Read-only app routes: either BFF (the phone app, and the dashboard's own previews) or the monolith. */
   const pub = express.Router();
   pub.use(publicContentRoutes);
+  pub.use(home.layoutPublicRoutes);
   pub.use(horoscope.publicRouter);
   pub.use(panchang);
   const routers = { home: home.routers(), live: live.routers({ requireAuth: requireDevotee }), poojas: poojas.routers(), chadhava: chadhava.routers() };

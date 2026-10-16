@@ -12,6 +12,7 @@ import { hasPermission } from './access/permissions.js';
  *  sample  a concrete path for tests (and the route-coverage check)
  *  successStatus  the status the monolith answered on success when it is not 200 (a create answers 201)
  *  body    send the JSON body on a DELETE
+ *  bodyLimit  JSON body size limit for this route (default 100kb)
  */
 export const ENGAGEMENT_ADMIN_ROUTES = [
   { method: 'GET', path: '/flags/full', to: '/flags/full', area: 'flags' },
@@ -71,10 +72,12 @@ export function createOperatorGate(sessions) {
 export function engagementAdminRouter({ sessions, client, audit, routes = ENGAGEMENT_ADMIN_ROUTES, namespace = '/internal/engagement' }) {
   const router = express.Router();
   const json = express.json();
+  const bigJson = new Map(); // bodyLimit -> parser
+  const parserFor = (r) => (r.bodyLimit ? (bigJson.get(r.bodyLimit) ?? bigJson.set(r.bodyLimit, express.json({ limit: r.bodyLimit })).get(r.bodyLimit)) : json);
   const gate = createOperatorGate(sessions);
 
   for (const r of routes) {
-    router[r.method.toLowerCase()](`/api${r.path}`, gate, json, async (req, res, next) => {
+    router[r.method.toLowerCase()](`/api${r.path}`, gate, parserFor(r), async (req, res, next) => {
       try {
         const to = r.to.replace(/:(\w+)/g, (_m, k) => encodeURIComponent(req.params[k]));
         // `id` exists only when identity owns the session; the id (not the username) is what identity's "is this me?" refusals compare.

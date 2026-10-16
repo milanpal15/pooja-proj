@@ -38,6 +38,12 @@ export const ROUTE_AREAS = [
   { path: /^\/admin\/(wallets?|wallet-transactions)(\/|$)/, area: 'wallets' },
   { path: /^\/admin\/calls(\/|$)/, area: 'calls' },
   { path: /^\/admin\/payouts(\/|$)/, area: 'payouts' },
+
+  // Home layout v2 (catalog; BFF-only like events: pooja-api has no such route, the parity test skips this row).
+  { path: /^\/admin\/home-layout(\/|$)/, area: 'content' },
+
+  // Events (the events service; BFF-only: pooja-api has no such area, the parity test skips these rows).
+  { path: /^\/admin\/(events|event-types|event-badges)(\/|$)/, area: 'events' },
 ];
 
 /** `{ area, level, also }` for a request. Unmapped paths are `operators:<level>` (admin-only). */

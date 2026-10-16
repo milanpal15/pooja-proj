@@ -881,6 +881,66 @@ describe('every route the admin BFF forwards exists here, and every operator rou
   });
 });
 
+/* ──────────────────────────────────────────────────────────────── the events caller (rewards) ── */
+describe('the events service may only pay rewards: credit type bonus with an `event-` key, and read its own keys', () => {
+  let h;
+  before(async () => { h = await boot('wallet_events_caller_tests'); await seedWallet(); });
+  after(() => h.stop());
+
+  const as = (method, path, body) => h.ledger(method, path, body, 'events');
+  const code = (r) => [r.status, r.body.code];
+  const balance = async (uid) => (await h.ledger('GET', `/balance/${uid}`)).body.balance;
+
+  test('a reward credit lands once; the same key again is the first result (no second payment)', async () => {
+    const a = await as('POST', '/credit', { uid: 'ev1', amount: 25, type: 'bonus', key: 'event-ms:yatra:day1:ev1', refType: 'event', refId: 'yatra' });
+    assert.deepEqual([a.status, a.body.balance, a.body.txn.type, a.body.duplicate], [200, 25, 'bonus', false]);
+    const b = await as('POST', '/credit', { uid: 'ev1', amount: 25, type: 'bonus', key: 'event-ms:yatra:day1:ev1' });
+    assert.deepEqual([b.status, b.body.balance, b.body.duplicate, b.body.txn.id], [200, 25, true, a.body.txn.id]);
+    assert.equal(await balance('ev1'), 25);
+  });
+
+  test('a key that does not start with `event-` is refused (403 key_not_allowed) and moves nothing', async () => {
+    for (const key of ['booking:ev2:x', 'call:1:goodwill:2', 'event', 'event-', 'Event-x', ' event-x', undefined]) {
+      const r = await as('POST', '/credit', { uid: 'ev2', amount: 5, type: 'bonus', key });
+      assert.deepEqual(code(r), [403, 'key_not_allowed'], String(key));
+    }
+    assert.equal(await balance('ev2'), 0);
+  });
+
+  test('only type bonus, and only a whole number of coins from 1 to 100000', async () => {
+    for (const type of ['recharge', 'refund', 'adjustment', 'booking_debit', undefined]) {
+      assert.deepEqual(code(await as('POST', '/credit', { uid: 'ev3', amount: 5, type, key: 'event-x:1' })), [400, 'bad_type'], String(type));
+    }
+    for (const amount of [0, -5, 1.5, '5', 100_001, null, undefined]) {
+      assert.deepEqual(code(await as('POST', '/credit', { uid: 'ev3', amount, type: 'bonus', key: `event-x:${amount}` })), [400, 'bad_amount'], String(amount));
+    }
+    assert.equal((await as('POST', '/credit', { uid: 'ev3', amount: 100_000, type: 'bonus', key: 'event-x:max' })).status, 200);
+  });
+
+  test('it cannot debit, refund, reconcile or read a balance (403 wrong_issuer), and may only look up `event-` keys', async () => {
+    for (const [m, p, body] of [
+      ['POST', '/debit', { uid: 'ev1', amount: 1, key: 'event-d', type: 'booking_debit' }],
+      ['POST', '/refund', { uid: 'ev1', amount: 1, key: 'event-r', ofKey: 'event-ms:yatra:day1:ev1' }],
+      ['POST', '/reconcile', {}],
+      ['GET', '/balance/ev1'],
+    ]) assert.deepEqual(code(await as(m, p, body)), [403, 'wrong_issuer'], `${m} ${p}`);
+    assert.equal((await as('GET', '/txn?key=event-ms:yatra:day1:ev1&uid=ev1')).body.txn.status, 'posted');
+    assert.deepEqual((await as('GET', '/txn?key=event-never')).body, { txn: null });
+    assert.deepEqual(code(await as('GET', '/txn?key=booking:l1:req1')), [403, 'key_not_allowed']);
+    assert.deepEqual(code(await as('GET', '/txn')), [403, 'key_not_allowed']);
+    assert.equal(await balance('ev1'), 25, 'nothing above moved a coin');
+  });
+
+  test('other callers are unchanged: orders can still credit with any key, and the events key rule does not apply to them', async () => {
+    const r = await h.ledger('POST', '/credit', { uid: 'ev4', amount: 3, type: 'bonus', key: 'anything:goes' }, 'orders');
+    assert.deepEqual([r.status, r.body.balance], [200, 3]);
+  });
+
+  test('events is a default allowed issuer', () => {
+    assert.ok(testConfig('x').allowedIssuers.includes('events'));
+  });
+});
+
 describe('config', () => {
   const need = { INTERNAL_JWT_SECRET: SECRET, ENGAGEMENT_URL: 'http://e/', IDENTITY_URL: 'http://i/' };
   test('the required variables, the defaults, and the parsing', () => {
@@ -890,7 +950,7 @@ describe('config', () => {
     assert.throws(() => loadConfig({ ...need, INTERNAL_JWT_SECRET: 'short' }), /16 characters/);
     const c = loadConfig(need);
     assert.deepEqual([c.port, c.dbName, c.engagementUrl, c.identityUrl, c.isProduction, c.reconcileEveryMs], [4060, 'wallet', 'http://e', 'http://i', false, 15000]);
-    assert.deepEqual(c.allowedIssuers, ['mobile-bff', 'admin-bff', 'monolith', 'pooja-api', 'orders', 'calls']);
+    assert.deepEqual(c.allowedIssuers, ['mobile-bff', 'admin-bff', 'monolith', 'pooja-api', 'orders', 'calls', 'events']);
     const o = loadConfig({ ...need, PORT: '5000', DB_NAME: 'w2', ALLOWED_ISSUERS: 'a, b', NODE_ENV: 'production', GIT_COMMIT: 'abc', RECONCILE_EVERY_MS: '0' });
     assert.deepEqual([o.port, o.dbName, o.allowedIssuers, o.isProduction, o.commit, o.reconcileEveryMs], [5000, 'w2', ['a', 'b'], true, 'abc', 0]);
     assert.throws(() => { o.port = 1; }, TypeError, 'frozen');

@@ -1,5 +1,5 @@
 // COPIED from pooja-api/src/access/permissions.js (the admin BFF owns the area gate for the routes it serves).
-// access-parity.test.mjs fails when the two drift. Move, do not fork, when the identity phase lands.
+// access-parity.test.mjs fails when the two drift - EXCEPT the `events` area, which exists only here (pooja-api never gets Events). Move, do not fork, when the identity phase lands.
 /**
  * Roles and permissions — DESIGN.md §21. THE one place a role is defined.
  *
@@ -10,7 +10,7 @@
 
 export const AREAS = [
   'overview', 'content', 'horoscope', 'panchang', 'announcements', 'push', 'flags', 'policies',
-  'devotees', 'astrologers', 'money', 'wallets', 'orders', 'calls', 'payouts', 'operators',
+  'devotees', 'astrologers', 'money', 'wallets', 'orders', 'calls', 'payouts', 'operators', 'events',
 ];
 
 export const ROLES = ['admin', 'editor', 'viewer'];
@@ -18,7 +18,7 @@ export const ROLES = ['admin', 'editor', 'viewer'];
 /** Areas wholly withheld from editor and viewer (personal data, or reaches every device). */
 const ADMIN_ONLY_AREAS = ['operators', 'devotees', 'push'];
 /** Areas an editor may write. */
-const EDITOR_EDITS = ['content', 'horoscope', 'panchang', 'announcements'];
+const EDITOR_EDITS = ['content', 'horoscope', 'panchang', 'announcements', 'events'];
 
 const views = AREAS.filter((a) => !ADMIN_ONLY_AREAS.includes(a)).map((a) => `${a}:view`);
 

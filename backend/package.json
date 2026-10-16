@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Bhakti backend: shared package, the two BFFs, and the domain services (engagement, identity, catalog, wallet, orders, calls). See ../docs/MICROSERVICES.md.",
+  "description": "Bhakti backend: shared package, the two BFFs, and the domain services (engagement, identity, catalog, wallet, orders, calls, events). See ../docs/MICROSERVICES.md.",
   "workspaces": [
     "packages/*",
     "services/*",
@@ -11,7 +11,7 @@
   ],
   "scripts": {
     "dev:all": "node tools/dev-all.mjs",
-    "test": "node --test --test-concurrency=1 packages/common/src/*.test.mjs packages/common/src/operator/*.test.mjs services/engagement/src/*.test.mjs services/identity/src/*.test.mjs services/catalog/src/*.test.mjs services/catalog/src/modules/*/*.test.mjs services/wallet/src/*.test.mjs services/wallet/src/modules/*/*.test.mjs services/orders/src/*.test.mjs services/calls/src/*.test.mjs bff/mobile/src/*.test.mjs bff/admin/src/*.test.mjs tools/*.test.mjs",
+    "test": "node --test --test-concurrency=1 packages/common/src/*.test.mjs packages/common/src/operator/*.test.mjs services/engagement/src/*.test.mjs services/identity/src/*.test.mjs services/catalog/src/*.test.mjs services/catalog/src/modules/*/*.test.mjs services/wallet/src/*.test.mjs services/wallet/src/modules/*/*.test.mjs services/orders/src/*.test.mjs services/calls/src/*.test.mjs services/events/src/*.test.mjs bff/mobile/src/*.test.mjs bff/admin/src/*.test.mjs tools/*.test.mjs",
     "split-db": "node tools/split-db.mjs"
   },
   "engines": {

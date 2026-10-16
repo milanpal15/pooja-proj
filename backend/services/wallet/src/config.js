@@ -11,7 +11,7 @@ export const loadConfig = (env = process.env) => {
       secret: { name: 'INTERNAL_JWT_SECRET', required: true },
       allowedIssuers: {
         name: 'ALLOWED_ISSUERS',
-        default: ['mobile-bff', 'admin-bff', 'monolith', 'pooja-api', 'orders', 'calls'],
+        default: ['mobile-bff', 'admin-bff', 'monolith', 'pooja-api', 'orders', 'calls', 'events'],
         parse: (v) => v.split(',').map((s) => s.trim()).filter(Boolean),
       },
       // The settings table (coin rate, billing rules) is engagement's. Required: pack validation reads the coin rate STRICTLY.

@@ -4,6 +4,8 @@ import { can, onlyFrom } from '../lib/perms.js';
 import { User } from '../models/index.js';
 
 const SERVICES = ['monolith', 'catalog', 'wallet', 'orders', 'calls'];
+/** The events service asks ONE thing (names for the operator participants list, only when the operator may see them): batch lookup. */
+const LOOKUP_FROM = [...SERVICES, 'events'];
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
@@ -12,16 +14,16 @@ const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
  */
 export function directoryRoutes() {
   const r = asyncRouter();
-  r.use(onlyFrom(...SERVICES));
+  const from = onlyFrom(...SERVICES);
 
-  r.get('/users/:uid', async (req, res) => {
+  r.get('/users/:uid', from, async (req, res) => {
     const u = await User.findOne({ uid: req.params.uid }).select('uid name contact deviceId role').lean();
     if (!u) return res.status(404).json({ error: 'user not found', code: 'not_found' });
     res.json({ user: { uid: u.uid, name: u.name || '', contact: u.contact || '', deviceId: u.deviceId || null, role: u.role || 'devotee' } });
   });
 
   /** Names for the admin `who` column. */
-  r.post('/lookup', async (req, res) => {
+  r.post('/lookup', onlyFrom(...LOOKUP_FROM), async (req, res) => {
     const uids = req.body?.uids;
     if (!Array.isArray(uids) || uids.length > 500 || uids.some((x) => typeof x !== 'string')) throw new HttpError(400, 'bad_request', 'uids[] (strings, at most 500) required.');
     const rows = await User.find({ uid: { $in: uids } }).select('uid name contact').lean();
@@ -29,7 +31,7 @@ export function directoryRoutes() {
   });
 
   /** Wallet lookup: a search over names and phones, so the caller must carry the operator's `devotees:view`. */
-  r.get('/search', async (req, res) => {
+  r.get('/search', from, async (req, res) => {
     if (!can(req, 'devotees:view')) throw new HttpError(403, 'forbidden', "You don't have permission for that.", { needs: 'devotees:view' });
     const q = String(req.query.q ?? '').trim().slice(0, 80);
     if (!q) return res.json({ users: [] });
@@ -39,7 +41,7 @@ export function directoryRoutes() {
   });
 
   /** Keep the convenience role in step with the astrologer lifecycle (the monolith's suspend / reactivate / delete). */
-  r.put('/users/:uid/role', async (req, res) => {
+  r.put('/users/:uid/role', from, async (req, res) => {
     const role = req.body?.role;
     if (!['devotee', 'astrologer'].includes(role)) throw new HttpError(400, 'bad_request', 'role must be devotee or astrologer.');
     await User.updateOne({ uid: req.params.uid }, { $set: { role } });

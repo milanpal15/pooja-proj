@@ -11,7 +11,7 @@ export const loadConfig = (env = process.env) => {
       secret: { name: 'INTERNAL_JWT_SECRET', required: true },
       allowedIssuers: {
         name: 'ALLOWED_ISSUERS',
-        default: ['mobile-bff', 'admin-bff', 'monolith', 'pooja-api', 'wallet', 'orders', 'calls', 'identity'],
+        default: ['mobile-bff', 'admin-bff', 'monolith', 'pooja-api', 'wallet', 'orders', 'calls', 'identity', 'events'],
         parse: (v) => v.split(',').map((s) => s.trim()).filter(Boolean),
       },
       // Settings (prasad fee, chadhava fee/minimum) are engagement's. Required: import-sevas and the chadhava catalogue read them.

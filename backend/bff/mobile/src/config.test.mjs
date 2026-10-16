@@ -26,3 +26,10 @@ test('unset URLs stay empty (the switch is "unset")', () => {
   assert.equal(c.walletUrl, '');
   assert.equal(c.monolithUrl, 'http://127.0.0.1:4000');
 });
+
+test('EVENTS_URL is normalised, optional, and needs the shared secret', () => {
+  const c = loadConfig({ INTERNAL_JWT_SECRET: 'x'.repeat(20), EVENTS_URL: 'bhakti-events:10000' });
+  assert.equal(c.eventsUrl, 'http://bhakti-events:10000');
+  assert.equal(loadConfig({}).eventsUrl, '');
+  assert.throws(() => loadConfig({ EVENTS_URL: 'http://127.0.0.1:4090' }), /INTERNAL_JWT_SECRET/);
+});

@@ -546,6 +546,7 @@ jobs:
           HOOK_WALLET: ${{ secrets.RENDER_DEPLOY_HOOK_WALLET }}
           HOOK_ORDERS: ${{ secrets.RENDER_DEPLOY_HOOK_ORDERS }}
           HOOK_CALLS: ${{ secrets.RENDER_DEPLOY_HOOK_CALLS }}
+          HOOK_EVENTS: ${{ secrets.RENDER_DEPLOY_HOOK_EVENTS }}
         run: |
           ./scripts/render-deploy-hook.sh bhakti-engagement "$HOOK_ENGAGEMENT"
           ./scripts/render-deploy-hook.sh bhakti-identity "$HOOK_IDENTITY"
@@ -553,6 +554,8 @@ jobs:
           ./scripts/render-deploy-hook.sh bhakti-wallet "$HOOK_WALLET"
           ./scripts/render-deploy-hook.sh bhakti-orders "$HOOK_ORDERS"
           ./scripts/render-deploy-hook.sh bhakti-calls "$HOOK_CALLS"
+          # Optional until the Events service exists on Render (secret RENDER_DEPLOY_HOOK_EVENTS).
+          [ -z "$HOOK_EVENTS" ] || ./scripts/render-deploy-hook.sh bhakti-events "$HOOK_EVENTS"
 
       - name: Trigger the two BFFs
         env:

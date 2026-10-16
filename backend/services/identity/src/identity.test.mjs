@@ -444,6 +444,16 @@ describe('directory (other services)', () => {
     assert.equal((await call('POST', '/directory/lookup', { headers: svc('monolith'), body: { uids: Array.from({ length: 501 }, (_, i) => `u${i}`) } })).status, 400);
   });
 
+  test('the events service may ask for names (batch lookup) and nothing else in the directory', async () => {
+    const ok = await call('POST', '/directory/lookup', { headers: svc('events'), body: { uids: ['uid-1'] } });
+    assert.equal(ok.status, 200);
+    assert.deepEqual(ok.body.users.map((u) => u.uid), ['uid-1']);
+    for (const [m, p, body] of [['GET', '/directory/users/uid-1'], ['GET', '/directory/search?q=a'], ['PUT', '/directory/users/uid-1/role', { role: 'astrologer' }]]) {
+      const r = await call(m, p, { headers: svc('events', ADMIN), body });
+      assert.deepEqual([r.status, r.body.code], [403, 'wrong_issuer'], `${m} ${p}`);
+    }
+  });
+
   test('search is a search over PII: it needs devotees:view in the operator claims it carries', async () => {
     assert.equal((await call('GET', '/directory/search?q=asha', { headers: svc('monolith', EDITOR) })).status, 403);
     assert.equal((await call('GET', '/directory/search?q=asha', { headers: svc('monolith', []) })).status, 403);

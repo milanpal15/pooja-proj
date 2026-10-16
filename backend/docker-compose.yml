@@ -98,6 +98,20 @@ services:
     depends_on: [mongo, engagement, identity, wallet]
     # No published port: only the BFFs (and identity, for the sign-in claim) call it, with a service JWT.
 
+  events:
+    build: { context: ., dockerfile: services/events/Dockerfile }
+    environment:
+      PORT: "4090"
+      MONGODB_URI: mongodb://mongo:27017        # the service picks its own database: events
+      DB_NAME: events
+      CATALOG_URL: http://catalog:4050          # publishing an event checks the streams / listings / poojas / temples it refers to (fail closed: 503 when unreachable)
+      WALLET_URL: http://wallet:4060            # event rewards are credited here (type bonus, keys `event-...`); unreachable = the coins stay pending and are retried
+      IDENTITY_URL: http://identity:4040        # real names in the operator participants list (only for roles that may see devotees)
+      ADMIN_SESSION_SECRET: ${ADMIN_SESSION_SECRET:-local-dev-session-secret}   # the SAME value as the admin BFF: devotee pseudonyms ("Devotee ••4821")
+      INTERNAL_JWT_SECRET: ${INTERNAL_JWT_SECRET:-local-dev-internal-secret-change-me}
+    depends_on: [mongo, catalog, wallet, identity]
+    # No published port: only the BFFs call it, with a service JWT.
+
   monolith:
     build: { context: .., dockerfile: backend/docker/monolith.Dockerfile }
     environment:
@@ -130,12 +144,13 @@ services:
       WALLET_URL: http://wallet:4060           # requires IDENTITY_URL on this BFF; serves /api/wallet*, /api/coins/packs and the Razorpay webhook
       ORDERS_URL: http://orders:4070           # requires IDENTITY_URL on this BFF; serves /api/bookings*, /api/chadhava/orders*, POST /api/chadhava and /api/poojas/:slug/reviews
       CALLS_URL: http://calls:4080             # requires IDENTITY_URL on this BFF; serves /api/astrologers*, /api/astrologer/me/* and /api/calls*
+      EVENTS_URL: http://events:4090           # serves GET /api/events and GET /api/events/:slug
       INTERNAL_JWT_SECRET: ${INTERNAL_JWT_SECRET:-local-dev-internal-secret-change-me}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
       # Verifying Firebase ID tokens needs only the project id (no secret). Must be the SAME project as the app's google-services.json.
       FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-pooja-app-aa462}
     ports: ["4010:4010"]
-    depends_on: [monolith, engagement, identity, catalog, wallet, orders, calls]
+    depends_on: [monolith, engagement, identity, catalog, wallet, orders, calls, events]
 
   admin-bff:
     build: { context: ., dockerfile: bff/admin/Dockerfile }
@@ -148,12 +163,13 @@ services:
       WALLET_URL: http://wallet:4060
       ORDERS_URL: http://orders:4070
       CALLS_URL: http://calls:4080
+      EVENTS_URL: http://events:4090
       INTERNAL_JWT_SECRET: ${INTERNAL_JWT_SECRET:-local-dev-internal-secret-change-me}
       ADMIN_SESSION_SECRET: ${ADMIN_SESSION_SECRET:-local-dev-session-secret}   # the BFF signs the operator cookie with it; the monolith derives devotee pseudonyms from the SAME value
       SESSION_SAMESITE: ${SESSION_SAMESITE:-Strict}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
     ports: ["4020:4020"]
-    depends_on: [monolith, engagement, identity, catalog, wallet, orders, calls]
+    depends_on: [monolith, engagement, identity, catalog, wallet, orders, calls, events]
 
 volumes:
   mongo-data:

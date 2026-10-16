@@ -13,9 +13,13 @@ const have = existsSync(fileURLToPath(mono('routes.js')));
 
 test('the copied gate matches pooja-api/src/access byte-for-purpose', { skip: !have && 'pooja-api not checked out next to backend/' }, async () => {
   const [p, r] = await Promise.all([import(mono('permissions.js')), import(mono('routes.js'))]);
-  assert.deepEqual(ROLE_PERMISSIONS, p.ROLE_PERMISSIONS);
-  assert.equal(ROUTE_AREAS.length, r.ROUTE_AREAS.length);
-  ROUTE_AREAS.forEach((row, i) => {
+  // The `events` area exists only in the BFF copy (pooja-api never gets Events): everything else must match.
+  const noEvents = (list) => list.filter((x) => !x.startsWith('events:'));
+  assert.deepEqual(Object.fromEntries(Object.entries(ROLE_PERMISSIONS).map(([k, v]) => [k, noEvents(v)])), p.ROLE_PERMISSIONS);
+  // ...and the Home-layout row (catalog + BFF only; pooja-api has no home-layout routes).
+  const mine = ROUTE_AREAS.filter((row) => row.area !== 'events' && !String(row.path).includes('home-layout'));
+  assert.equal(mine.length, r.ROUTE_AREAS.length);
+  mine.forEach((row, i) => {
     assert.equal(String(row.path), String(r.ROUTE_AREAS[i].path), `row ${i} path`);
     assert.equal(row.area, r.ROUTE_AREAS[i].area, `row ${i} area`);
     assert.equal(row.also, r.ROUTE_AREAS[i].also, `row ${i} also`);
@@ -39,7 +43,7 @@ test('every catalog operator route gets the same area and level from the BFF cop
   const r = await import(mono('routes.js'));
   const { CATALOG_ADMIN_ROUTES } = await import('../catalog-routes.js');
   assert.ok(CATALOG_ADMIN_ROUTES.length > 80, `found ${CATALOG_ADMIN_ROUTES.length}`);
-  for (const route of CATALOG_ADMIN_ROUTES) {
+  for (const route of CATALOG_ADMIN_ROUTES.filter((x) => !x.path.startsWith('/admin/home-layout'))) {
     const sample = (route.sample ?? route.path).replace(':date', '2026-01-01');
     assert.deepEqual(areaFor(route.method, sample), r.areaFor(route.method, sample), `${route.method} ${route.path}`);
     assert.equal(areaFor(route.method, sample).mapped, true, `${route.method} ${route.path} must be mapped`);

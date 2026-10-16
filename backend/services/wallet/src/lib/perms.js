@@ -18,7 +18,10 @@ const FORBIDDEN = "You don't have permission for that.";
  * spend a devotee's coins, and nothing but the order-side services may move the ledger.
  */
 const LEDGER = ['monolith', 'pooja-api', 'orders', 'calls'];
+/** The events service may ONLY pay rewards: a credit, and look up its own credit by key. `debit`, `refund`, `balance`, `reconcile` stay closed to it. */
+const EVENTS = 'events';
 const EDGES = [
+  { re: /^\/(credit|txn)(\/|$)/, from: [...LEDGER, EVENTS] },
   { re: /^\/(debit|credit|refund|txn|balance|reconcile)(\/|$)/, from: LEDGER },
   { re: /^\/wallet(\/|$)/, from: ['mobile-bff'] },
   { re: /^\/(coins\/packs|webhooks\/razorpay)$/, from: ['mobile-bff', 'admin-bff'] },

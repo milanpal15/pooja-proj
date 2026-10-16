@@ -35,6 +35,17 @@ describe('validation', () => {
     assert.equal((await post({ language: 'fr' })).body.code, 'bad_language');
     assert.equal((await post({ target: { type: 'bhajan' } })).status, 201);
   });
+  test('slides can also open events, live darshan and any in-app screen', async () => {
+    for (const type of ['event', 'route']) assert.equal((await post({ target: { type, ref: '' } })).body.code, 'bad_target', type);
+    for (const ref of ['events', '//evil.com', 'https://x.com']) assert.equal((await post({ target: { type: 'route', ref } })).body.code, 'bad_target', ref);
+    assert.equal((await post({ target: { type: 'event', ref: '../x' } })).body.code, 'bad_target');
+    const ok = [[{ type: 'events' }, '/events'], [{ type: 'event', ref: 'nine-day-japa' }, '/events/nine-day-japa'], [{ type: 'live' }, '/darshan'], [{ type: 'live', ref: 'kashi' }, '/darshan/kashi'], [{ type: 'panchang' }, '/panchang'], [{ type: 'horoscope' }, '/horoscope'], [{ type: 'route', ref: '/events' }, '/events']];
+    for (const [target, href] of ok) {
+      const r = await post({ target });
+      assert.equal(r.status, 201, JSON.stringify([target, r.body]));
+      assert.equal(r.body.href, href, JSON.stringify(target));
+    }
+  });
   test('a PUT is validated as the merged document', async () => {
     const c = await post({});
     assert.equal((await h.call('PUT', `/content/hero/${c.body._id}`, { body: { title: '' } })).body.code, 'title_required');

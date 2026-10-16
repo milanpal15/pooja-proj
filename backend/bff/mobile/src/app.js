@@ -1,4 +1,4 @@
-import { createCallsMount, createCatalogMount, createEngagementMount, createGatewayApp, createIdentityMobileMount, createLogger, createOrdersMount, createWalletMount } from '@bhakti/common';
+import { createCallsMount, createCatalogMount, createEngagementMount, createEventsMount, createGatewayApp, createIdentityMobileMount, createLogger, createOrdersMount, createWalletMount } from '@bhakti/common';
 
 import { createFirebaseVerifier } from './firebase.js';
 
@@ -17,6 +17,8 @@ import { createFirebaseVerifier } from './firebase.js';
  *     `GET /api/poojas/:slug/reviews` are served from the orders service (packages/common/src/orders-mount.js); orders unreachable is 503 `orders_unavailable`.
  *   - CALLS_URL set (phase 6): the astrologer list / profile, the devotee call routes (request, poll, cancel, end, accept, decline, rate) and the astrologer's own
  *     `/api/astrologer/me/*` are served from the calls service (packages/common/src/calls-mount.js); calls unreachable is 503 `calls_unavailable`.
+ *   - EVENTS_URL set: `GET /api/events` and `GET /api/events/:slug` (published events; Firebase-optional) are served from the events service
+ *     (packages/common/src/events-mount.js); events unreachable is 503 `events_unavailable`.
  *   - IDENTITY_URL also serves the phone's FCM push registration `POST|DELETE /api/push/register` (background push; identity holds the registry and the Firebase key).
  * Explicit lists, fail-closed: anything else still goes to the monolith, whose own gate decides.
  */
@@ -35,7 +37,9 @@ export function createApp(config, { logger = createLogger('mobile-bff'), fetchIm
   const orders = createOrdersMount('mobile-bff', config, { logger, fetchImpl, operator: false, devotee: identity?.devotee ?? null, ...(now ? { now } : {}) });
   // After identity: the devotee routes read `req.deviceAuth`, which the identity edge's `/api` middleware sets.
   const calls = createCallsMount('mobile-bff', config, { logger, fetchImpl, operator: false, devotee: identity?.devotee ?? null });
-  const mounts = [engagement, identity, catalog, wallet, orders, calls].filter(Boolean);
+  // After identity: a signed-in devotee's uid is forwarded when `req.deviceAuth` is valid; a guest is served too (the list is public).
+  const events = createEventsMount('mobile-bff', config, { logger, fetchImpl, operator: false, devotee: identity?.devotee ?? null, ...(now ? { now } : {}) });
+  const mounts = [engagement, identity, catalog, wallet, orders, calls, events].filter(Boolean);
   return createGatewayApp('mobile-bff', config, {
     logger,
     softDeps: Object.assign({}, ...mounts.map((m) => m.softDeps)),

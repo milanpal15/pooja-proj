@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import { after, before, beforeEach, describe, test } from 'node:test';
 
-import { CONTENT_KEYS, CONTENT_STALE_MS, FALLBACK_SETTINGS, verifyServiceToken } from '@bhakti/common';
+import { CONTENT_KEYS, CONTENT_STALE_MS, FALLBACK_SETTINGS, HOME_STALE_MS, verifyServiceToken } from '@bhakti/common';
 
 import { createApp } from './app.js';
 import { loadConfig } from './config.js';
@@ -78,6 +78,7 @@ before(async () => {
       res.writeHead(200, { ...base, 'content-length': MEDIA.length });
       return res.end(MEDIA);
     }
+    if (u.pathname === '/internal/catalog/public/home') return json(200, { version: 4, schemaVersion: 1, publishedAt: '2026-01-01T00:00:00.000Z', blocks: [{ id: 'b1', type: 'spacer', lang: u.searchParams.get('lang') }] });
     if (u.pathname === '/internal/catalog/poojas') return json(200, { poojas: [{ slug: 'p1' }], q: u.searchParams.get('q') });
     if (u.pathname === '/internal/catalog/poojas/nope') return json(404, { error: 'Pooja not found.', code: 'not_found' });
     if (u.pathname === '/internal/catalog/poojas/p1') return json(200, { pooja: { slug: 'p1', rating: null } });
@@ -172,6 +173,53 @@ describe('GET /api/content is assembled here', () => {
     catMode = 'badtoken';
     const r = await call('GET', '/api/content?other=1');
     assert.equal(r.status, 503);
+  });
+});
+
+describe('GET /api/home (the server-driven Home layout)', () => {
+  test('public, no auth: passes lang (en|hi only) to catalog as mobile-bff and returns the body with ETag + Cache-Control', async () => {
+    const r = await call('GET', '/api/home?lang=hi');
+    assert.equal(r.status, 200);
+    assert.deepEqual([r.body.version, r.body.blocks[0].lang], [4, 'hi']);
+    assert.equal(r.headers.get('cache-control'), 'public, max-age=60');
+    assert.match(r.headers.get('etag'), /^W\/"[0-9a-f]{20}"$/);
+    assert.deepEqual([catCalls.at(-1).path, catCalls.at(-1).query, catCalls.at(-1).claims.iss], ['/internal/catalog/public/home', { lang: 'hi' }, 'mobile-bff']);
+    assert.equal((await call('GET', '/api/home?lang=<script>')).body.blocks[0].lang, null);
+    assert.deepEqual(catCalls.at(-1).query, {}, 'an unknown lang is dropped, not forwarded');
+    assert.equal((await call('GET', '/api/home', { token: 'junk' })).status, 200, 'a bad bearer token on a public route changes nothing');
+  });
+
+  test('If-None-Match: 304 with the ETag and no body, also with Cache-Control: no-cache (a reload); a stale tag gets the body', async () => {
+    const first = await call('GET', '/api/home?lang=en');
+    const etag = first.headers.get('etag');
+    for (const inm of [etag, `"x", ${etag}`, '*']) {
+      const r = await call('GET', '/api/home?lang=en', { headers: { 'if-none-match': inm } });
+      assert.equal(r.status, 304, inm);
+      assert.equal(r.text, '');
+      assert.equal(r.headers.get('etag'), etag);
+    }
+    assert.equal((await call('GET', '/api/home?lang=en', { headers: { 'if-none-match': 'W/"stale"' } })).status, 200);
+    assert.notEqual((await call('GET', '/api/home?lang=hi')).headers.get('etag'), etag, 'the body differs per language, so does the tag');
+  });
+
+  test('catalog down: the last good layout for THAT language, flagged, ETag intact, for up to an hour; else 503 catalog_unavailable', async () => {
+    const good = await call('GET', '/api/home?lang=en');
+    catMode = 'down';
+    const stale = await call('GET', '/api/home?lang=en');
+    assert.equal(stale.status, 200);
+    assert.equal(stale.headers.get('x-degraded'), 'catalog');
+    assert.equal(stale.text, good.text);
+    assert.equal(stale.headers.get('etag'), good.headers.get('etag'));
+    assert.equal((await call('GET', '/api/home?lang=en', { headers: { 'if-none-match': good.headers.get('etag') } })).status, 304);
+    assert.deepEqual([(await call('GET', '/api/home?lang=hi')).status], [503], 'never served for hi before');
+    clock += HOME_STALE_MS + 1;
+    const gone = await call('GET', '/api/home?lang=en');
+    assert.deepEqual([gone.status, gone.body.code], [503, 'catalog_unavailable']);
+  });
+
+  test('our own bad service token is a degraded 503, never the catalog 401 shown to the app', async () => {
+    catMode = 'badtoken';
+    assert.equal((await call('GET', '/api/home?lang=fr')).status, 503);
   });
 });
 

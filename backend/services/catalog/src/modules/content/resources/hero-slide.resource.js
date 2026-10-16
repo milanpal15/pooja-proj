@@ -18,14 +18,15 @@ function cleanTarget(t) {
   const type = t.type;
   if (!TARGET_TYPES.includes(type)) throw new HttpError(400, 'bad_target', `target.type must be one of ${TARGET_TYPES.join(', ')}.`);
   const ref = typeof t.ref === 'string' ? t.ref.trim() : '';
-  if (['pooja', 'chadhava', 'temple', 'link'].includes(type) && !ref) {
+  if (['pooja', 'chadhava', 'temple', 'event', 'route', 'link'].includes(type) && !ref) {
     throw new HttpError(400, 'bad_target', `A ${type} target needs a ref.`);
   }
   if (type === 'link' && !heroHref({ type, ref })) throw new HttpError(400, 'bad_target', 'A link target must be an https URL.');
-  if (['pooja', 'chadhava', 'temple'].includes(type) && !/^[a-z0-9][a-z0-9_-]*$/i.test(ref)) {
+  if (type === 'route' && !heroHref({ type, ref })) throw new HttpError(400, 'bad_target', 'A route target must be an in-app path starting with /.');
+  if (['pooja', 'chadhava', 'temple', 'event', 'live'].includes(type) && ref && !/^[a-z0-9][a-z0-9_-]*$/i.test(ref)) {
     throw new HttpError(400, 'bad_target', `A ${type} ref must be a slug.`);
   }
-  return { type, ref: ['pooja', 'chadhava', 'temple', 'link'].includes(type) ? ref : '' };
+  return { type, ref: ['pooja', 'chadhava', 'temple', 'event', 'live', 'route', 'link'].includes(type) ? ref : '' };
 }
 
 /**

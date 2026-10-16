@@ -73,6 +73,8 @@ before(async () => {
     if (catMode === 'down') return req.socket.destroy();
     if (catMode === 'badtoken') return json(401, { error: 'bad', code: 'bad_signature' });
     if (u.pathname === '/internal/catalog/public/content') return json(200, { deities: [], temples: [], aartis: [], festivals: [], sevas: [], knowledge: [], faqs: [], hero: [], home: { sections: [] }, reminders: [], tones: [], wallpaperStyles: [] });
+    if (u.pathname === '/internal/catalog/admin/home-layout/draft' && catMode === 'badlayout') return json(400, { error: 'The layout has errors.', code: 'bad_layout', fields: { 'blocks.3.data.source': 'Not a known source.' } });
+    if (u.pathname === '/internal/catalog/public/home') return json(200, { version: 1, schemaVersion: 1, publishedAt: '2026-01-01T00:00:00.000Z', blocks: [] });
     if (u.pathname === '/internal/catalog/content/upload' && req.method === 'POST') return json(200, { url: '/uploads/6acf0a7fce86d1f7b8489916.png', bytes: body.length });
     if (u.pathname === '/internal/catalog/content/deities' && req.method === 'POST' && catMode === 'invalid') return json(400, { error: 'Could not save that.' });
     if (u.pathname === '/internal/catalog/admin/poojas' && req.method === 'POST' && catMode === 'invalid') return json(400, { error: 'Slug must be lowercase', code: 'bad_pooja' });
@@ -222,6 +224,59 @@ describe('forwarding', () => {
     assert.equal(r.body.code, 'upstream_unavailable');
     catMode = 'ok';
     clock += 20_000; // let the client's circuit breaker cool
+  });
+});
+
+describe('Home layout v2 routes', () => {
+  const HL = '/api/admin/home-layout';
+  test('the table has the eight routes of docs/HOME_LAYOUT.md section 4, all area content', () => {
+    const mine = CATALOG_ADMIN_ROUTES.filter((r) => r.path.startsWith('/admin/home-layout')).map((r) => `${r.method} ${r.path}`).sort();
+    assert.deepEqual(mine, ['GET /admin/home-layout', 'GET /admin/home-layout/registry', 'GET /admin/home-layout/versions/:n', 'POST /admin/home-layout/publish', 'POST /admin/home-layout/reset-default', 'POST /admin/home-layout/rollback', 'POST /admin/home-layout/validate', 'PUT /admin/home-layout/draft']);
+    for (const r of CATALOG_ADMIN_ROUTES.filter((x) => x.path.startsWith('/admin/home-layout'))) assert.equal(areaFor(r.method, r.sample ?? r.path).area, 'content');
+  });
+
+  test('viewer reads (including the registry), cannot write; editor and admin write; a stranger is 401', async () => {
+    for (const p of ['', '/registry', '/versions/1']) {
+      assert.equal((await call('GET', `${HL}${p}`, { headers: await as('viewer') })).status, 200, p);
+      assert.equal((await call('GET', `${HL}${p}`)).status, 401, p);
+    }
+    const w = [['PUT', '/draft', { schemaVersion: 1, blocks: [] }], ['POST', '/validate', { schemaVersion: 1, blocks: [] }], ['POST', '/publish', { note: 'n' }], ['POST', '/rollback', { version: 1 }], ['POST', '/reset-default', {}]];
+    for (const [m, p, body] of w) {
+      catCalls = [];
+      const v = await call(m, `${HL}${p}`, { headers: await as('viewer'), body });
+      assert.deepEqual([v.status, v.body.needs], [403, 'content:edit'], `viewer ${m} ${p}`);
+      assert.equal(catCalls.length, 0);
+      assert.equal((await call(m, `${HL}${p}`, { headers: await as('editor'), body })).status, 200, `editor ${m} ${p}`);
+      assert.equal((await call(m, `${HL}${p}`, { headers: await as('admin'), body })).status, 200, `admin ${m} ${p}`);
+      assert.equal((await call(m, `${HL}${p}`, { body })).status, 401);
+    }
+  });
+
+  test('a large layout (300 KB) passes through intact, the signed token names the operator, and catalog\'s 400 bad_layout fields are relayed', async () => {
+    const blocks = Array.from({ length: 60 }, (_, i) => ({ id: `b${i}`, type: 'html', props: { html: 'x'.repeat(5000) } }));
+    const r = await call('PUT', `${HL}/draft`, { headers: await as('editor'), body: { schemaVersion: 1, blocks } });
+    assert.equal(r.status, 200);
+    assert.equal(catCalls[0].body.blocks.length, 60);
+    assert.equal(catCalls[0].path, '/internal/catalog/admin/home-layout/draft');
+    assert.deepEqual([catCalls[0].claims.iss, catCalls[0].claims.ctx.username], ['admin-bff', 'ed']);
+    catMode = 'badlayout';
+    const bad = await call('PUT', `${HL}/draft`, { headers: await as('editor'), body: { schemaVersion: 1, blocks: [] } });
+    assert.deepEqual([bad.status, bad.body.code, bad.body.fields], [400, 'bad_layout', { 'blocks.3.data.source': 'Not a known source.' }]);
+    assert.equal((await call('GET', `${HL}/versions/3`, { headers: await as('admin') })).body.path, '/internal/catalog/admin/home-layout/versions/3');
+  });
+
+  test('writes are audited (area content, no body); reads are not; GET /api/home is also served here without a session', async () => {
+    audits.length = 0;
+    await call('POST', `${HL}/publish`, { headers: await as('editor'), body: { note: 'secret note' } });
+    await call('PUT', `${HL}/draft`, { headers: await as('editor'), body: { schemaVersion: 1, blocks: [] } });
+    await call('GET', HL, { headers: await as('editor') });
+    await call('POST', `${HL}/publish`, { headers: await as('viewer'), body: {} });
+    await settle();
+    assert.deepEqual(audits.map((a) => [a.body.operator, a.body.area, a.body.method, a.body.path, a.body.status]), [
+      ['ed', 'content', 'POST', `${HL}/publish`, 200], ['ed', 'content', 'PUT', `${HL}/draft`, 200],
+    ]);
+    assert.equal(JSON.stringify(audits).includes('secret note'), false);
+    assert.equal((await call('GET', '/api/home?lang=en')).status, 200);
   });
 });
 

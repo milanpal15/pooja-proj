@@ -33,6 +33,16 @@ export const CATALOG_ADMIN_ROUTES = [
 
   ...crud('/admin/home-sections', { before: [order('/admin/home-sections')] }),
 
+  // Home layout v2 (docs/HOME_LAYOUT.md section 4): draft -> publish. Bodies may be large (60 blocks), hence `bodyLimit`.
+  { method: 'GET', path: '/admin/home-layout', to: '/admin/home-layout', area: 'content' },
+  { method: 'GET', path: '/admin/home-layout/registry', to: '/admin/home-layout/registry', area: 'content' },
+  { method: 'PUT', path: '/admin/home-layout/draft', to: '/admin/home-layout/draft', area: 'content', bodyLimit: '1mb' },
+  { method: 'POST', path: '/admin/home-layout/validate', to: '/admin/home-layout/validate', area: 'content', bodyLimit: '1mb' },
+  { method: 'POST', path: '/admin/home-layout/publish', to: '/admin/home-layout/publish', area: 'content' },
+  { method: 'POST', path: '/admin/home-layout/rollback', to: '/admin/home-layout/rollback', area: 'content' },
+  { method: 'POST', path: '/admin/home-layout/reset-default', to: '/admin/home-layout/reset-default', area: 'content' },
+  { method: 'GET', path: '/admin/home-layout/versions/:n', to: '/admin/home-layout/versions/:n', area: 'content', sample: '/admin/home-layout/versions/1' },
+
   { method: 'GET', path: '/admin/poojas', to: '/admin/poojas', area: 'content' },
   { method: 'POST', path: '/admin/poojas', to: '/admin/poojas', area: 'content', successStatus: 201 },
   { method: 'POST', path: '/admin/poojas/import-sevas', to: '/admin/poojas/import-sevas', area: 'content' },

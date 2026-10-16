@@ -22,7 +22,8 @@ export { SESSION_TTL_MS, createSessionResolver } from './operator/operator-sessi
 export { targetOf } from './operator/audit.js';
 export { AREAS, ROLES, ROLE_PERMISSIONS, can, hasPermission, permissionsFor } from './operator/access/permissions.js';
 export { ROUTE_AREAS, areaFor } from './operator/access/routes.js';
-export { CATALOG_NS, CONTENT_STALE_MS, createCatalogMount } from './catalog-mount.js';
+export { etagMatches, jsonEtag } from './etag.js';
+export { CATALOG_NS, CONTENT_STALE_MS, HOME_STALE_MS, createCatalogMount } from './catalog-mount.js';
 export { CATALOG_ADMIN_ROUTES, CATALOG_PUBLIC_GETS, CONTENT_RESOURCES } from './catalog-routes.js';
 export { CONTENT_KEYS, FALLBACK_SETTINGS, assembleContent, createEngagementReaders } from './catalog-content.js';
 export { createOperatorGate } from './operator/engagement-routes.js';
@@ -32,3 +33,5 @@ export { ORDERS_NS, REVIEWS_STALE_MS, createOrdersMount } from './orders-mount.j
 export { ORDERS_ADMIN_ROUTES, ORDERS_DEVOTEE_ROUTES, ORDERS_GONE, ORDERS_PUBLIC_GETS } from './orders-routes.js';
 export { CALLS_NS, createCallsMount } from './calls-mount.js';
 export { CALLS_ADMIN_ROUTES, CALLS_DEVOTEE_ROUTES, CALLS_PUBLIC_GETS } from './calls-routes.js';
+export { EVENTS_NS, EVENTS_STALE_MS, createEventsMount } from './events-mount.js';
+export { EVENTS_ADMIN_ROUTES, EVENTS_DEVOTEE_ROUTES, EVENTS_PUBLIC_GETS } from './events-routes.js';

@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 
-import { rejectFcmRegistration, createCallsMount, createCatalogMount, createEngagementMount, createGatewayApp, createIdentityAdminMount, createLogger, createOrdersMount, createWalletMount } from '@bhakti/common';
+import { rejectFcmRegistration, createCallsMount, createCatalogMount, createEngagementMount, createEventsMount, createGatewayApp, createIdentityAdminMount, createLogger, createOrdersMount, createWalletMount } from '@bhakti/common';
 
 /**
  * Dashboard gateway. Everything is streamed to the monolith, except:
@@ -16,6 +16,8 @@ import { rejectFcmRegistration, createCallsMount, createCatalogMount, createEnga
  *     and the public review list is served from it (packages/common/src/orders-mount.js).
  *   - CALLS_URL set (phase 6): the operator astrologers / calls / payouts screens (CRUD, suspend, force end, goodwill refund, record a payout) sit behind the same area
  *     gate and audit, and the public astrologer list is served from it (packages/common/src/calls-mount.js).
+ *   - EVENTS_URL set: the operator events / event-types / event-badges screens (CRUD, task kinds, stats) sit behind the same area gate (area `events`) and audit
+ *     (packages/common/src/events-mount.js).
  * Explicit lists, fail-closed: a path that is neither public nor allowed by the area gate is refused here.
  */
 export function createApp(config, { logger = createLogger('admin-bff'), fetchImpl, now } = {}) {
@@ -53,7 +55,12 @@ export function createApp(config, { logger = createLogger('admin-bff'), fetchImp
     fetchImpl,
     ...(identity ? { operator: { sessions: identity.sessions, audit: identity.audit } } : {}),
   });
-  const mounts = [engagement, identity, catalog, wallet, orders, calls].filter(Boolean);
+  const events = createEventsMount('admin-bff', config, {
+    logger,
+    fetchImpl,
+    ...(identity ? { operator: { sessions: identity.sessions, audit: identity.audit } } : {}),
+  });
+  const mounts = [engagement, identity, catalog, wallet, orders, calls, events].filter(Boolean);
   return createGatewayApp('admin-bff', config, {
     logger,
     softDeps: Object.assign({}, ...mounts.map((m) => m.softDeps)),
@@ -65,6 +72,7 @@ export function createApp(config, { logger = createLogger('admin-bff'), fetchImp
           wallet?.mount(app); // wallet, coin packs, billing rules ... behind the area gate
           orders?.mount(app); // bookings, reviews, chadhava orders ... behind the area gate; the public review list
           calls?.mount(app); // astrologers, calls, payouts ... behind the area gate; the public astrologer list
+          events?.mount(app); // events, event types, badges ... behind the area gate (area `events`)
           if (identity) {
             identity.mount(app); // /api/admin/login|logout|session
             identity.mountIdentityRoutes(app);

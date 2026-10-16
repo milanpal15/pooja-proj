@@ -21,6 +21,7 @@ import { assembleContent, createEngagementReaders } from './catalog-content.js';
 import { CATALOG_ADMIN_ROUTES, CATALOG_PUBLIC_GETS } from './catalog-routes.js';
 import { createServiceClient } from './client.js';
 import { ServiceError } from './errors.js';
+import { etagMatches, jsonEtag } from './etag.js';
 import { signServiceToken } from './jwt.js';
 import { createAuditor } from './operator/audit.js';
 import { createOperatorGate, engagementAdminRouter } from './operator/engagement-routes.js';
@@ -29,6 +30,9 @@ import { createProxy, probeUpstream } from './proxy.js';
 
 export const CATALOG_NS = '/internal/catalog';
 export const CONTENT_STALE_MS = 60 * 60_000;
+/** A last good Home layout may be served this long if catalog is down (the app also keeps its own cache + a bundled default). */
+export const HOME_STALE_MS = 60 * 60_000;
+
 const CACHE_MAX = 300;
 const UNAVAILABLE = { error: 'catalog_unavailable', code: 'catalog_unavailable' };
 
@@ -96,6 +100,34 @@ export function createCatalogMount(iss, config, { logger, fetchImpl, operator, d
       } catch (e) {
         if (usable(e)) return res.status(e.status).json(e.body);
         degrade(res, key, CONTENT_STALE_MS, e, 'content');
+      }
+    });
+
+    /* GET /api/home?lang=en|hi - the server-driven Home layout (docs/HOME_LAYOUT.md section 4). Public, no auth. ETag + 304 are done HERE
+       over the body (304 when If-None-Match matches), so they hold on a stale-while-error answer too. */
+    router.get('/api/home', async (req, res) => {
+      const lang = req.query.lang === 'en' || req.query.lang === 'hi' ? req.query.lang : undefined;
+      const key = `/api/home?lang=${lang ?? ''}`;
+      const send = (body) => {
+        const etag = jsonEtag(body);
+        res.set('ETag', etag);
+        res.set('Cache-Control', 'public, max-age=60');
+        if (etagMatches(req.headers['if-none-match'], etag)) return res.status(304).end();
+        res.json(body);
+      };
+      try {
+        const body = await client.get(`${CATALOG_NS}/public/home`, { reqId: req.id, query: lang ? { lang } : undefined });
+        remember(key, body);
+        send(body);
+      } catch (e) {
+        if (usable(e)) return res.status(e.status).json(e.body);
+        logger?.warn(`catalog home degraded: ${e?.code || e?.message}`);
+        const hit = lastGood.get(key);
+        if (hit && now() - hit.at < HOME_STALE_MS) {
+          res.setHeader('x-degraded', 'catalog');
+          return send(hit.body);
+        }
+        res.status(503).json(UNAVAILABLE);
       }
     });
 

@@ -10,6 +10,7 @@ COPY services/catalog/package.json services/catalog/
 COPY services/wallet/package.json services/wallet/
 COPY services/orders/package.json services/orders/
 COPY services/calls/package.json services/calls/
+COPY services/events/package.json services/events/
 COPY bff/mobile/package.json bff/mobile/
 COPY bff/admin/package.json bff/admin/
 RUN npm ci --omit=dev --ignore-scripts

@@ -9,7 +9,7 @@
 #   BASE=http://127.0.0.1:4310 ADMIN_PASSWORD=ci-only-password node ../pooja-api/scripts/smoke.mjs
 #   tools/stack.sh status | stop
 #
-# Ports (BASE_PORT + n): engagement 2, identity 3, catalog 4, wallet 5, orders 6, calls 7, monolith 8, mobile-bff 10, admin-bff 11.
+# Ports (BASE_PORT + n): engagement 2, identity 3, catalog 4, wallet 5, orders 6, calls 7, monolith 8, events 9, mobile-bff 10, admin-bff 11.
 # STACK_DIR (default /tmp/bhakti-stack) holds the logs and pids. NODE_ENV is development unless STACK_NODE_ENV=production
 # (then the mock payment/audio providers are refused, exactly as on Render, and the BFFs get the production cookie/CORS shape).
 # FIREBASE_SERVICE_ACCOUNT_PATH=/path/key.json gives the identity service the Firebase Admin key (real push delivery, account block/delete); without it
@@ -33,7 +33,7 @@ ADMIN_SESSION_SECRET="${ADMIN_SESSION_SECRET:-ci-session-secret-0123456789abcdef
 FIREBASE_PROJECT_ID="${FIREBASE_PROJECT_ID:-ci-no-such-project}"
 
 p() { echo $((BASE_PORT + $1)); }
-ENG=$(p 2); IDN=$(p 3); CAT=$(p 4); WAL=$(p 5); ORD=$(p 6); CAL=$(p 7); MON=$(p 8); MOB=$(p 10); ADM=$(p 11)
+ENG=$(p 2); IDN=$(p 3); CAT=$(p 4); WAL=$(p 5); ORD=$(p 6); CAL=$(p 7); MON=$(p 8); EVT=$(p 9); MOB=$(p 10); ADM=$(p 11)
 fu() { echo "http://127.0.0.1:$1"; }                                   # a full URL (health probes; the monolith, which does not add a scheme)
 u() { if [ -n "${BARE_URLS:-}" ]; then echo "127.0.0.1:$1"; else fu "$1"; fi; }   # BARE_URLS=1: hand services a bare host:port, as Render's fromService does
 
@@ -68,6 +68,7 @@ cmd_start() {
   start catalog    "$BACKEND" services/catalog/src/server.js     PORT="$CAT" MONGODB_URI="$MONGO_BASE" DB_NAME="${DB_PREFIX}catalog" ENGAGEMENT_URL="$(u "$ENG")" ORDERS_URL="$(u "$ORD")" LIVE_PROBE=0
   start wallet     "$BACKEND" services/wallet/src/server.js      PORT="$WAL" MONGODB_URI="$MONGO_BASE" DB_NAME="${DB_PREFIX}wallet" ENGAGEMENT_URL="$(u "$ENG")" IDENTITY_URL="$(u "$IDN")" ADMIN_SESSION_SECRET="$ADMIN_SESSION_SECRET"
   start orders     "$BACKEND" services/orders/src/server.js      PORT="$ORD" MONGODB_URI="$MONGO_BASE" DB_NAME="${DB_PREFIX}orders" WALLET_URL="$(u "$WAL")" CATALOG_URL="$(u "$CAT")" IDENTITY_URL="$(u "$IDN")" ENGAGEMENT_URL="$(u "$ENG")" ADMIN_SESSION_SECRET="$ADMIN_SESSION_SECRET"
+  start events     "$BACKEND" services/events/src/server.js      PORT="$EVT" MONGODB_URI="$MONGO_BASE" DB_NAME="${DB_PREFIX}events" CATALOG_URL="$(u "$CAT")" WALLET_URL="$(u "$WAL")" IDENTITY_URL="$(u "$IDN")" ADMIN_SESSION_SECRET="$ADMIN_SESSION_SECRET"
   start calls      "$BACKEND" services/calls/src/server.js       PORT="$CAL" MONGODB_URI="$MONGO_BASE" DB_NAME="${DB_PREFIX}calls" WALLET_URL="$(u "$WAL")" IDENTITY_URL="$(u "$IDN")" ENGAGEMENT_URL="$(u "$ENG")" ADMIN_SESSION_SECRET="$ADMIN_SESSION_SECRET"
 
   local base="$MONGO_BASE"
@@ -75,13 +76,13 @@ cmd_start() {
   start monolith "$MONO" src/index.js PORT="$MON" MONGODB_URI="${base%/}/${DB_PREFIX}bhakti_shell" ADMIN_PASSWORD="$ADMIN_PASSWORD" ADMIN_SESSION_SECRET="$ADMIN_SESSION_SECRET" \
       PAYMENTS_PROVIDER=mock RTC_PROVIDER=mock \
       ENGAGEMENT_URL="$(fu "$ENG")" IDENTITY_URL="$(fu "$IDN")" CATALOG_URL="$(fu "$CAT")" WALLET_URL="$(fu "$WAL")" ORDERS_URL="$(fu "$ORD")" CALLS_URL="$(fu "$CAL")"
-  local bffenv=(MONOLITH_URL="$(u "$MON")" ENGAGEMENT_URL="$(u "$ENG")" IDENTITY_URL="$(u "$IDN")" CATALOG_URL="$(u "$CAT")" WALLET_URL="$(u "$WAL")" ORDERS_URL="$(u "$ORD")" CALLS_URL="$(u "$CAL")" ADMIN_SESSION_SECRET="$ADMIN_SESSION_SECRET")
+  local bffenv=(MONOLITH_URL="$(u "$MON")" ENGAGEMENT_URL="$(u "$ENG")" IDENTITY_URL="$(u "$IDN")" CATALOG_URL="$(u "$CAT")" WALLET_URL="$(u "$WAL")" ORDERS_URL="$(u "$ORD")" CALLS_URL="$(u "$CAL")" EVENTS_URL="$(u "$EVT")" ADMIN_SESSION_SECRET="$ADMIN_SESSION_SECRET")
   start mobile-bff "$BACKEND" bff/mobile/src/server.js PORT="$MOB" FIREBASE_PROJECT_ID="$FIREBASE_PROJECT_ID" ${prod[@]+"${prod[@]}"} "${bffenv[@]}"
   start admin-bff  "$BACKEND" bff/admin/src/server.js  PORT="$ADM" SESSION_SAMESITE="$([ "$STACK_NODE_ENV" = production ] && echo None || echo Strict)" ${prod[@]+"${prod[@]}"} "${bffenv[@]}"
 
   echo "waiting for the stack (logs in $STACK_DIR):"
   local rc=0
-  for pair in "engagement $(fu "$ENG")/health" "identity $(fu "$IDN")/health" "catalog $(fu "$CAT")/health" "wallet $(fu "$WAL")/health" "orders $(fu "$ORD")/health" "calls $(fu "$CAL")/health" \
+  for pair in "engagement $(fu "$ENG")/health" "identity $(fu "$IDN")/health" "catalog $(fu "$CAT")/health" "wallet $(fu "$WAL")/health" "orders $(fu "$ORD")/health" "calls $(fu "$CAL")/health" "events $(fu "$EVT")/health" \
               "monolith $(fu "$MON")/api/health" "mobile-bff $(fu "$MOB")/api/health" "admin-bff $(fu "$ADM")/api/health"; do
     wait_ok ${pair% *} ${pair#* } || rc=1
   done
@@ -89,7 +90,7 @@ cmd_start() {
 }
 
 cmd_status() {
-  for pair in "engagement $(fu "$ENG")/health" "identity $(fu "$IDN")/health" "catalog $(fu "$CAT")/health" "wallet $(fu "$WAL")/health" "orders $(fu "$ORD")/health" "calls $(fu "$CAL")/health" \
+  for pair in "engagement $(fu "$ENG")/health" "identity $(fu "$IDN")/health" "catalog $(fu "$CAT")/health" "wallet $(fu "$WAL")/health" "orders $(fu "$ORD")/health" "calls $(fu "$CAL")/health" "events $(fu "$EVT")/health" \
               "monolith $(fu "$MON")/api/health" "mobile-bff $(fu "$MOB")/api/health" "admin-bff $(fu "$ADM")/api/health"; do
     echo "  ${pair% *}: $(curl -s -o /dev/null -w '%{http_code}' --max-time 3 "${pair#* }" 2>/dev/null || echo down)"
   done

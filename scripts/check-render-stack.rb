@@ -13,9 +13,9 @@ file = ARGV[0] || 'backend/render.yaml'
 y = YAML.load_file(file)
 services = y['services']
 by_name = services.to_h { |s| [s['name'], s] }
-check.(services.size == 8, "expected 8 services, found #{services.size}")
+check.(services.size == 9, "expected 9 services, found #{services.size}")
 
-private_svcs = %w[engagement identity catalog wallet orders calls]
+private_svcs = %w[engagement identity catalog wallet orders calls events]
 bffs = { 'mobile' => 'bhakti-mobile-bff', 'admin' => 'bhakti-admin-bff' }
 dirs = private_svcs.to_h { |n| ["bhakti-#{n}", "services/#{n}"] }.merge('bhakti-mobile-bff' => 'bff/mobile', 'bhakti-admin-bff' => 'bff/admin')
 
@@ -72,9 +72,10 @@ need = {
   'bhakti-wallet' => %w[ENGAGEMENT_URL IDENTITY_URL],
   'bhakti-orders' => %w[WALLET_URL CATALOG_URL IDENTITY_URL ENGAGEMENT_URL],
   'bhakti-calls' => %w[WALLET_URL IDENTITY_URL ENGAGEMENT_URL],
+  'bhakti-events' => %w[CATALOG_URL WALLET_URL IDENTITY_URL],
   'bhakti-identity' => %w[CALLS_URL],
-  'bhakti-mobile-bff' => %w[MONOLITH_URL ENGAGEMENT_URL IDENTITY_URL CATALOG_URL WALLET_URL ORDERS_URL CALLS_URL FIREBASE_PROJECT_ID],
-  'bhakti-admin-bff' => %w[MONOLITH_URL ENGAGEMENT_URL IDENTITY_URL CATALOG_URL WALLET_URL ORDERS_URL CALLS_URL CORS_ORIGIN SESSION_SAMESITE],
+  'bhakti-mobile-bff' => %w[MONOLITH_URL ENGAGEMENT_URL IDENTITY_URL CATALOG_URL WALLET_URL ORDERS_URL CALLS_URL EVENTS_URL FIREBASE_PROJECT_ID],
+  'bhakti-admin-bff' => %w[MONOLITH_URL ENGAGEMENT_URL IDENTITY_URL CATALOG_URL WALLET_URL ORDERS_URL CALLS_URL EVENTS_URL CORS_ORIGIN SESSION_SAMESITE],
 }
 need.each do |name, ks|
   keys = (by_name[name] || {})['envVars'].to_a.map { |e| e['key'] }
@@ -89,7 +90,7 @@ if admin
   cors = e.find { |x| x['key'] == 'CORS_ORIGIN' }
   check.(cors && cors['value'] != '*', "admin BFF CORS_ORIGIN must not be '*'")
 end
-%w[bhakti-engagement bhakti-identity bhakti-catalog bhakti-wallet bhakti-orders bhakti-calls].each do |n|
+%w[bhakti-engagement bhakti-identity bhakti-catalog bhakti-wallet bhakti-orders bhakti-calls bhakti-events].each do |n|
   check.(by_name[n] && by_name[n]['type'] == 'pserv', "#{n} must be a private service")
 end
 

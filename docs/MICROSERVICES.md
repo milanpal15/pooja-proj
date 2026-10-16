@@ -213,6 +213,12 @@ unchanged.
      back to its bundle). The other app reads (`horoscope`, `panchang`, `live*`, `poojas*`, `chadhava/offerings|listings*`) get the same
      stale-while-error per request URL (60 min; **live: 2 min**, because "on air" goes stale fast). Engagement down: settings/announcement fall
      back to the documented defaults, as before.
+   - **Home layout v2** (docs/HOME_LAYOUT.md; built in catalog, no new service): collections `homelayoutdrafts` (one working copy) and
+     `homelayoutversions` (full documents, 50 kept). Public `GET /api/home?lang=` (mobile AND admin BFF; internal `GET /internal/catalog/public/home`):
+     ETag + 304 computed over the body (`jsonEtag` in `@bhakti/common`), `Cache-Control: public, max-age=60`; catalog down = the last good
+     layout for that language with `x-degraded: catalog` for up to 60 min, else 503 `catalog_unavailable` (the app then uses its cache / bundled default).
+     Operator routes `/api/admin/home-layout*` (area `content`: editor writes, viewer reads; audited; `bodyLimit 1mb`). The registry
+     (`modules/home/registry.js`) drives both validation and `GET /api/admin/home-layout/registry`. `/api/content` `home.sections` is unchanged.
    - **Media**: `/uploads/<id>.<ext>` is streamed by both BFFs from `GET /internal/catalog/media/:file` (Range 206/416, ETag/304, `immutable`,
      `nosniff`, `Content-Security-Policy: sandbox`, type from the extension - the monolith's code, verified byte for byte including 100-199 and
      suffix ranges); catalog down = `503 catalog_unavailable`. Uploads: the admin BFF gates (area `content`), audits and **streams** the multipart
@@ -473,3 +479,25 @@ calls  ──GET push/reachable?uid=──► identity          (is there a phon
   going Offline first, they stay listed (up to 4 h) with no phone to ring until the next heartbeat re-reads the registry - the app should go Offline before sign-out.
 * **Verified**: with a fake FCM sender (identity, calls, orders and both BFFs under test; an end-to-end run on a throwaway stack). **Not verified**: real FCM delivery to a real phone.
 
+
+## 11. The events service (docs/EVENTS.md)
+
+A seventh private service, `backend/services/events` (db `events`, local port **4090**, Render `bhakti-events`, `pserv`). Phase 1 owns event types,
+events (blocks, milestones, the task-kind registry) and badges. **Phase 2** adds free registration (atomic capacity, pass codes, custom fields), the completion engine for
+`self_mark` and `counter` tasks (milestone / event results written exactly once), coin rewards through the wallet with a retry sweeper, badges, the devotee's own
+sections / `me` / `my events` / `my badges`, and real stats + a masked participants list. Signal kinds, check-in, photos and paid joining are later phases (docs/EVENTS.md section 8).
+
+* **Edges.** `mobile-bff` serves `GET /api/events` and `GET /api/events/:slug` (published events, Firebase-optional, stale-while-error 10 min for anonymous reads only) and, behind its Firebase
+  edge (401 without a token; the verified uid is forwarded as the signed `sub`), `POST /api/events/:slug/join`, `POST /api/events/:slug/leave`,
+  `POST /api/events/:slug/milestones/:mKey/tasks/:tKey/progress`, `GET /api/me/events`, `GET /api/me/badges` (events' status and body relayed unchanged; unreachable = `503 events_unavailable`);
+  `admin-bff` serves `/api/admin/events*` (incl. `:id/stats`, `:id/participants`), `/api/admin/event-types*`, `/api/admin/event-badges*` behind the `events` area (admin + editor edit, viewer views; writes audited). Both through
+  `createEventsMount` in `@bhakti/common` (`EVENTS_URL` on each BFF; unset = not served). `pooja-api` has no events and never will.
+* **Callers.** `ALLOWED_ISSUERS=mobile-bff,admin-bff,catalog,orders,identity,wallet`. `/public/*` is for either BFF (the personal routes need the mobile BFF's `sub`), `/admin/*` for admin-bff only; everything else (signals, phase 3) is refused until it exists.
+* **Calls out.** catalog (reads only: `GET /live/:slug`, `/chadhava/listings/:slug`, `/poojas/:slug`, `/public/content`; publishing fails closed with `503 catalog_unavailable`, drafts still save),
+  **wallet** (`WALLET_URL`; ONE call, `POST /internal/wallet/credit` as issuer `events`: type `bonus`, key `event-ms:<slug>:<mKey>:<uid>[:<i>]` / `event-done:<slug>:<uid>[:<i>]`; the wallet refuses this caller
+  anything else - other keys, other types, debit, refund, balance, reconcile - see `services/wallet/src/lib/perms.js` + `ledger.routes.js`, so **the wallet's `ALLOWED_ISSUERS` must include `events`**, which its default does) and
+  **identity** (`IDENTITY_URL`; `POST /internal/identity/directory/lookup` for names in the participants list, asked ONLY for an operator holding `devotees:view`; identity's directory allows `events` that one route). Wallet unset or down:
+  completions still count, the coins stay `pending` on the result row and the sweeper (`SWEEP_EVERY_MS`, default 15 s, backing off per credit) retries with the SAME key until the wallet confirms.
+  `ADMIN_SESSION_SECRET` (the same value as the admin BFF / wallet / orders / calls) derives the `Devotee ••4821` pseudonyms.
+* **Roll out.** Deploy `bhakti-events` (secret `RENDER_DEPLOY_HOOK_EVENTS` is optional in CI), then set `EVENTS_URL` on both BFFs (the Blueprint wires it). Add `events` to catalog's `ALLOWED_ISSUERS` if you override it.
+* `tools/stack.sh` (port offset 9; it now also passes `WALLET_URL`, `IDENTITY_URL`, `ADMIN_SESSION_SECRET`), `tools/dev-all.mjs` (`USE_EVENTS=0` skips it) and `docker-compose.yml` start it. When rolling out phase 2, deploy wallet and identity (their `ALLOWED_ISSUERS` gain `events`) BEFORE events, or set `WALLET_URL` later: rewards just wait.

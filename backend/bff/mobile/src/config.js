@@ -2,8 +2,8 @@ import { loadEnv, serviceUrl } from '@bhakti/common';
 
 /** The ONLY file in this project that reads process.env. `.env` is loaded by server.js (dotenv). */
 const withChecks = (c) => {
-  if ((c.engagementUrl || c.identityUrl || c.catalogUrl || c.walletUrl || c.ordersUrl || c.callsUrl) && c.internalJwtSecret.length < 16) {
-    throw new Error('ENGAGEMENT_URL / IDENTITY_URL / CATALOG_URL / WALLET_URL / ORDERS_URL / CALLS_URL is set, so INTERNAL_JWT_SECRET (at least 16 characters) is required.');
+  if ((c.engagementUrl || c.identityUrl || c.catalogUrl || c.walletUrl || c.ordersUrl || c.callsUrl || c.eventsUrl) && c.internalJwtSecret.length < 16) {
+    throw new Error('ENGAGEMENT_URL / IDENTITY_URL / CATALOG_URL / WALLET_URL / ORDERS_URL / CALLS_URL / EVENTS_URL is set, so INTERNAL_JWT_SECRET (at least 16 characters) is required.');
   }
   // GET /api/content is assembled here from the catalog bundle + engagement's settings and announcement.
   if (c.catalogUrl && !c.engagementUrl) throw new Error('CATALOG_URL is set, so ENGAGEMENT_URL is required too (settings and the announcement come from it).');
@@ -48,6 +48,9 @@ export const loadConfig = (env = process.env) => withChecks({
     callsUrl: { name: 'CALLS_URL', default: '', parse: serviceUrl },
     // How long placing / answering a call may take end to end: calls asks the settings and the wallet (5 s each) inside it.
     callsTimeoutMs: { name: 'CALLS_TIMEOUT_MS', default: 15000, parse: Number },
+    // Events: when set, `GET /api/events[/:slug]` (mobile) / the operator events, event-types and event-badges screens (admin) are served from the events service.
+    // UNSET = those paths fall through to the monolith (which has no events). Needs nothing else: a guest can read the list.
+    eventsUrl: { name: 'EVENTS_URL', default: '', parse: serviceUrl },
     // Verifying a Firebase ID token needs only the project id; a service-account key (same lookup order as pooja-api) also gives it.
     firebaseProjectId: { name: 'FIREBASE_PROJECT_ID', default: '' },
     firebaseServiceAccount: { name: 'FIREBASE_SERVICE_ACCOUNT', default: '' },

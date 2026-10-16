@@ -1,4 +1,4 @@
-# Blueprint: the microservices stack (6 domain services + 2 BFFs).  (The monolith has its own, in pooja-api/; the dashboard in pooja-admin/.)
+# Blueprint: the microservices stack (7 domain services + 2 BFFs).  (The monolith has its own, in pooja-api/; the dashboard in pooja-admin/.)
 #
 # Render looks for `render.yaml` at the REPO ROOT by default and this is not there. Set **Blueprint Path** to
 # `backend/render.yaml` when you create the Blueprint. `rootDir` below is relative to the REPO ROOT.
@@ -16,7 +16,7 @@
 # repo variable DEPLOY_MICROSERVICES is 'true'). See .github/workflows/ci.yml and docs/MICROSERVICES_CUTOVER.md.
 #
 # ── Who is reachable from the internet ────────────────────────────────────────────────────────────────────
-# Only the two BFFs (`type: web`). The six domain services are PRIVATE SERVICES (`type: pserv`): they get no public URL and
+# Only the two BFFs (`type: web`). The seven domain services are PRIVATE SERVICES (`type: pserv`): they get no public URL and
 # are reachable only from your other Render services in the same workspace AND region (keep every service, and the monolith,
 # in `singapore`). Private services have no free plan, hence `plan: starter` on every service below.
 #   * Want the free plan anyway? A free service must be `type: web` (publicly reachable). Then the ONLY control is the bearer
@@ -289,6 +289,50 @@ services:
       - key: AGORA_APP_CERTIFICATE
         sync: false
 
+  # ── bhakti-events ───────────────────────────────────────────────────────────────────────────────────────
+  # events: event types, events (blocks, milestones, task kinds), badges, registrations + progress (db `events`). Reads catalog to check that what an
+  # event refers to exists, credits coin rewards through the wallet (which must list `events` in its ALLOWED_ISSUERS - the default does), and asks identity
+  # for names only when the operator may see devotees.
+  # Optional: ALLOWED_ISSUERS, SERVICE_TIMEOUT_MS, SWEEP_EVERY_MS. docs/EVENTS.md
+  - type: pserv
+    name: bhakti-events
+    runtime: node
+    plan: starter
+    region: singapore
+    rootDir: backend
+    buildCommand: npm ci --omit=dev --ignore-scripts
+    startCommand: node services/events/src/server.js
+    autoDeploy: false
+    envVars:
+      - fromGroup: bhakti-shared
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 20.19.4
+      # The Atlas SERVER uri, no database name (the service picks its own, DB_NAME). e.g. mongodb+srv://USER:PASSWORD@CLUSTER.mongodb.net/?retryWrites=true&w=majority
+      - key: MONGODB_URI
+        sync: false
+      - key: DB_NAME
+        value: events
+      # Publishing is refused with 503 catalog_unavailable while this is unset or unreachable (fail closed).
+      - key: CATALOG_URL
+        fromService:
+          type: pserv
+          name: bhakti-catalog
+          property: hostport
+      # Coin rewards are credited here. Unreachable: a completion still counts and the credit is retried (same key) until the wallet confirms.
+      - key: WALLET_URL
+        fromService:
+          type: pserv
+          name: bhakti-wallet
+          property: hostport
+      # Names / phones in the participants list (admin only); everyone else sees pseudonyms and identity is not called.
+      - key: IDENTITY_URL
+        fromService:
+          type: pserv
+          name: bhakti-identity
+          property: hostport
+
   # ── bhakti-mobile-bff ───────────────────────────────────────────────────────────────────────────────────
   # mobile-bff: the phone app's only door (PUBLIC). Verifies Firebase tokens, asks identity "blocked?" per request, composes /api/content.
   # Razorpay's webhook URL: https://<this service's host>/api/webhooks/razorpay (streamed to the wallet byte for byte).
@@ -341,6 +385,11 @@ services:
         fromService:
           type: pserv
           name: bhakti-calls
+          property: hostport
+      - key: EVENTS_URL
+        fromService:
+          type: pserv
+          name: bhakti-events
           property: hostport
       # Verifying a Firebase ID token needs ONLY the project id (no secret). Must be the SAME project as poojaappclone/google-services.json.
       - key: FIREBASE_PROJECT_ID
@@ -401,6 +450,11 @@ services:
         fromService:
           type: pserv
           name: bhakti-calls
+          property: hostport
+      - key: EVENTS_URL
+        fromService:
+          type: pserv
+          name: bhakti-events
           property: hostport
       # The dashboard's exact URL (e.g. https://pooja-admin.onrender.com or the bare host). NEVER * - the session is a cookie.
       - key: CORS_ORIGIN
