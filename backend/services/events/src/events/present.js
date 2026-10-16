@@ -1,6 +1,7 @@
 /** Turns stored events into the shapes of docs/EVENTS.md (cards, details, admin rows). Pure: no database, no clock of its own. */
 import { currentMilestoneKey, doneKeysOf, milestoneOpenState } from '../engine/rules.js';
 import { getKind } from '../tasks/index.js';
+import { routeView } from './route.js';
 import { deriveStatus, effectiveEnd, isFull } from './status.js';
 
 const iso = (d) => (d ? new Date(d).toISOString() : null);
@@ -137,7 +138,9 @@ export function toDetail(e, type, now, { registered = null, st = null, signedIn 
       fields: r.fields ?? [], registered: card.registered, spotsLeft: card.spotsLeft,
     };
   }
-  return { ...card, schemaVersion: e.schemaVersion ?? 1, blocks: e.blocks ?? [], ...blocks, me: signedIn ? toMe(e, st, now) : null };
+  // `route` is computed for the caller (stops with their state), never the stored block; null when the event has no route block.
+  delete blocks.route;
+  return { ...card, schemaVersion: e.schemaVersion ?? 1, blocks: e.blocks ?? [], ...blocks, route: routeView(e, now, signedIn ? st : null), me: signedIn ? toMe(e, st, now) : null };
 }
 
 /** Dashboard row / editor document: the stored event (ids as strings, dates as ISO) plus the derived status. */

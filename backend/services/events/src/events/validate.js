@@ -8,8 +8,9 @@
  */
 import { HttpError } from '../lib/http-error.js';
 import { getKind } from '../tasks/index.js';
+import { applyRoute, normalizeRoute } from './route.js';
 
-export const BLOCK_NAMES = ['schedule', 'registration', 'venue', 'milestones', 'rewards', 'content'];
+export const BLOCK_NAMES = ['schedule', 'registration', 'venue', 'milestones', 'rewards', 'content', 'route'];
 export const SCHEMA_VERSION = 1;
 /** Would collide with app routes (/events/badges ...). */
 export const RESERVED_SLUGS = ['badges', 'mine', 'new'];
@@ -296,9 +297,10 @@ function content(c, v) {
  * @param {object} deps
  * @param {{typeExists:(slug:string)=>Promise<boolean>, badgeSlugs:(slugs:string[])=>Promise<Set<string>>, catalog:{exists:(type:string,slug:string)=>Promise<boolean>}}} deps.lookups
  * @param {string[]} [deps.retiredKeys]  milestone keys removed from this event earlier
+ * @param {object[]} [deps.warnings]  filled with `{path, code, ...}` warnings (saved anyway), e.g. a stop far from the route path
  * @returns {Promise<object>} the fields to store (no slug, no retiredKeys bookkeeping)
  */
-export async function normalizeEvent(input, { lookups, retiredKeys = [] } = {}) {
+export async function normalizeEvent(input, { lookups, retiredKeys = [], warnings } = {}) {
   const c = collector();
   if (!isObj(input)) throw new HttpError(400, 'bad_event', 'The event must be a JSON object.', { fields: { '': 'Must be an object.' } });
   const published = c.bool('published', input.published, false);
@@ -344,7 +346,7 @@ export async function normalizeEvent(input, { lookups, retiredKeys = [] } = {}) 
     summary: c.str('summary', input.summary, { max: 600 }), summaryHi: c.str('summaryHi', input.summaryHi, { max: 600 }),
     cover: c.media('cover', input.cover), language: c.oneOf('language', input.language, ['all', 'en', 'hi'], 'all'),
     theme, published, seriesId: null, blocks,
-    schedule: undefined, registration: undefined, venue: undefined, milestones: undefined, rewards: undefined, content: undefined,
+    schedule: undefined, registration: undefined, venue: undefined, milestones: undefined, rewards: undefined, content: undefined, route: undefined,
   };
   if (has('schedule')) out.schedule = schedule(c, input.schedule, published);
   if (has('registration')) out.registration = registration(c, input.registration);
@@ -352,12 +354,15 @@ export async function normalizeEvent(input, { lookups, retiredKeys = [] } = {}) 
   if (has('milestones')) out.milestones = milestones(c, input.milestones, retired, refs);
   if (has('rewards')) out.rewards = rewards(c, input.rewards, out.milestones ? new Set(out.milestones.items.map((m) => m.key)) : null, refs);
   if (has('content')) out.content = content(c, input.content);
+  if (has('route')) out.route = normalizeRoute(c, input.route);
   out.startsAt = out.schedule?.startsAt ?? null;
 
   // Rewards triggered by a milestone must name a milestone of this event even when the milestones block is absent: reported above.
   if (typeSlug && lookups && !(await lookups.typeExists(typeSlug))) c.add('typeSlug', `No event type "${typeSlug}".`);
 
   if (c.any()) throw new HttpError(400, 'bad_event', 'This event has problems that need fixing.', { fields: c.fields });
+  // Figures computed from the route (never edited by hand): each location stop's distance along the path and from it.
+  applyRoute(out.milestones, out.route, warnings);
 
   // References. Badges are ours; the rest are catalog's (fail closed when publishing).
   const badgeRefs = refs.filter((r) => r.type === 'badge');

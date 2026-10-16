@@ -16,6 +16,8 @@ const FORBIDDEN = "You don't have permission for that.";
 const EDGES = [
   { re: /^\/public(\/|$)/, from: ['mobile-bff', 'admin-bff'] },
   { re: /^\/admin(\/|$)/, from: ['admin-bff'] },
+  // The identity service's read-only by-uid view of a devotee (Users 360, docs/USERS.md).
+  { re: /^\/directory\/users\/[^/]+$/, from: ['identity'] },
   { re: /./, from: [] },
 ];
 

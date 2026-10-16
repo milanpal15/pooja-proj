@@ -12,6 +12,7 @@ import { HttpError } from './lib/http-error.js';
 import { callerGate, operatorGate } from './lib/perms.js';
 import { adminEventRoutes } from './routes/admin-events.js';
 import { badgeRoutes } from './routes/badges.js';
+import { directoryRoutes } from './routes/directory.js';
 import { publicRoutes } from './routes/public.js';
 import { typeRoutes } from './routes/types.js';
 
@@ -50,6 +51,7 @@ export function createApp(config, { isReady, dbPing = async () => {}, logger = c
   internal.use(express.json({ limit: '512kb' }));
 
   internal.use('/public', publicRoutes({ now, engine }));
+  internal.use('/directory', directoryRoutes()); // identity only: a devotee's registrations + badges, read-only (Users 360)
   internal.use('/admin/event-types', typeRoutes());
   internal.use('/admin/event-badges', badgeRoutes());
   internal.use('/admin/events', adminEventRoutes({ catalog: lookupCatalog, now, redact: createRedactor(sessionSecret), directory: directory ?? createIdentityDirectory(config, { fetchImpl, logger }) }));

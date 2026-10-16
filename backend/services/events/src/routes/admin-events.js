@@ -42,7 +42,8 @@ export function adminEventRoutes({ catalog, now = () => new Date(), redact, dire
 
   router.post('/', async (req, res) => {
     const body = isObj(req.body) ? req.body : {};
-    const fields = await normalizeEvent(body, { lookups });
+    const warnings = [];
+    const fields = await normalizeEvent(body, { lookups, warnings });
     let slug;
     if (typeof body.slug === 'string' && body.slug.trim()) {
       slug = body.slug.trim();
@@ -52,7 +53,7 @@ export function adminEventRoutes({ catalog, now = () => new Date(), redact, dire
     } else slug = await uniqueSlug(slugify(fields.title));
     try {
       const doc = await Event.create({ ...stripUndefined(fields), slug });
-      res.status(201).json(toAdmin(doc.toObject(), (await typesByslug()).get(doc.typeSlug), now()));
+      res.status(201).json({ ...toAdmin(doc.toObject(), (await typesByslug()).get(doc.typeSlug), now()), warnings });
     } catch (e) { duplicateAsConflict(e); }
   });
 
@@ -68,14 +69,15 @@ export function adminEventRoutes({ catalog, now = () => new Date(), redact, dire
     if (!existing) throw new HttpError(404, 'not_found', 'Event not found.');
     const body = isObj(req.body) ? req.body : {};
     const merged = mergeOver(existing, body);
-    const fields = await normalizeEvent(merged, { lookups, retiredKeys: existing.retiredKeys });
+    const warnings = [];
+    const fields = await normalizeEvent(merged, { lookups, retiredKeys: existing.retiredKeys, warnings });
     // Keys of milestones that were removed are retired for good (a stable key is never reused for something else).
     const before = (existing.milestones?.items ?? []).map((m) => m.key);
     const after = new Set((fields.milestones?.items ?? []).map((m) => m.key));
     const retiredKeys = [...new Set([...(existing.retiredKeys ?? []), ...before.filter((k) => !after.has(k))])];
     const unset = Object.fromEntries(Object.entries(fields).filter(([, v]) => v === undefined).map(([k]) => [k, '']));
     const out = await Event.findByIdAndUpdate(existing._id, { $set: { ...stripUndefined(fields), retiredKeys }, ...(Object.keys(unset).length ? { $unset: unset } : {}) }, { new: true, lean: true });
-    res.json(toAdmin(out, (await typesByslug()).get(out.typeSlug), now()));
+    res.json({ ...toAdmin(out, (await typesByslug()).get(out.typeSlug), now()), warnings });
   });
 
   router.delete('/:id', async (req, res) => {

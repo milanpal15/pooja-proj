@@ -40,7 +40,7 @@ describe('task-kind registry', () => {
     assert.deepEqual(live.refs, [{ type: 'stream', slug: 'kashi', field: 'streamSlug' }]);
     assert.equal(getKind('live_darshan').validate({ streamSlug: 'Bad Slug!', minutes: 10 }).errors[0].field, 'streamSlug');
     assert.equal(getKind('location').validate({ lat: 91, lng: 0, radiusM: 100 }).errors[0].field, 'lat');
-    assert.equal(getKind('location').validate({ lat: 1, lng: 2, radiusM: 5 }).errors[0].field, 'radiusM');
+    assert.equal(getKind('location').validate({ lat: 1, lng: 2, radiusM: 5, name: 'A' }).errors[0].field, 'radiusM');
     assert.deepEqual(getKind('photo').validate({}).config, { needsApproval: true });
     assert.equal(getKind('pooja_booked').validate({ poojaSlug: 'x' }).refs[0].type, 'pooja');
     assert.equal(getKind('chadhava_offered').validate({}).errors.length, 1);
@@ -53,9 +53,9 @@ describe('task-kind registry', () => {
     assert.notEqual(getKind('self_mark').summary({}, 'en'), getKind('self_mark').summary({}, 'hi'));
   });
 
-  test('self_mark and counter evaluate; the other seven say "not implemented"', () => {
+  test('self_mark, counter and location evaluate; the other six say "not implemented"', () => {
     assert.equal(getKind('self_mark').evaluate({}, {}, {}).done, true);
-    for (const k of NINE.filter((x) => x !== 'self_mark' && x !== 'counter')) {
+    for (const k of NINE.filter((x) => !['self_mark', 'counter', 'location'].includes(x))) {
       assert.throws(() => getKind(k).evaluate({}, {}, {}), /not implemented/, k);
     }
   });

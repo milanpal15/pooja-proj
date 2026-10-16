@@ -336,12 +336,11 @@ describe('progress: what is refused', () => {
       { key: 'bhajan', kind: 'bhajan_listened', title: 'Listen', titleHi: '', config: { aartiSlug: 'om-jai', minutes: 5 } },
       { key: 'chad', kind: 'chadhava_offered', title: 'Offer', titleHi: '', config: { listingSlug: 'diya' } },
       { key: 'pooja', kind: 'pooja_booked', title: 'Book', titleHi: '', config: { poojaSlug: 'rudra' } },
-      { key: 'loc', kind: 'location', title: 'Be there', titleHi: '', config: { lat: 1, lng: 1, radiusM: 100 } },
       { key: 'qr', kind: 'qr_checkin', title: 'Check in', titleHi: '', config: {} },
       { key: 'photo', kind: 'photo', title: 'Photo', titleHi: '', config: { needsApproval: true } },
       { key: 'ghost', kind: 'no_such_kind', title: 'Ghost', titleHi: '', config: {} },
     ])] } });
-    for (const t of ['live', 'bhajan', 'chad', 'pooja', 'loc', 'qr', 'photo', 'ghost']) {
+    for (const t of ['live', 'bhajan', 'chad', 'pooja', 'qr', 'photo', 'ghost']) {
       assert.deepEqual(code(await report('k1', 'later-kinds', 'k1', t, { seconds: 20 })), [422, 'task_not_supported'], t);
     }
     assert.equal(await TaskProgress.countDocuments({ eventSlug: 'later-kinds' }), 0);

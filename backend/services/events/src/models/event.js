@@ -29,6 +29,7 @@ const schema = new mongoose.Schema(
     milestones: block,
     rewards: block,
     content: block,
+    route: block,
     /** schedule.startsAt, denormalised for sorting. */
     startsAt: { type: Date, default: null, index: true },
     /** Milestone keys that once existed and were removed: a key is never reused. */

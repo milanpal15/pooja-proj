@@ -19,6 +19,7 @@ import { EventResult, MilestoneResult, Registration, TaskProgress } from '../mod
 import { NotImplementedError, getKind } from '../tasks/index.js';
 import { deriveStatus } from '../events/status.js';
 import { hasRegistration, hasStarted, progressOf, toMe } from '../events/present.js';
+import { claimSlot, savePoint } from './location-store.js';
 import { loadUserState } from './user-state.js';
 import { eventComplete, doneKeysOf, milestoneOpenState, ruleMet } from './rules.js';
 import { grantBadges, pendingOf, planEvent, planMilestone, settleCredits } from './rewards.js';
@@ -151,16 +152,30 @@ export function createEngine({ wallet, now = () => new Date(), logger }) {
 
     const key = { uid, eventSlug: event.slug, milestoneKey: mKey, taskKey: tKey };
     let row = null;
+    // A kind that reads the devotee's position (`needsPoint`): take the 5 s report slot (a finished task costs no slot) and load the
+    // previous point; the new one is stored below whatever the verdict (docs/EVENTS.md section 11.2).
+    let prev = null;
+    let pointSaved = false;
+    if (kind.needsPoint) {
+      const cur0 = await TaskProgress.findOne(key).lean();
+      if (!cur0?.completedAt) {
+        const slot = await claimSlot({ uid, event, t });
+        if (slot.limited) return { status: 429, body: { error: 'Too fast.', code: 'too_fast', task: taskOut(task, cur0) } };
+        prev = slot.prev;
+      }
+    }
     for (let attempt = 0; attempt < 8; attempt += 1) {
       const cur = await TaskProgress.findOne(key).lean();
       if (cur?.completedAt) { row = cur; break; } // already complete: current state, nothing changes
       let out;
       try {
-        out = kind.evaluate(cur?.state ?? {}, body ?? {}, { config: task.config ?? {}, now: t, uid, event });
+        out = kind.evaluate(cur?.state ?? {}, body ?? {}, { config: task.config ?? {}, now: t, uid, event, prev });
       } catch (e) {
         if (e instanceof NotImplementedError) throw new HttpError(422, 'task_not_supported', 'This kind of task is not supported yet.', { kind: task.kind });
         throw e;
       }
+      if (out.point && !pointSaved) { await savePoint({ uid, event, t, lat: out.point.lat, lng: out.point.lng }); pointSaved = true; }
+      if (out.refuse) throw new HttpError(out.refuse.status, out.refuse.code, out.refuse.message ?? out.refuse.code, out.refuse.extra ?? {});
       if (out.invalid) throw new HttpError(400, 'bad_report', 'That report is not valid for this task.');
       if (out.tooFast) return { status: 429, body: { error: 'Too fast.', code: 'too_fast', task: taskOut(task, cur) } };
       const set = { state: out.state, source: 'app', ...(out.done ? { completedAt: t, how: out.how ?? null } : {}) };
