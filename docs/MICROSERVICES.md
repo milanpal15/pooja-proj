@@ -39,6 +39,7 @@ calls    → wallet (per-minute debit/credit), identity (user, astrologer claim,
 wallet   → engagement (settings, flags), identity (blocked?)
 catalog  → orders (booking counts, review aggregates — read-only, cached), engagement (settings)
 identity → calls (astrologer invite lookup/claim)
+identity → engagement (device registry), wallet, orders, events, calls (read-only by-uid `directory` routes for the Users 360, `iss: identity` only; docs/USERS.md)
 ```
 (Phase 6 as built: identity → calls is `POST /internal/calls/directory/astrologers/claim` and `GET .../active?uid=`, issuer `identity` only; calls → identity is the devotee directory (name, push device) and the best-effort role write; calls → engagement is the billing rules and the push token; calls → wallet is every minute's debit and every refund.)
 No other edges. **No service reads another service's database.** No cycles beyond the two read-only
@@ -532,3 +533,8 @@ own 30 s client for this route (Overpass can be slow), relays `400/429/503 place
   sanitised, never forwarded) in the audit log, and reports `environment` (`APP_ENV`: `local` default, `tester` by `tools/tester.sh`, `production` in `render.yaml`) in the session.
   Role edits reach a signed-in operator within the session-cache TTL (5 s) and at once on the instance that handled the write.
 
+
+## 14. Users 360 and blocking (docs/USERS.md)
+* **identity** owns the block (`User.block`, `blockHistory`, `tags`, `notes`; `blocked` stays and is derived), `BlockedDevice`, the paged/filtered user list, the 360 aggregate and the timed-block sweeper (`BLOCK_SWEEP_EVERY_MS`). The 360 asks engagement (device registry), wallet, orders, events and calls through read-only `GET .../directory/users/:uid` routes that answer to `iss: identity` only (wallet and orders now list `identity` in `ALLOWED_ISSUERS`); each section has its own 1.5 s timeout (`USER360_SECTION_TIMEOUT_MS`) and degrades to `{ unavailable:true, reason }`.
+* **mobile BFF** answers a blocked account / device itself: `403 account_blocked | device_blocked` with the operator's message and the support contact from the settings table, on `/api/auth/sync` and every non-public route (also those streamed to the monolith). The device check (`X-Device-Id`) is cached 30 s and **fails open**; the account check still fails closed.
+* **admin BFF** relays `/api/admin/users...` and `/api/admin/blocked-devices` (area `devotees`), and builds the CSV export (streamed, 50 000 rows) from identity's JSON pages.

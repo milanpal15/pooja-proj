@@ -1797,7 +1797,7 @@ from that list, so changing a role is a one-file server change and the UI cannot
 | `push` | Sending an announcement to every device | edit | — | — |
 | `flags` | Feature flags | edit | view | view |
 | `policies` | Terms/rules devotees accept | edit | view | view |
-| `devotees` | Devotee accounts: list, block, delete | edit | — | — |
+| `devotees` | Devotee accounts: list/search, 360 view, block/unblock, force sign-out, tags, notes, blocked devices, delete, CSV export (export also needs `edit`; docs/USERS.md) | edit | — | — |
 | `astrologers` | Astrologer records, rates, shares, presence, suspend | edit | view | view |
 | `money` | Coin packs, billing rules | edit | view | view |
 | `wallets` | Wallet lookup, transactions, adjustments | edit | view *(masked)* | view *(masked)* |
