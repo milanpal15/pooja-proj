@@ -63,7 +63,7 @@ cmd_start() {
   if [ "$STACK_NODE_ENV" = production ]; then prod=(CORS_ORIGIN=https://dashboard.invalid); fi
 
   # The six services (identity's first start creates the first admin from ADMIN_PASSWORD), in dependency order (docs/MICROSERVICES_CUTOVER.md): leaf first, then who needs whom.
-  start engagement "$BACKEND" services/engagement/src/server.js PORT="$ENG" MONGODB_URI="$MONGO_BASE" DB_NAME="${DB_PREFIX}engagement"
+  start engagement "$BACKEND" services/engagement/src/server.js PORT="$ENG" MONGODB_URI="$MONGO_BASE" DB_NAME="${DB_PREFIX}engagement" IDENTITY_URL="$(u "$IDN")"
   start identity   "$BACKEND" services/identity/src/server.js   PORT="$IDN" MONGODB_URI="$MONGO_BASE" DB_NAME="${DB_PREFIX}identity" CALLS_URL="$(u "$CAL")" MONOLITH_URL="$(u "$MON")" ADMIN_USERNAME=admin ADMIN_PASSWORD="$ADMIN_PASSWORD" ${FIREBASE_SERVICE_ACCOUNT_PATH:+FIREBASE_SERVICE_ACCOUNT_PATH="$FIREBASE_SERVICE_ACCOUNT_PATH"}
   start catalog    "$BACKEND" services/catalog/src/server.js     PORT="$CAT" MONGODB_URI="$MONGO_BASE" DB_NAME="${DB_PREFIX}catalog" ENGAGEMENT_URL="$(u "$ENG")" ORDERS_URL="$(u "$ORD")" LIVE_PROBE=0 ${OVERPASS_URLS:+OVERPASS_URLS="$OVERPASS_URLS"}
   start wallet     "$BACKEND" services/wallet/src/server.js      PORT="$WAL" MONGODB_URI="$MONGO_BASE" DB_NAME="${DB_PREFIX}wallet" ENGAGEMENT_URL="$(u "$ENG")" IDENTITY_URL="$(u "$IDN")" ADMIN_SESSION_SECRET="$ADMIN_SESSION_SECRET"
@@ -78,7 +78,7 @@ cmd_start() {
       ENGAGEMENT_URL="$(fu "$ENG")" IDENTITY_URL="$(fu "$IDN")" CATALOG_URL="$(fu "$CAT")" WALLET_URL="$(fu "$WAL")" ORDERS_URL="$(fu "$ORD")" CALLS_URL="$(fu "$CAL")"
   local bffenv=(MONOLITH_URL="$(u "$MON")" ENGAGEMENT_URL="$(u "$ENG")" IDENTITY_URL="$(u "$IDN")" CATALOG_URL="$(u "$CAT")" WALLET_URL="$(u "$WAL")" ORDERS_URL="$(u "$ORD")" CALLS_URL="$(u "$CAL")" EVENTS_URL="$(u "$EVT")" ADMIN_SESSION_SECRET="$ADMIN_SESSION_SECRET")
   start mobile-bff "$BACKEND" bff/mobile/src/server.js PORT="$MOB" FIREBASE_PROJECT_ID="$FIREBASE_PROJECT_ID" ${prod[@]+"${prod[@]}"} "${bffenv[@]}"
-  start admin-bff  "$BACKEND" bff/admin/src/server.js  PORT="$ADM" SESSION_SAMESITE="$([ "$STACK_NODE_ENV" = production ] && echo None || echo Strict)" ${prod[@]+"${prod[@]}"} "${bffenv[@]}"
+  start admin-bff  "$BACKEND" bff/admin/src/server.js  PORT="$ADM" APP_ENV="${APP_ENV:-local}" SESSION_SAMESITE="$([ "$STACK_NODE_ENV" = production ] && echo None || echo Strict)" ${prod[@]+"${prod[@]}"} "${bffenv[@]}"
 
   echo "waiting for the stack (logs in $STACK_DIR):"
   local rc=0

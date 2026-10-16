@@ -106,6 +106,11 @@ describe('service auth', () => {
     ['DELETE', '/admin/announcements/000000000000000000000001'], ['POST', '/admin/announcements/000000000000000000000001/push'],
     ['POST', '/ingest/session'], ['POST', '/ingest/screen'], ['POST', '/push/register'], ['GET', '/visitors/d1/push-token'],
     ['GET', '/analytics/summary'], ['GET', '/analytics/trend'], ['GET', '/visitors'],
+    ['GET', '/policy'], ['POST', '/policy/evaluate'], ['POST', '/policy/blocked-counts'],
+    ['GET', '/admin/releases'], ['POST', '/admin/releases'], ['PUT', '/admin/releases/000000000000000000000001'], ['POST', '/admin/releases/000000000000000000000001/withdraw'],
+    ['PUT', '/admin/version-policy'], ['POST', '/admin/version-policy/impact'], ['GET', '/admin/versions/usage'],
+    ['GET', '/admin/approvals'], ['GET', '/admin/approvals/settings'], ['PUT', '/admin/approvals/settings'],
+    ['POST', '/admin/approvals/000000000000000000000001/approve'], ['POST', '/admin/approvals/000000000000000000000001/reject'], ['POST', '/admin/approvals/000000000000000000000001/cancel'],
   ];
   const bad = {
     'no token': {},

@@ -18,7 +18,7 @@ import express from 'express';
 import { createServiceClient } from './client.js';
 import { ServiceError } from './errors.js';
 import { signServiceToken } from './jwt.js';
-import { permissionsFor } from './operator/access/permissions.js';
+import { BUILTIN_ROLES, permissionsFor } from './operator/access/permissions.js';
 import { createIdentityAuditor } from './operator/audit.js';
 import { identityAdminRouter } from './operator/identity-routes.js';
 import { createOperatorSessions } from './operator/identity-session.js';
@@ -110,6 +110,9 @@ export function createIdentityMobileMount(config, { logger, fetchImpl, verifyIdT
    *   { error:'invalid'|'blocked'|'unavailable', detail }
    */
   async function deviceAuth(req, _res, next) {
+    // Idempotent: the version gate may already have asked (to honour a maintenance allow-list) before the `/api` edge runs.
+    if (req.deviceAuthChecked) return next();
+    req.deviceAuthChecked = true;
     const m = /^Bearer\s+(.+)$/i.exec(req.headers.authorization || '');
     const token = m ? m[1].trim() : '';
     if (!token) return next();
@@ -231,10 +234,17 @@ export function createIdentityMobileMount(config, { logger, fetchImpl, verifyIdT
     app.use(r);
   }
 
+  /** The verified, not-blocked devotee's uid for a request that carries a Bearer token, else null. Never answers, never throws. */
+  const authenticate = async (req) => {
+    await new Promise((resolve) => { deviceAuth(req, null, resolve); });
+    return req.deviceAuth?.ok ? req.deviceAuth.uid : null;
+  };
+
   return {
     softDeps: { identity: () => probeUpstream(config.identityUrl, '/health') },
     mount,
     mountPushRegister,
+    authenticate,
     /** The device auth edge for routes OTHER mounts serve (catalog's Jai): same answers as requireAuth, same signed claims. */
     devotee: { requireDevotee, asDevotee },
     /** For createGatewayApp: swap the end user's credentials for this BFF's signed token. */
@@ -265,7 +275,7 @@ export function createIdentityAdminMount(config, { logger, fetchImpl, now } = {}
   /** Records the write and, for an operator change, drops the cached session so a demotion bites immediately here. */
   const audit = (entry) => {
     identityAudit(entry);
-    if (/^\/admin\/operators(\/|$)/.test(entry.path) && entry.method !== 'GET') sessions.invalidate();
+    if (/^\/admin\/(operators|roles)(\/|$)/.test(entry.path) && entry.method !== 'GET') sessions.invalidate(); // a role edit applies at once on this instance
   };
 
   // The throttle: 10 failures per client+user and 40 per client, per 15 minutes -> 429. In memory, per instance.
@@ -309,7 +319,7 @@ export function createIdentityAdminMount(config, { logger, fetchImpl, now } = {}
         }
         perUser.reset(userKey);
         cookies.set(res, { uid: op.id, role: op.role });
-        res.json({ ok: true, required: true, username: op.username, role: op.role, permissions: op.permissions });
+        res.json({ ok: true, required: true, username: op.username, role: op.role, roleName: op.roleName, permissions: op.permissions });
       } catch (e) {
         relayError(res, e, logger);
       }
@@ -325,9 +335,10 @@ export function createIdentityAdminMount(config, { logger, fetchImpl, now } = {}
       const r = await sessions.state(req);
       if (r.error) return res.status(503).json(UNAVAILABLE);
       const st = r.state;
-      if (st?.required === false) return res.json({ required: false, authed: true, role: 'admin', permissions: permissionsFor('admin') });
-      if (!r.s || !st?.authed) return res.json({ required: true, authed: false });
-      res.json({ required: true, authed: true, username: st.username, role: st.role, permissions: st.permissions });
+      const environment = config.appEnv || 'local'; // 'local' | 'tester' | 'production' (APP_ENV): the dashboard's environment badge
+      if (st?.required === false) return res.json({ required: false, authed: true, role: 'admin', roleName: BUILTIN_ROLES[0].name, permissions: permissionsFor('admin'), environment });
+      if (!r.s || !st?.authed) return res.json({ required: true, authed: false, environment });
+      res.json({ required: true, authed: true, username: st.username, role: st.role, roleName: st.roleName, permissions: st.permissions, environment });
     });
   }
 

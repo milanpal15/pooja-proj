@@ -1,7 +1,7 @@
 
 
 import { hashPassword } from './lib/passwords.js';
-import { Operator, Policy } from './models/index.js';
+import { Operator, Policy, Role } from './models/index.js';
 
 const DEFAULT_TERMS = `## Rules & Regulations
 
@@ -59,6 +59,21 @@ export async function seedIdentity(config) {
     { $setOnInsert: { key: 'terms', title: 'Rules & Regulations', bodyMd: DEFAULT_TERMS, version: 1, publishedAt: new Date() } },
     { upsert: true },
   );
+  await migrateOperatorRoles();
   return ensureFirstOperator(config);
+}
+
+/**
+ * In-place upgrade of existing databases (docs/ROLES.md): `Operator.role` used to be a three-value enum, now it is a role KEY. Existing rows already
+ * hold `admin` / `editor` / `viewer` - valid keys, so nothing needs rewriting; this only repairs the two shapes the enum used to hide:
+ *   - a row with NO role (the schema defaulted it to `editor` on read) is made explicit;
+ *   - a key with stray case / spaces is normalised, so it can match a role key.
+ * Idempotent. Custom roles live in their own collection (created lazily); a role key that no longer resolves is left alone and holds no rights.
+ */
+export async function migrateOperatorRoles() {
+  await Operator.updateMany({ $or: [{ role: { $exists: false } }, { role: null }, { role: '' }] }, { $set: { role: 'editor' } });
+  const odd = await Operator.find({ role: { $regex: /[^a-z0-9-]/ } }).select('role').lean();
+  for (const o of odd) await Operator.updateOne({ _id: o._id }, { $set: { role: String(o.role).trim().toLowerCase() } });
+  await Role.init();
 }
 

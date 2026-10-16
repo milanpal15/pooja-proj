@@ -2,6 +2,7 @@ import express from 'express';
 
 import { areaFor } from './access/routes.js';
 import { hasPermission } from './access/permissions.js';
+import { decodeAuditDetail } from './audit.js';
 
 /**
  * The operator (dashboard) routes the engagement service owns. This table is the single list of what the admin
@@ -13,6 +14,8 @@ import { hasPermission } from './access/permissions.js';
  *  successStatus  the status the monolith answered on success when it is not 200 (a create answers 201)
  *  body    send the JSON body on a DELETE
  *  bodyLimit  JSON body size limit for this route (default 100kb)
+ *  relayStatus  answer with the service's own 2xx status (e.g. 200 vs 202) instead of `successStatus`
+ *  audit   `false` = a POST that only reads (an impact preview): never written to the audit log
  */
 export const ENGAGEMENT_ADMIN_ROUTES = [
   { method: 'GET', path: '/flags/full', to: '/flags/full', area: 'flags' },
@@ -33,6 +36,21 @@ export const ENGAGEMENT_ADMIN_ROUTES = [
   { method: 'PUT', path: '/content/announcements/:id', to: '/admin/announcements/:id', area: 'announcements', sample: '/content/announcements/000000000000000000000001' },
   { method: 'DELETE', path: '/content/announcements/:id', to: '/admin/announcements/:id', area: 'announcements', sample: '/content/announcements/000000000000000000000001' },
   { method: 'POST', path: '/admin/announcements/:id/push', to: '/admin/announcements/:id/push', area: 'push', sample: '/admin/announcements/000000000000000000000001/push' },
+
+  // App releases, version policy, approvals (docs/RELEASES.md section 5; BFF-only, pooja-api has none of it).
+  { method: 'GET', path: '/admin/releases', to: '/admin/releases', area: 'releases' },
+  { method: 'POST', path: '/admin/releases', to: '/admin/releases', area: 'releases', successStatus: 201 },
+  { method: 'PUT', path: '/admin/releases/:id', to: '/admin/releases/:id', area: 'releases', sample: '/admin/releases/000000000000000000000001' },
+  { method: 'POST', path: '/admin/releases/:id/withdraw', to: '/admin/releases/:id/withdraw', area: 'releases', sample: '/admin/releases/000000000000000000000001/withdraw' },
+  { method: 'PUT', path: '/admin/version-policy', to: '/admin/version-policy', area: 'releases', relayStatus: true }, // 200 applied / 202 sent for approval
+  { method: 'POST', path: '/admin/version-policy/impact', to: '/admin/version-policy/impact', area: 'releases', audit: false }, // a read-only what-if
+  { method: 'GET', path: '/admin/versions/usage', to: '/admin/versions/usage', area: 'releases' },
+  { method: 'GET', path: '/admin/approvals', to: '/admin/approvals', area: 'approvals' },
+  { method: 'GET', path: '/admin/approvals/settings', to: '/admin/approvals/settings', area: 'approvals' },
+  { method: 'PUT', path: '/admin/approvals/settings', to: '/admin/approvals/settings', area: 'approvals' },
+  { method: 'POST', path: '/admin/approvals/:id/approve', to: '/admin/approvals/:id/approve', area: 'approvals', sample: '/admin/approvals/000000000000000000000001/approve' },
+  { method: 'POST', path: '/admin/approvals/:id/reject', to: '/admin/approvals/:id/reject', area: 'approvals', sample: '/admin/approvals/000000000000000000000001/reject' },
+  { method: 'POST', path: '/admin/approvals/:id/cancel', to: '/admin/approvals/:id/cancel', area: 'approvals', sample: '/admin/approvals/000000000000000000000001/cancel' },
 ];
 
 /** The path as the gate sees it: without the `/api` prefix (access/routes.js is keyed that way). */
@@ -51,10 +69,10 @@ export function createOperatorGate(sessions) {
       const s = await sessions.resolve(req);
       if (!s.ok) return res.status(s.status).json(s.body);
       req.operator = s.operator;
-      const { area, level, also } = areaFor(req.method, apiPath(req));
+      const { area, level, also, viewAlso } = areaFor(req.method, apiPath(req));
       const needs = `${area}:${level}`;
       const deny = (perm) => res.status(403).json({ error: FORBIDDEN, code: 'forbidden', needs: perm });
-      if (!hasPermission(s.operator.permissions, needs)) return deny(needs);
+      if (!hasPermission(s.operator.permissions, needs) && !(level === 'view' && viewAlso && hasPermission(s.operator.permissions, viewAlso))) return deny(needs);
       if (also && !hasPermission(s.operator.permissions, also)) return deny(also);
       next();
     } catch (e) {
@@ -85,11 +103,13 @@ export function engagementAdminRouter({ sessions, client, audit, routes = ENGAGE
         const opts = { reqId: req.id, as, query: req.query && Object.keys(req.query).length ? Object.fromEntries(Object.entries(req.query).filter(([, v]) => typeof v === 'string')) : undefined };
         // GET and DELETE carry no body, except a route that says so (`body: true`, e.g. DELETE /content/upload {url}).
         const call = (r.method === 'GET' || r.method === 'DELETE') && !r.body
-          ? client.request(r.method, `${namespace}${to}`, opts)
-          : client.request(r.method, `${namespace}${to}`, { ...opts, body: req.body ?? {} });
-        const data = await call;
-        res.status(r.successStatus ?? 200).json(data);
-        audit?.({ operator: req.operator, method: r.method, path: apiPath(req), status: res.statusCode });
+          ? client.request(r.method, `${namespace}${to}`, { ...opts, full: true })
+          : client.request(r.method, `${namespace}${to}`, { ...opts, body: req.body ?? {}, full: true });
+        const out = await call;
+        // The service's `x-audit-detail` (what changed) goes to the audit log; it is never copied into the reply.
+        const detail = decodeAuditDetail(out.auditDetail);
+        res.status(r.relayStatus ? out.status : (r.successStatus ?? 200)).json(out.data);
+        if (r.audit !== false) audit?.({ operator: req.operator, method: r.method, path: apiPath(req), status: res.statusCode, reqId: req.id, ...(detail ? { detail } : {}) });
       } catch (e) {
         // A rejected service token is OUR misconfiguration, not the operator's session: never answer 401 (the
         // dashboard would sign them out). Everything else from engagement passes through unchanged.

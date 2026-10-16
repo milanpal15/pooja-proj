@@ -516,3 +516,19 @@ Answers are cached in the `placecaches` collection (one row per snapped 0.05-deg
 instance in `OVERPASS_URLS`, and 30 requests/minute per client (the BFF puts the phone's address in the signed token's `ctx.ip`). The BFF has its
 own 30 s client for this route (Overpass can be slow), relays `400/429/503 places_unavailable` unchanged and serves its last good body for an hour
 (`x-degraded: catalog`) when catalog is unreachable. Tests never touch the network (stub fetch). Without `CATALOG_URL` the BFF does not serve the route.
+
+## 13. App releases, version gating, approvals, custom roles (docs/RELEASES.md, docs/ROLES.md)
+
+* **engagement** (the control plane) owns `AppRelease`, `VersionPolicy` (one per platform, seeded empty), `ApprovalRequest` (24 h expiry, swept every `APPROVAL_SWEEP_EVERY_MS`),
+  `VersionBlockCount`, the `approvalsEnabled` switch (`ControlSetting`) and the device registry (the analytics `Visitor` rows, extended in place with `platform, versionName,
+  versionCode, osApi, uid, lastSeen`). It asks **identity** one thing (`GET /internal/identity/directory/approvers`, a count; env `IDENTITY_URL`, unset = a lone stack where the requester self-approves).
+  Internal routes: `GET /policy`, `POST /policy/evaluate`, `POST /policy/blocked-counts` (mobile-bff only) and the operator routes under `/admin/{releases,version-policy,versions,approvals}`.
+* **mobile BFF** serves `GET /api/app/policy` (never 5xx) and runs the **version gate** in front of every other route (`createAppPolicyMount`): in-memory policy, refresh 30 s in the
+  background, stale-while-error 1 h, **fail open**, `426 app_outdated` / `503 maintenance`, counters flushed every 60 s. The shared pure decision is `evaluatePolicy` in `@bhakti/common`.
+  The signed-in uid for the maintenance allow-list comes from the identity edge (`authenticate`).
+* **identity** owns the `roles` collection (custom roles only; `admin`/`editor`/`viewer` are code presets), resolves role → permissions for login/session, enforces the guards
+  (escalation, in-use, last admin, own role, built-in immutability) and serves the audit log with filters and cursor paging.
+* **admin BFF** gates every new route by area (`releases`, `approvals`, `audit`, `roles`), relays `200`/`202` for the version policy, stores the service's `X-Audit-Detail` (before/after,
+  sanitised, never forwarded) in the audit log, and reports `environment` (`APP_ENV`: `local` default, `tester` by `tools/tester.sh`, `production` in `render.yaml`) in the session.
+  Role edits reach a signed-in operator within the session-cache TTL (5 s) and at once on the instance that handled the write.
+

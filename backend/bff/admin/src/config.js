@@ -47,6 +47,9 @@ export const loadConfig = (env = process.env) => withChecks({
     // boot (everyone is signed out on restart); set it in any real deployment (>= 16 chars). SESSION_SAMESITE: Strict | Lax | None.
     sessionSecret: { name: 'ADMIN_SESSION_SECRET', default: '' },
     sessionSameSite: { name: 'SESSION_SAMESITE', default: 'Strict' },
+    // Which deployment this is, shown as the dashboard's environment badge (returned by GET /api/admin/session): local | tester | production.
+    // tools/stack.sh leaves it `local`, tools/tester.sh sets `tester`, render.yaml sets `production`. Anything else is read as `local`.
+    appEnv: { name: 'APP_ENV', default: 'local', parse: (v) => (['local', 'tester', 'production'].includes(String(v).trim().toLowerCase()) ? String(v).trim().toLowerCase() : 'local') },
   }),
   isProduction: env.NODE_ENV === 'production',
   commit: env.RENDER_GIT_COMMIT || env.GIT_COMMIT || null,

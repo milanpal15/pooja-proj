@@ -199,24 +199,24 @@ describe('login, cookie, session, logout', () => {
   });
 
   test('GET /session: no cookie, forged cookie, valid cookie, role read from the record, deactivated, expired', async () => {
-    assert.deepEqual((await call('GET', '/api/admin/session')).body, { required: true, authed: false });
-    assert.deepEqual((await call('GET', '/api/admin/session', { headers: { cookie: 'pooja_admin=forged.value' } })).body, { required: true, authed: false });
+    assert.deepEqual((await call('GET', '/api/admin/session')).body, { required: true, authed: false, environment: 'local' });
+    assert.deepEqual((await call('GET', '/api/admin/session', { headers: { cookie: 'pooja_admin=forged.value' } })).body, { required: true, authed: false, environment: 'local' });
     const h = await as('ed');
-    assert.deepEqual((await call('GET', '/api/admin/session', { headers: h })).body, { required: true, authed: true, username: 'ed', role: 'editor', permissions: permissionsFor('editor') });
+    assert.deepEqual((await call('GET', '/api/admin/session', { headers: h })).body, { required: true, authed: true, username: 'ed', role: 'editor', permissions: permissionsFor('editor'), environment: 'local' });
     ops.bbbbbbbbbbbbbbbbbbbbbbbb.role = 'viewer';
     clock += 6_000; // past the 5 s cache
     assert.equal((await call('GET', '/api/admin/session', { headers: h })).body.role, 'viewer', 'a demotion shows on the next call');
     ops.bbbbbbbbbbbbbbbbbbbbbbbb.active = false;
     clock += 6_000;
-    assert.deepEqual((await call('GET', '/api/admin/session', { headers: h })).body, { required: true, authed: false });
+    assert.deepEqual((await call('GET', '/api/admin/session', { headers: h })).body, { required: true, authed: false, environment: 'local' });
     ops.bbbbbbbbbbbbbbbbbbbbbbbb.active = true;
     clock += 13 * 3600_000;
-    assert.deepEqual((await call('GET', '/api/admin/session', { headers: h })).body, { required: true, authed: false }, 'cookie older than 12 h');
+    assert.deepEqual((await call('GET', '/api/admin/session', { headers: h })).body, { required: true, authed: false, environment: 'local' }, 'cookie older than 12 h');
   });
 
   test('GET /session when no operator exists answers required:false (dev); logout clears the cookie', async () => {
     idnMode = 'open';
-    assert.deepEqual((await call('GET', '/api/admin/session')).body, { required: false, authed: true, role: 'admin', permissions: permissionsFor('admin') });
+    assert.deepEqual((await call('GET', '/api/admin/session')).body, { required: false, authed: true, role: 'admin', roleName: 'Administrator', permissions: permissionsFor('admin'), environment: 'local' });
     const out = await call('POST', '/api/admin/logout');
     assert.equal(out.status, 200);
     assert.deepEqual(out.body, { ok: true });

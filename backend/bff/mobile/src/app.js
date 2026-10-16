@@ -1,4 +1,4 @@
-import { createCallsMount, createCatalogMount, createEngagementMount, createEventsMount, createGatewayApp, createIdentityMobileMount, createLogger, createOrdersMount, createWalletMount } from '@bhakti/common';
+import { createAppPolicyMount, createCallsMount, createCatalogMount, createEngagementMount, createEventsMount, createGatewayApp, createIdentityMobileMount, createLogger, createOrdersMount, createWalletMount } from '@bhakti/common';
 
 import { createFirebaseVerifier } from './firebase.js';
 
@@ -20,6 +20,8 @@ import { createFirebaseVerifier } from './firebase.js';
  *   - EVENTS_URL set: `GET /api/events` and `GET /api/events/:slug` (published events; Firebase-optional) are served from the events service
  *     (packages/common/src/events-mount.js); events unreachable is 503 `events_unavailable`.
  *   - IDENTITY_URL also serves the phone's FCM push registration `POST|DELETE /api/push/register` (background push; identity holds the registry and the Firebase key).
+ *   - ENGAGEMENT_URL also gives the app its version GATE and `GET /api/app/policy` (packages/common/src/app-policy-mount.js, docs/RELEASES.md): a build the operator
+ *     blocked gets `426 app_outdated`, maintenance gets `503 maintenance`; the gate FAILS OPEN (no policy, engagement down => the request passes).
  * Explicit lists, fail-closed: anything else still goes to the monolith, whose own gate decides.
  */
 export function createApp(config, { logger = createLogger('mobile-bff'), fetchImpl, verifyIdToken, firebase, now } = {}) {
@@ -39,17 +41,18 @@ export function createApp(config, { logger = createLogger('mobile-bff'), fetchIm
   const calls = createCallsMount('mobile-bff', config, { logger, fetchImpl, operator: false, devotee: identity?.devotee ?? null });
   // After identity: a signed-in devotee's uid is forwarded when `req.deviceAuth` is valid; a guest is served too (the list is public).
   const events = createEventsMount('mobile-bff', config, { logger, fetchImpl, operator: false, devotee: identity?.devotee ?? null, ...(now ? { now } : {}) });
+  // App releases (docs/RELEASES.md): the public `GET /api/app/policy` and the version GATE in front of every other route. Fails OPEN.
+  const appPolicy = createAppPolicyMount(config, { logger, fetchImpl, ...(now ? { now } : {}), ...(identity ? { resolveUid: identity.authenticate } : {}) });
   const mounts = [engagement, identity, catalog, wallet, orders, calls, events].filter(Boolean);
   return createGatewayApp('mobile-bff', config, {
     logger,
     softDeps: Object.assign({}, ...mounts.map((m) => m.softDeps)),
-    mount: mounts.length
-      ? (app) => {
-          // FIRST: `/api/push/register` is shared with engagement's anonymous Expo route; the FCM contract must be decided before that one runs.
-          identity?.mountPushRegister(app);
-          mounts.forEach((m) => m.mount(app));
-        }
-      : undefined,
+    mount: (app) => {
+      appPolicy.mount(app); // FIRST of all: the version gate guards everything registered after it (and `GET /api/app/policy` is answered here)
+      // `/api/push/register` is shared with engagement's anonymous Expo route; the FCM contract must be decided before that one runs.
+      identity?.mountPushRegister(app);
+      mounts.forEach((m) => m.mount(app));
+    },
     proxyHeaders: identity?.proxyHeaders,
   });
 }

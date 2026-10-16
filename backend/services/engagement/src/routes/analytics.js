@@ -17,7 +17,7 @@ analyticsRoutes.post('/ingest/session', async (req, res) => {
   await Visitor.updateOne(
     { deviceId },
     {
-      $set: { model: str(req.body?.model), os: str(req.body?.os), appVersion: str(req.body?.appVersion, 40), lastActive: new Date() },
+      $set: { model: str(req.body?.model), os: str(req.body?.os), appVersion: str(req.body?.appVersion, 40), lastActive: new Date(), lastSeen: new Date() },
       $setOnInsert: { firstSeen: new Date() },
       $inc: { sessions: 1 },
     },
@@ -31,7 +31,7 @@ analyticsRoutes.post('/ingest/screen', async (req, res) => {
   const deviceId = str(req.body?.deviceId);
   const screen = str(req.body?.screen);
   await Event.create({ type: 'screen', deviceId, screen });
-  if (deviceId) await Visitor.updateOne({ deviceId }, { $set: { lastActive: new Date() } });
+  if (deviceId) await Visitor.updateOne({ deviceId }, { $set: { lastActive: new Date(), lastSeen: new Date() } });
   res.json({ ok: true });
 });
 

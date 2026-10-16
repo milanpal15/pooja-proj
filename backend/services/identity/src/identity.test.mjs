@@ -419,7 +419,7 @@ describe('operators: credentials, session, lockout refusals, audit', () => {
     await Operator.deleteOne({ _id: second._id });
   });
 
-  test('audit log: written only by the admin BFF, stores no bodies, read needs operators:view, newest first, limit clamped', async () => {
+  test('audit log: written only by the admin BFF, stores no bodies, read needs audit:view, newest first, limit clamped', async () => {
     assert.equal((await call('POST', '/audit', { headers: admin(), body: {} })).status, 400);
     const entry = { operator: 'root', role: 'admin', area: 'content', method: 'PUT', path: '/api/content/deities/1', targetId: '1', status: 200, bodyText: 'secret password', password: 'x' };
     assert.equal((await call('POST', '/audit', { headers: admin(), body: entry })).status, 200);
@@ -429,8 +429,9 @@ describe('operators: credentials, session, lockout refusals, audit', () => {
     assert.equal(JSON.stringify(row).includes('secret'), false);
     assert.equal((await call('GET', '/admin/audit-log', { headers: admin(EDITOR) })).status, 403);
     const log = await call('GET', '/admin/audit-log?limit=1', { headers: admin() });
-    assert.equal(log.body.entries.length, 1);
-    assert.equal(log.body.entries[0].path, '/api/users/9', 'newest first');
+    assert.equal(log.body.items.length, 1);
+    assert.equal(log.body.items[0].path, '/api/users/9', 'newest first');
+    assert.ok(log.body.next, 'a full page names the next cursor');
     assert.equal((await call('GET', '/admin/audit-log?limit=99999', { headers: admin() })).status, 200);
     assert.equal((await call('POST', '/audit', { headers: svc('monolith'), body: entry })).status, 403);
   });

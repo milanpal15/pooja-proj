@@ -83,7 +83,8 @@ export function createServiceClient({ service, baseUrl, iss, secret, timeoutMs =
           data = { error: text.slice(0, 200) };
         }
       }
-      return { status: res.status, data };
+      const auditDetail = res.headers?.get?.('x-audit-detail');
+      return { status: res.status, data, ...(auditDetail ? { auditDetail } : {}) };
     } catch (e) {
       if (ac.signal.aborted) {
         throw new ServiceError(504, { error: 'upstream_timeout', code: 'upstream_timeout' }, service);
@@ -103,7 +104,7 @@ export function createServiceClient({ service, baseUrl, iss, secret, timeoutMs =
    * @param {string} [opts.reqId]
    * @param {{sub?:string, role?:string, perms?:string[]}} [opts.as]  claims to forward
    * @param {number} [opts.timeoutMs]
-   * @param {boolean} [opts.full]  resolve `{ status, data }` instead of just `data` - for a caller that must relay a 201 vs a 200
+   * @param {boolean} [opts.full]  resolve `{ status, data, auditDetail }` instead of just `data` - for a caller that must relay a 201 vs a 200 (`auditDetail`: the reply's `x-audit-detail` header, if any)
    */
   async function request(method, path, opts = {}) {
     if (!cb.allow()) {
@@ -133,7 +134,7 @@ export function createServiceClient({ service, baseUrl, iss, secret, timeoutMs =
         }
         cb.success();
         if (out.status >= 400) throw new ServiceError(out.status, out.data || { error: 'Service error.' }, service);
-        return opts.full ? { status: out.status, data: out.data } : out.data;
+        return opts.full ? { status: out.status, data: out.data, ...(out.auditDetail ? { auditDetail: out.auditDetail } : {}) } : out.data;
       } catch (e) {
         if (!(e instanceof ServiceError)) throw e;
         if (e.status === 502 || e.status === 504) {

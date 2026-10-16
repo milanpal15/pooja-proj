@@ -275,6 +275,7 @@ describe('push registration (FCM token) is served from identity', () => {
     const engSeen = [];
     const eng = await listen((req, res, body, json) => {
       if (req.url === '/health') return json(200, {});
+      if (req.url.startsWith('/internal/engagement/policy')) return json(200, { policy: {}, releases: [] }); // the version gate's own refresh, not what this test counts
       engSeen.push({ url: req.url, body });
       json(200, { ok: true, engagement: true });
     });

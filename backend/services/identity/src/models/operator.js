@@ -19,15 +19,16 @@ const operatorSchema = new Schema(
     /** scrypt, as `scrypt$<salt-hex>$<hash-hex>`. Never the password itself. */
     passwordHash: { type: String, required: true },
     /**
-     * `admin` may do anything, including managing operators, devotees,
+     * A role KEY (docs/ROLES.md). `admin` may do anything, including managing operators, devotees,
      * feature flags and payments. `editor` may write content — deities,
      * temples, horoscope, festivals, announcements — and can look at, but
-     * not change, the rest. `viewer` is read-only. What each holds lives in
-     * access/permissions.js (DESIGN.md §21).
+     * not change, the rest. `viewer` is read-only. Those three are code-defined presets
+     * (common/operator/access/permissions.js, DESIGN.md §21); any other key names a custom role
+     * in the `roles` collection. A key that no longer resolves holds NO permissions (fail closed).
      * The split that matters: whoever writes the daily reading has no
      * business being able to delete a devotee's account.
      */
-    role: { type: String, enum: ['admin', 'editor', 'viewer'], default: 'editor', index: true },
+    role: { type: String, default: 'editor', index: true, trim: true, lowercase: true },
     /** Suspends sign-in without deleting the record or its history. */
     active: { type: Boolean, default: true },
     lastLogin: Date,

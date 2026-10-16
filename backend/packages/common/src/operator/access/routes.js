@@ -26,7 +26,8 @@ export const ROUTE_AREAS = [
   { path: /^\/admin\/policies(\/|$)/, area: 'policies' },
   { path: /^\/users(\/|$)/, area: 'devotees' },
   { path: /^\/admin\/operators(\/|$)/, area: 'operators' },
-  { path: /^\/admin\/audit-log$/, area: 'operators' },
+  // The audit log has its own area here (admin only): docs/RELEASES.md section 5. pooja-api still maps it to `operators`; the parity test knows.
+  { path: /^\/admin\/audit-log$/, area: 'audit' },
 
   { path: /^\/(analytics|visitors)(\/|$)/, area: 'overview' },
 
@@ -44,11 +45,18 @@ export const ROUTE_AREAS = [
 
   // Events (the events service; BFF-only: pooja-api has no such area, the parity test skips these rows).
   { path: /^\/admin\/(events|event-types|event-badges)(\/|$)/, area: 'events' },
+
+  // App releases, version policy, approvals and custom roles (engagement + identity; BFF-only, docs/RELEASES.md and docs/ROLES.md).
+  { path: /^\/admin\/(releases|version-policy|versions)(\/|$)/, area: 'releases' },
+  { path: /^\/admin\/approvals(\/|$)/, area: 'approvals' },
+  // The Operators screen shows role names, so anyone who can view operators may READ the list (identity omits the permissions for them).
+  { path: /^\/admin\/roles$/, area: 'roles', viewAlso: 'operators:view' },
+  { path: /^\/admin\/roles(\/|$)/, area: 'roles' },
 ];
 
-/** `{ area, level, also }` for a request. Unmapped paths are `operators:<level>` (admin-only). */
+/** `{ area, level, also, viewAlso }` for a request (`viewAlso`: an alternative permission that is enough for a READ). Unmapped paths are `operators:<level>` (admin-only). */
 export function areaFor(method, path) {
   const level = method === 'GET' || method === 'HEAD' ? 'view' : 'edit';
   const hit = ROUTE_AREAS.find((r) => r.path.test(path));
-  return { area: hit ? hit.area : 'operators', level, mapped: !!hit, also: hit?.also };
+  return { area: hit ? hit.area : 'operators', level, mapped: !!hit, also: hit?.also, ...(hit?.viewAlso ? { viewAlso: hit.viewAlso } : {}) };
 }

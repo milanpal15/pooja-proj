@@ -2,17 +2,23 @@ import express from 'express';
 import { accessLog, errorHandler, health, requestId, requireServiceAuth } from '@bhakti/common';
 import { createLogger } from '@bhakti/common';
 
+import { createApprovers } from './lib/approvers.js';
 import { HttpError } from './lib/http-error.js';
 import { analyticsRoutes } from './routes/analytics.js';
+import { appPolicyRoutes } from './routes/app-policy.js';
 import { announcementAdminRoutes, announcementPushRoutes, announcementRoutes } from './routes/announcements.js';
 import { flagRoutes } from './routes/flags.js';
+import { releaseRoutes, versionRoutes } from './routes/releases.js';
 import { settingAdminRoutes, settingRoutes } from './routes/settings.js';
+import { approvalRoutes, versionPolicyRoutes } from './routes/version-policy.js';
 
 /**
  * @param {object} config  see config.js
- * @param {{ isReady: () => boolean, dbPing?: () => Promise<unknown>, logger?: object, fetchImpl?: typeof fetch }} deps
+ * @param {{ isReady: () => boolean, dbPing?: () => Promise<unknown>, logger?: object, fetchImpl?: typeof fetch, approvers?: { count: (perm?: string, reqId?: string) => Promise<number|null> }, now?: () => Date }} deps
+ *        `approvers` (how many active operators may approve) and `now` (the clock) are injectable for tests.
  */
-export function createApp(config, { isReady, dbPing = async () => {}, logger = createLogger('engagement'), fetchImpl } = {}) {
+export function createApp(config, { isReady, dbPing = async () => {}, logger = createLogger('engagement'), fetchImpl, approvers, now = () => new Date() } = {}) {
+  const approverDirectory = approvers ?? createApprovers(config, { fetchImpl, logger });
   const app = express();
   app.disable('x-powered-by');
   app.use(requestId());
@@ -30,6 +36,11 @@ export function createApp(config, { isReady, dbPing = async () => {}, logger = c
   internal.use('/admin/announcements', announcementAdminRoutes);
   internal.use(announcementPushRoutes({ expoPushUrl: config.expoPushUrl, fetchImpl }));
   internal.use(analyticsRoutes);
+  internal.use('/policy', appPolicyRoutes({ now })); // the mobile BFF: the gate's policy, the public policy answer, blocked counters
+  internal.use('/admin/releases', releaseRoutes({ now }));
+  internal.use('/admin/versions', versionRoutes({ now }));
+  internal.use('/admin/version-policy', versionPolicyRoutes({ approvers: approverDirectory, now }));
+  internal.use('/admin/approvals', approvalRoutes({ now }));
   app.use('/internal/engagement', internal);
 
   // HttpError -> { error, code, ...extra }; everything else goes to the shared handler (AuthError -> 401, 500 generic).

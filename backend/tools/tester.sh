@@ -88,6 +88,7 @@ stack_cmd() {
     "MONGO_BASE=mongodb://127.0.0.1:$MONGO_PORT" "BASE_PORT=$BASE_PORT" "STACK_DIR=$RUN/stack" "DB_PREFIX="
     "ADMIN_PASSWORD=$ADMIN_PASSWORD" "INTERNAL_JWT_SECRET=$INTERNAL_JWT_SECRET" "ADMIN_SESSION_SECRET=$ADMIN_SESSION_SECRET"
     "FIREBASE_PROJECT_ID=$FIREBASE_PROJECT_ID"
+    "APP_ENV=tester" # the dashboard's environment badge
   )
   [ -n "${FIREBASE_SERVICE_ACCOUNT_PATH:-}" ] && [ -f "$FIREBASE_SERVICE_ACCOUNT_PATH" ] && envs+=("FIREBASE_SERVICE_ACCOUNT_PATH=$FIREBASE_SERVICE_ACCOUNT_PATH")
   # Optional: point the temples map at another Overpass-compatible server (a mirror, or a local stand-in while the public ones are down).

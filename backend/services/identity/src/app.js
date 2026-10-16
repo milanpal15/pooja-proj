@@ -11,6 +11,7 @@ import { directoryRoutes, statusRoutes } from './routes/directory.js';
 import { operatorRoutes } from './routes/operators.js';
 import { policyRoutes } from './routes/policies.js';
 import { pushRoutes } from './routes/push.js';
+import { roleRoutes } from './routes/roles.js';
 import { userAdminRoutes } from './routes/users-admin.js';
 
 /**
@@ -42,6 +43,7 @@ export function createApp(config, { isReady, dbPing = async () => {}, logger = c
   internal.use('/admin/users', userAdminRoutes({ firebase: fb }));
   internal.use('/operators', ops.session);
   internal.use('/admin/operators', ops.crud);
+  internal.use('/admin/roles', roleRoutes()); // custom roles (docs/ROLES.md)
   internal.use('/audit', ops.audit);
   internal.use('/admin/audit-log', ops.auditRead);
   internal.use('/directory', directoryRoutes()); // other services

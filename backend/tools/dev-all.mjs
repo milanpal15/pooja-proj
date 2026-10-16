@@ -162,6 +162,7 @@ if (useEngagement) {
     PORT: String(ports.engagement),
     MONGODB_URI: mongoBase,
     INTERNAL_JWT_SECRET: secret,
+    ...(useIdentity ? { IDENTITY_URL: identityUrl } : {}), // the approver count for risky version changes
   });
 }
 if (useIdentity) {

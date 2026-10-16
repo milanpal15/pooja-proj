@@ -7,6 +7,10 @@ import { permissionsFor } from './access/permissions.js';
  * per operator id (and "no cookie, sign-in required" under one shared key); this BFF drops the entry when an operator write passes through it. Accepted consequence: a demotion
  * made through ANOTHER admin-bff instance reaches here up to `ttlMs` late. Other negative answers and failures are never cached.
  *
+ * Roles (docs/ROLES.md): `permissions` is what identity resolved from the role STORE (built-ins from code, custom roles from the database), so an edit to a
+ * role reaches a signed-in operator within `ttlMs` (5 s here, well inside the contract's 30 s ceiling) with no re-login; this same list feeds the route gate AND
+ * the permissions signed for the services. Role writes that pass through this BFF drop the cache at once (identity-mount.js).
+ *
  * `resolve(req)` has the shape engagementAdminRouter already uses, so the same gate serves every route family.
  */
 export const IDENTITY_SESSION_TTL_MS = 5_000;
@@ -50,8 +54,8 @@ export function createOperatorSessions({ client, cookies, isProduction = false, 
         return { ok: true, operator: { id: 'local-dev', username: 'local-dev', role: 'admin', permissions: permissionsFor('admin') } };
       }
       if (!r.s || !r.state?.authed) return { ok: false, status: 401, body: { error: 'Sign in required' } };
-      const { id, username, role, permissions } = r.state;
-      return { ok: true, operator: { id, username, role, permissions: Array.isArray(permissions) ? permissions : [] } };
+      const { id, username, role, roleName, permissions } = r.state;
+      return { ok: true, operator: { id, username, role, ...(roleName ? { roleName } : {}), permissions: Array.isArray(permissions) ? permissions : [] } };
     },
 
     invalidate: (id) => (id ? cache.delete(String(id)) : cache.clear()),

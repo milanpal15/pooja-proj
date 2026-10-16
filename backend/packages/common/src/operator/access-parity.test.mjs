@@ -5,23 +5,27 @@ import { existsSync } from 'node:fs';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { ROLE_PERMISSIONS, can, hasPermission, permissionsFor } from './access/permissions.js';
+import { AREAS, ROLE_PERMISSIONS, can, hasPermission, permissionsFor } from './access/permissions.js';
 import { ROUTE_AREAS, areaFor } from './access/routes.js';
 
 const mono = (f) => new URL(`../../../../../pooja-api/src/access/${f}`, import.meta.url);
 const have = existsSync(fileURLToPath(mono('routes.js')));
+/** Areas that exist only in this copy: pooja-api never gets them (docs/RELEASES.md, docs/ROLES.md). */
+const BFF_ONLY = ['events', 'releases', 'approvals', 'audit', 'roles'];
 
 test('the copied gate matches pooja-api/src/access byte-for-purpose', { skip: !have && 'pooja-api not checked out next to backend/' }, async () => {
   const [p, r] = await Promise.all([import(mono('permissions.js')), import(mono('routes.js'))]);
-  // The `events` area exists only in the BFF copy (pooja-api never gets Events): everything else must match.
-  const noEvents = (list) => list.filter((x) => !x.startsWith('events:'));
+  // Areas that exist only in the BFF copy (pooja-api never gets them): everything else must match.
+  const noEvents = (list) => list.filter((x) => !BFF_ONLY.some((a) => x.startsWith(`${a}:`)));
   assert.deepEqual(Object.fromEntries(Object.entries(ROLE_PERMISSIONS).map(([k, v]) => [k, noEvents(v)])), p.ROLE_PERMISSIONS);
+  assert.deepEqual(p.AREAS, AREAS.filter((a) => !BFF_ONLY.includes(a)), 'the shared areas, in the same order');
   // ...and the Home-layout row (catalog + BFF only; pooja-api has no home-layout routes).
-  const mine = ROUTE_AREAS.filter((row) => row.area !== 'events' && !String(row.path).includes('home-layout'));
+  const mine = ROUTE_AREAS.filter((row) => !BFF_ONLY.includes(row.area) && !String(row.path).includes('home-layout') || String(row.path).includes('audit-log'));
   assert.equal(mine.length, r.ROUTE_AREAS.length);
   mine.forEach((row, i) => {
     assert.equal(String(row.path), String(r.ROUTE_AREAS[i].path), `row ${i} path`);
-    assert.equal(row.area, r.ROUTE_AREAS[i].area, `row ${i} area`);
+    // The one deliberate difference: the audit log has its own `audit` area here (docs/RELEASES.md section 5); pooja-api maps it to `operators`.
+    assert.equal(row.area, String(row.path).includes('audit-log') ? 'audit' : r.ROUTE_AREAS[i].area, `row ${i} area`);
     assert.equal(row.also, r.ROUTE_AREAS[i].also, `row ${i} also`);
   });
   for (const m of ['GET', 'PUT']) for (const path of ['/flags/full', '/content/settings', '/nothing/mapped']) {

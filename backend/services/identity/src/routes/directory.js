@@ -1,7 +1,9 @@
 import { asyncRouter } from '../lib/async-handler.js';
 import { HttpError } from '../lib/http-error.js';
 import { can, onlyFrom } from '../lib/perms.js';
-import { User } from '../models/index.js';
+import { permissionsOfRole } from '../lib/roles.js';
+import { hasPermission } from '../lib/perms.js';
+import { Operator, User } from '../models/index.js';
 
 const SERVICES = ['monolith', 'catalog', 'wallet', 'orders', 'calls'];
 /** The events service asks ONE thing (names for the operator participants list, only when the operator may see them): batch lookup. */
@@ -20,6 +22,19 @@ export function directoryRoutes() {
     const u = await User.findOne({ uid: req.params.uid }).select('uid name contact deviceId role').lean();
     if (!u) return res.status(404).json({ error: 'user not found', code: 'not_found' });
     res.json({ user: { uid: u.uid, name: u.name || '', contact: u.contact || '', deviceId: u.deviceId || null, role: u.role || 'devotee' } });
+  });
+
+  /**
+   * How many ACTIVE operators hold a permission (engagement asks `approvals:edit`: a risky version change needs a second approver, unless
+   * the requester is the only one who could approve). Counts only - no names leave this service.
+   */
+  r.get('/approvers', onlyFrom('engagement'), async (req, res) => {
+    const perm = String(req.query.perm ?? 'approvals:edit');
+    if (!/^[a-z]+:(view|edit)$/.test(perm)) throw new HttpError(400, 'bad_request', 'perm must look like approvals:edit.');
+    const operators = await Operator.find({ active: true }).select('role').lean();
+    const roles = [...new Set(operators.map((o) => o.role))];
+    const held = new Map(await Promise.all(roles.map(async (k) => [k, hasPermission(await permissionsOfRole(k), perm)])));
+    res.json({ perm, count: operators.filter((o) => held.get(o.role)).length });
   });
 
   /** Names for the admin `who` column. */
