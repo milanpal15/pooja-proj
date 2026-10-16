@@ -15,6 +15,7 @@ import * as live from './modules/live/index.js';
 import { mediaRoutes, uploadRoutes } from './modules/media/index.js';
 import { panchang } from './modules/panchang/index.js';
 import { pricingRoutes } from './modules/pricing/pricing.routes.js';
+import * as places from './modules/places/index.js';
 import * as poojas from './modules/poojas/index.js';
 
 /**
@@ -55,6 +56,7 @@ export function createApp(config, { isReady, dbPing = async () => {}, logger = c
   pub.use(home.layoutPublicRoutes);
   pub.use(horoscope.publicRouter);
   pub.use(panchang);
+  pub.use(places.placesRouter(config, { fetchImpl, logger })); // mobile BFF only (lib/perms.js)
   const routers = { home: home.routers(), live: live.routers({ requireAuth: requireDevotee }), poojas: poojas.routers(), chadhava: chadhava.routers() };
   for (const r of [routers.live, routers.poojas, routers.chadhava]) pub.use(r.public);
   internal.use(pub);

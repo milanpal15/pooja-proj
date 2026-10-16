@@ -90,6 +90,8 @@ stack_cmd() {
     "FIREBASE_PROJECT_ID=$FIREBASE_PROJECT_ID"
   )
   [ -n "${FIREBASE_SERVICE_ACCOUNT_PATH:-}" ] && [ -f "$FIREBASE_SERVICE_ACCOUNT_PATH" ] && envs+=("FIREBASE_SERVICE_ACCOUNT_PATH=$FIREBASE_SERVICE_ACCOUNT_PATH")
+  # Optional: point the temples map at another Overpass-compatible server (a mirror, or a local stand-in while the public ones are down).
+  [ -n "${OVERPASS_URLS:-}" ] && envs+=("OVERPASS_URLS=$OVERPASS_URLS")
   ( cd "$BACKEND" && env "${envs[@]}" tools/stack.sh "$@" )
 }
 

@@ -83,3 +83,10 @@ export const CATALOG_PUBLIC_GETS = [
   { path: '/chadhava/listings', maxStaleMs: HOUR },
   { path: '/chadhava/listings/:slug', maxStaleMs: HOUR },
 ];
+
+/**
+ * Public GETs served by the MOBILE BFF only (the admin BFF has no use for them and does not expose them).
+ * `/places/temples`: nearby OpenStreetMap temples for the map (docs/TEMPLE_MAP.md). The BFF forwards the phone's address (`ctx.ip`) for
+ * catalog's per-client limit; a 503 `places_unavailable` is catalog's honest answer and is relayed, not retried.
+ */
+export const CATALOG_MOBILE_PLACES = { path: '/places/temples', maxStaleMs: HOUR, timeoutMs: 30_000 };

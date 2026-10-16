@@ -62,6 +62,8 @@ export const MANIFEST = {
     'livestreams', 'livecategories', 'livejailasts', 'livejaicounts', 'media.files', 'media.chunks',
     // Home layout v2 is catalog-only (the monolith has no such collections, so the copy is empty); listed so the manifest names every model.
     'homelayoutdrafts', 'homelayoutversions',
+    // The nearby-temples cache (OpenStreetMap answers); catalog-only, so the copy is empty. Listed so the manifest names every model.
+    'placecaches',
   ],
   // pooja-api: Wallet, WalletTxn, CoinPack, CoinOrder (modules/wallet, modules/coins). The service keeps the very same collections, so the copy is
   // 1:1: balances, the append-only ledger (idempotency keys included - they are what keeps a retry from moving money twice), the packs and the orders

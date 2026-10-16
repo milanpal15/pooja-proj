@@ -17,6 +17,7 @@ const EDGES = [
   { re: /^\/media\//, from: ['mobile-bff', 'admin-bff'] },
   { re: /^\/pricing\//, from: ['monolith', 'pooja-api', 'orders'] },
   { method: 'POST', re: /^\/live\/[^/]+\/jai$/, from: ['mobile-bff'] },
+  { method: 'GET', re: /^\/places\//, from: ['mobile-bff'] }, // the phone's map only; the dashboard has no use for it
   { re: /^\/(content|admin|horoscope\/day)(\/|$)/, from: ['admin-bff'] },
   // `events` checks that the streams / listings / poojas / temples / aartis an event refers to exist (read-only public routes).
   { method: 'GET', re: /^\/(live|poojas|chadhava\/listings|public\/content)(\/|$)/, from: ['mobile-bff', 'admin-bff', 'monolith', 'pooja-api', 'events'] },

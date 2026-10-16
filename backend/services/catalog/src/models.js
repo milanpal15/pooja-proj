@@ -21,3 +21,4 @@ export { HomeLayoutDraft, HomeLayoutVersion } from './modules/home/layout.model.
 export { Pooja } from './modules/poojas/pooja.model.js';
 export { ChadhavaListing, ChadhavaCategory, Offering } from './modules/chadhava/chadhava.model.js';
 export { LiveCategory, LiveJaiCount, LiveJaiLast, LiveStream } from './modules/live/live.model.js';
+export { PlaceCache } from './modules/places/places.model.js';

@@ -18,7 +18,7 @@ test('the content router serves the same resources at the same paths as the mono
 test('the models barrel registers exactly the catalog collections (and not Setting / Booking / PoojaReview)', () => {
   assert.deepEqual(mongoose.modelNames().sort(), [
     'Aarti', 'ChadhavaCategory', 'ChadhavaListing', 'Deity', 'Faq', 'Festival', 'HeroSlide', 'Horoscope', 'HomeSection', 'HomeLayoutDraft', 'HomeLayoutVersion',
-    'Knowledge', 'LiveCategory', 'LiveJaiCount', 'LiveJaiLast', 'LiveStream', 'Offering', 'Panchang', 'Pooja', 'Reminder',
+    'Knowledge', 'LiveCategory', 'LiveJaiCount', 'LiveJaiLast', 'LiveStream', 'Offering', 'Panchang', 'PlaceCache', 'Pooja', 'Reminder',
     'Seva', 'Temple', 'Tone', 'WallpaperStyle',
   ].sort());
 });

@@ -120,7 +120,7 @@ services:
         sync: false
 
   # ── bhakti-catalog ──────────────────────────────────────────────────────────────────────────────────────
-  # catalog: content, Home, live darshan, pooja + chadhava definitions, panchang, horoscope, GridFS media (db `catalog`). Optional: LIVE_PROBE, UPLOAD_DIR, ALLOWED_ISSUERS.
+  # catalog: content, Home, live darshan, pooja + chadhava definitions, panchang, horoscope, GridFS media (db `catalog`). Optional: LIVE_PROBE, UPLOAD_DIR, ALLOWED_ISSUERS, OVERPASS_URLS, PLACES_CACHE_DAYS, PLACES_USER_AGENT (nearby-temples map, docs/TEMPLE_MAP.md).
   - type: pserv
     name: bhakti-catalog
     runtime: node

@@ -25,6 +25,20 @@ export const loadConfig = (env = process.env) => {
       youtubeApiKey: { name: 'YOUTUBE_API_KEY', default: '', parse: (v) => v.trim() },
       // The 60 s live-stream probe. Off in tests; `0` turns it off in a deployment that has no outbound access.
       probeEnabled: { name: 'LIVE_PROBE', default: true, parse: (v) => !['0', 'false', 'off'].includes(v.trim().toLowerCase()) },
+      // Nearby temples map (docs/TEMPLE_MAP.md): the public Overpass instances, tried in order.
+      overpassUrls: {
+        name: 'OVERPASS_URLS',
+        default: ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter'],
+        parse: (v) => v.split(',').map((s) => s.trim()).filter(Boolean),
+      },
+      placesCacheDays: { name: 'PLACES_CACHE_DAYS', default: 7, parse: (v) => Number(v) > 0 ? Number(v) : 7 },
+      placesStaleDays: { name: 'PLACES_STALE_DAYS', default: 30, parse: (v) => Number(v) > 0 ? Number(v) : 30 },
+      placesUserAgent: { name: 'PLACES_USER_AGENT', default: 'BhaktiApp/1.0 (temples map)', parse: (v) => v.trim() || 'BhaktiApp/1.0 (temples map)' },
+      placesTimeoutMs: { name: 'PLACES_TIMEOUT_MS', default: 20000, parse: (v) => Number(v) > 0 ? Number(v) : 20000 },
+      placesTotalMs: { name: 'PLACES_TOTAL_MS', default: 25000, parse: (v) => Number(v) > 0 ? Number(v) : 25000 },
+      placesBreakerMs: { name: 'PLACES_BREAKER_MS', default: 60000, parse: (v) => Number(v) > 0 ? Number(v) : 60000 },
+      placesUpstreamPerSec: { name: 'PLACES_UPSTREAM_PER_SEC', default: 2, parse: (v) => Number(v) > 0 ? Number(v) : 2 },
+      placesRatePerMin: { name: 'PLACES_RATE_PER_MIN', default: 30, parse: (v) => Number(v) > 0 ? Number(v) : 30 },
     }),
     isProduction: env.NODE_ENV === 'production',
     commit: env.RENDER_GIT_COMMIT || env.GIT_COMMIT || null,

@@ -24,7 +24,7 @@ export { AREAS, ROLES, ROLE_PERMISSIONS, can, hasPermission, permissionsFor } fr
 export { ROUTE_AREAS, areaFor } from './operator/access/routes.js';
 export { etagMatches, jsonEtag } from './etag.js';
 export { CATALOG_NS, CONTENT_STALE_MS, HOME_STALE_MS, createCatalogMount } from './catalog-mount.js';
-export { CATALOG_ADMIN_ROUTES, CATALOG_PUBLIC_GETS, CONTENT_RESOURCES } from './catalog-routes.js';
+export { CATALOG_ADMIN_ROUTES, CATALOG_MOBILE_PLACES, CATALOG_PUBLIC_GETS, CONTENT_RESOURCES } from './catalog-routes.js';
 export { CONTENT_KEYS, FALLBACK_SETTINGS, assembleContent, createEngagementReaders } from './catalog-content.js';
 export { createOperatorGate } from './operator/engagement-routes.js';
 export { PACKS_STALE_MS, WALLET_NS, createWalletMount } from './wallet-mount.js';

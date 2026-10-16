@@ -56,13 +56,13 @@ export function fakeDeps({ settings = { prasadDelivery: '99' }, stats = {} } = {
  * tests carried over from pooja-api read the same; it goes to `/internal/catalog<path>` with a service token:
  * `uid` -> a mobile-bff token for that devotee, otherwise an admin-bff token (full admin permissions unless `perms`).
  */
-export async function boot(dbName, { deps = fakeDeps(), extra } = {}) {
+export async function boot(dbName, { deps = fakeDeps(), extra, fetchImpl } = {}) {
   const config = testConfig(dbName, extra);
   await connectDb(config);
   await mongoose.connection.dropDatabase();
   await Promise.all(Object.values(mongoose.models).map((m) => m.init()));
   const logger = { info() {}, warn() {}, error() {} };
-  const app = createApp(config, { isReady: () => true, dbPing: async () => {}, logger, settings: deps.settings, orders: deps.orders });
+  const app = createApp(config, { isReady: () => true, dbPing: async () => {}, logger, settings: deps.settings, orders: deps.orders, ...(fetchImpl ? { fetchImpl } : {}) });
   const server = http.createServer(app);
   await new Promise((ok) => server.listen(0, '127.0.0.1', ok));
   const url = `http://127.0.0.1:${server.address().port}`;

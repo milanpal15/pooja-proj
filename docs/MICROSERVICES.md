@@ -505,3 +505,14 @@ sections / `me` / `my events` / `my badges`, and real stats + a masked participa
   `ADMIN_SESSION_SECRET` (the same value as the admin BFF / wallet / orders / calls) derives the `Devotee ••4821` pseudonyms.
 * **Roll out.** Deploy `bhakti-events` (secret `RENDER_DEPLOY_HOOK_EVENTS` is optional in CI), then set `EVENTS_URL` on both BFFs (the Blueprint wires it). Add `events` to catalog's `ALLOWED_ISSUERS` if you override it.
 * `tools/stack.sh` (port offset 9; it now also passes `WALLET_URL`, `IDENTITY_URL`, `ADMIN_SESSION_SECRET`), `tools/dev-all.mjs` (`USE_EVENTS=0` skips it) and `docker-compose.yml` start it. When rolling out phase 2, deploy wallet and identity (their `ALLOWED_ISSUERS` gain `events`) BEFORE events, or set `WALLET_URL` later: rewards just wait.
+
+## 12. Nearby temples (`GET /api/places/temples`, docs/TEMPLE_MAP.md)
+
+The one place the catalog service calls a third party: the public **Overpass** (OpenStreetMap) instances, behind `services/catalog/src/modules/places/`.
+Catalog serves `GET /internal/catalog/places/temples` to the **mobile BFF only** (`callerGate`: the admin BFF gets 403, and
+`createCatalogMount` registers the route only for `iss === 'mobile-bff'`, using `CATALOG_MOBILE_PLACES`, not the shared `CATALOG_PUBLIC_GETS`).
+Answers are cached in the `placecaches` collection (one row per snapped 0.05-degree cell and radius bucket, fresh for `PLACES_CACHE_DAYS`=7, kept
+`PLACES_STALE_DAYS`=30 more for stale-while-error), one in-flight upstream call per cell, at most 2 upstream calls/second, a 60 s breaker per
+instance in `OVERPASS_URLS`, and 30 requests/minute per client (the BFF puts the phone's address in the signed token's `ctx.ip`). The BFF has its
+own 30 s client for this route (Overpass can be slow), relays `400/429/503 places_unavailable` unchanged and serves its last good body for an hour
+(`x-degraded: catalog`) when catalog is unreachable. Tests never touch the network (stub fetch). Without `CATALOG_URL` the BFF does not serve the route.

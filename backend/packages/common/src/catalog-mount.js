@@ -18,7 +18,7 @@
 import express from 'express';
 
 import { assembleContent, createEngagementReaders } from './catalog-content.js';
-import { CATALOG_ADMIN_ROUTES, CATALOG_PUBLIC_GETS } from './catalog-routes.js';
+import { CATALOG_ADMIN_ROUTES, CATALOG_MOBILE_PLACES, CATALOG_PUBLIC_GETS } from './catalog-routes.js';
 import { createServiceClient } from './client.js';
 import { ServiceError } from './errors.js';
 import { etagMatches, jsonEtag } from './etag.js';
@@ -142,6 +142,27 @@ export function createCatalogMount(iss, config, { logger, fetchImpl, operator, d
           // 404 not_found, 400 ... are the caller's / the data's answer: pass them through unchanged.
           if (usable(e)) return res.status(e.status).json(e.body);
           degrade(res, key, maxStaleMs, e, path);
+        }
+      });
+    }
+
+    /* GET /api/places/temples - nearby OpenStreetMap temples (docs/TEMPLE_MAP.md). MOBILE BFF only. Its own client: the call can
+       legitimately take ~25 s (Overpass), and catalog's `503 places_unavailable` is an ANSWER (relayed as is, not retried, not a breaker failure). */
+    if (iss === 'mobile-bff') {
+      const places = createServiceClient({ service: 'catalog', baseUrl: config.catalogUrl, iss, secret, timeoutMs: CATALOG_MOBILE_PLACES.timeoutMs, codedErrorsAreAnswers: true, ...extra });
+      router.get(`/api${CATALOG_MOBILE_PLACES.path}`, async (req, res) => {
+        const key = req.originalUrl;
+        try {
+          const body = await places.get(`${CATALOG_NS}${CATALOG_MOBILE_PLACES.path}`, { reqId: req.id, query: stringQuery(req.query), as: { ctx: { ip: String(req.ip || '').slice(0, 64) } } });
+          remember(key, body);
+          res.json(body);
+        } catch (e) {
+          // 400 bad_params, 429 too_fast and catalog's own 503 places_unavailable are answers: pass them through unchanged.
+          if (usable(e) || (e instanceof ServiceError && e.body?.code === 'places_unavailable')) {
+            if (e.status === 429 && e.body?.retryAfterSec) res.set('Retry-After', String(e.body.retryAfterSec));
+            return res.status(e.status).json(e.body);
+          }
+          degrade(res, key, CATALOG_MOBILE_PLACES.maxStaleMs, e, CATALOG_MOBILE_PLACES.path);
         }
       });
     }
