@@ -57,8 +57,18 @@ export function useLoginFlow(onSignedIn?: (by: SignedInBy) => void) {
     [resetError],
   );
 
-  /** Choosing mobile also clears any number left from a previous visit. */
+  /**
+   * Choosing mobile also clears any number left from a previous visit.
+   *
+   * The button is always shown, so when SMS sign-in is switched off (or the flags could not be loaded and the app fell back to its
+   * defaults) say so. `deriveStep` would otherwise bounce the next step straight back to this screen, which looked like a dead button.
+   */
   const chooseMobile = () => {
+    if (!phoneEnabled) {
+      resetError();
+      setError(t('err_sms_billing'));
+      return;
+    }
     otp.setPhone('');
     goTo('entry');
   };

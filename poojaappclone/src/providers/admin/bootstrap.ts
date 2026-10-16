@@ -64,12 +64,16 @@ export async function bootstrapAdmin({
     os: `${Platform.OS} ${Platform.Version}`,
     appVersion: '1.0.0',
   });
-  try {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 4000);
-    const res = await fetch(`${ADMIN_API}/api/flags`, { signal: ctrl.signal });
-    clearTimeout(timer);
-    if (res.ok) {
+  // Two attempts: a short one, then a long one. A hosted backend that has been idle (Render's free plan sleeps) can take 20-60 s to wake,
+  // and a single 4 s try gave up before it answered, leaving a stale cached flag in force (mobile login looked dead). Neither blocks the UI:
+  // the cached flags are already applied above.
+  for (const timeoutMs of [6_000, 30_000]) {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+      const res = await fetch(`${ADMIN_API}/api/flags`, { signal: ctrl.signal });
+      clearTimeout(timer);
+      if (!res.ok) continue;
       const data = (await res.json()) as { flags?: Partial<Record<string, unknown>> };
       if (data.flags) {
         // Only accept known keys, coerced to booleans — a malformed remote
@@ -84,8 +88,9 @@ export async function bootstrapAdmin({
           return merged;
         });
       }
+      return;
+    } catch {
+      // backend offline or still waking — try the longer attempt, then keep the local flags
     }
-  } catch {
-    // backend offline — keep local flags
   }
 }
