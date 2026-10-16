@@ -3,17 +3,21 @@
  * filter its blocks for this device and moment, localise texts, resolve links.
  * No React, no `@/` imports — tested with `node --test` (layout.test.mjs).
  */
-import type { HomeLayout, LayoutAction, LayoutBlock, LayoutData, LayoutItem, ViewItem } from './layout-types';
+import { matchesAudience } from './audience';
+import type { HomeLayout, Layout, LayoutAction, LayoutBlock, LayoutData, LayoutItem, ViewItem } from './layout-types';
 import { metaFor } from './block-meta';
 import { pick } from './pick';
 import { inWindow } from './schedule';
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 const MAX_BLOCKS = 60;
+const MAX_LAYOUTS = 8;
+export const DEFAULT_LAYOUT_ID = 'default';
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 const isoOrNull = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v : null);
+const strList = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && !!x.trim()) : []);
 
 function parseAction(v: unknown): LayoutAction {
   if (!isObj(v) || typeof v.type !== 'string') return null;
@@ -33,6 +37,8 @@ function parseItem(v: unknown): LayoutItem | null {
     liveBadge: v.liveBadge === true,
     flag: str(v.flag),
     deitySlug: str(v.deitySlug),
+    enabled: v.enabled !== false,
+    badgeUntil: isoOrNull(v.badgeUntil),
     action: parseAction(v.action),
     href: str(v.href),
   };
@@ -61,6 +67,7 @@ function parseBlock(v: unknown): LayoutBlock | null {
     endsAt: isoOrNull(v.endsAt),
     language,
     flag: str(v.flag),
+    audience: strList(v.audience),
     title: str(v.title),
     titleHi: str(v.titleHi),
     subtitle: str(v.subtitle),
@@ -75,24 +82,81 @@ function parseBlock(v: unknown): LayoutBlock | null {
   };
 }
 
-/**
- * A served / cached / bundled document -> a layout the renderer can trust, or
- * null when it is not one (wrong schema version, no blocks array). Blocks that
- * are malformed or repeat an id are dropped; unknown TYPES are kept here and
- * skipped by `visibleBlocks`, so a newer server never breaks an older app.
- */
-export function parseLayout(raw: unknown): HomeLayout | null {
-  if (!isObj(raw) || raw.schemaVersion !== SCHEMA_VERSION || !Array.isArray(raw.blocks)) return null;
+function parseBlocks(raw: unknown): LayoutBlock[] {
   const seen = new Set<string>();
   const blocks: LayoutBlock[] = [];
-  for (const b of raw.blocks) {
+  for (const b of Array.isArray(raw) ? raw : []) {
     const block = parseBlock(b);
     if (!block || seen.has(block.id)) continue;
     seen.add(block.id);
     blocks.push(block);
     if (blocks.length >= MAX_BLOCKS) break;
   }
-  return { schemaVersion: SCHEMA_VERSION, version: typeof raw.version === 'number' ? raw.version : undefined, blocks };
+  return blocks;
+}
+
+function parseOneLayout(v: unknown): Layout | null {
+  if (!isObj(v) || typeof v.id !== 'string' || !v.id || !Array.isArray(v.blocks)) return null;
+  return {
+    id: v.id,
+    name: str(v.name),
+    enabled: v.enabled !== false,
+    audience: strList(v.audience),
+    startsAt: isoOrNull(v.startsAt),
+    endsAt: isoOrNull(v.endsAt),
+    blocks: parseBlocks(v.blocks),
+  };
+}
+
+/**
+ * A served / cached / bundled document -> a set the renderer can trust, or null
+ * when it is not one. v2 is `{layouts}`; a stored v1 `{blocks}` is wrapped as
+ * the `default` layout. Layouts that are malformed or repeat an id are dropped
+ * (at most 8); blocks likewise (at most 60). Unknown block TYPES are kept here
+ * and skipped by `visibleBlocks`, so a newer server never breaks an older app.
+ */
+export function parseLayout(raw: unknown): HomeLayout | null {
+  if (!isObj(raw)) return null;
+  const version = typeof raw.version === 'number' ? raw.version : undefined;
+  if (raw.schemaVersion === 1 && Array.isArray(raw.blocks)) {
+    const layout: Layout = { id: DEFAULT_LAYOUT_ID, name: '', enabled: true, audience: [], startsAt: null, endsAt: null, blocks: parseBlocks(raw.blocks) };
+    return { schemaVersion: SCHEMA_VERSION, version, layouts: [layout] };
+  }
+  if (raw.schemaVersion !== SCHEMA_VERSION || !Array.isArray(raw.layouts)) return null;
+  const seen = new Set<string>();
+  const layouts: Layout[] = [];
+  for (const l of raw.layouts) {
+    const layout = parseOneLayout(l);
+    if (!layout || seen.has(layout.id)) continue;
+    seen.add(layout.id);
+    layouts.push(layout);
+    if (layouts.length >= MAX_LAYOUTS) break;
+  }
+  return { schemaVersion: SCHEMA_VERSION, version, layouts };
+}
+
+export type SelectContext = { now: number; segments: ReadonlySet<string> | readonly string[] };
+
+/**
+ * Which layout this device shows (§9.2): among the enabled layouts inside their
+ * schedule whose audience matches, the FIRST in array order; else the layout
+ * with id `default`; else the bundled one (`fallback`). The server already
+ * filters on enabled and schedule; this re-checks because the cache can be old.
+ */
+export function selectLayout(set: HomeLayout | null | undefined, ctx: SelectContext, fallback: Layout): Layout {
+  const layouts = set?.layouts ?? [];
+  const hit = layouts.find((l) => l.enabled && inWindow(l.startsAt, l.endsAt, ctx.now) && matchesAudience(l.audience, ctx.segments));
+  return hit ?? layouts.find((l) => l.id === DEFAULT_LAYOUT_ID) ?? fallback;
+}
+
+/** Every audience tag in play for the blocks / layouts that could show now — lets the hooks evaluate only what is needed. */
+export function audienceTagsIn(set: HomeLayout | null | undefined): Set<string> {
+  const out = new Set<string>();
+  for (const l of set?.layouts ?? []) {
+    l.audience.forEach((t) => out.add(t));
+    for (const b of l.blocks) b.audience.forEach((t) => out.add(t));
+  }
+  return out;
 }
 
 /** `1.2.10` vs `1.2.9`: negative, 0, positive. Non-numeric parts count as 0. */
@@ -112,6 +176,8 @@ export type FilterContext = {
   /** Feature flags; a key that is absent is UNKNOWN and never hides anything. */
   flags: Record<string, boolean>;
   appVersion: string;
+  /** Segments true for this device right now; absent = none (audience-gated blocks hidden). */
+  segments?: ReadonlySet<string> | readonly string[];
 };
 
 /** Hidden only when the flag is KNOWN to be off — offline (flags unloaded) shows everything. */
@@ -131,6 +197,7 @@ export function visibleBlocks(blocks: LayoutBlock[], ctx: FilterContext): Layout
     if (!meta || compareVersions(ctx.appVersion, meta.minAppVersion) < 0) return false;
     if (b.language !== 'all' && b.language !== ctx.lang) return false;
     if (!inWindow(b.startsAt, b.endsAt, ctx.now)) return false;
+    if (!matchesAudience(b.audience, ctx.segments ?? [])) return false;
     return flagOn(b.flag, ctx.flags);
   });
 }
@@ -152,6 +219,21 @@ export function propText(block: LayoutBlock, name: string, hi: boolean): string 
 export function propNum(block: LayoutBlock, name: string, fallback: number, min = -Infinity, max = Infinity): number {
   const v = block.props[name];
   return typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : fallback;
+}
+
+export type Columns = 3 | 4 | 5;
+export type TileStyle = 'icon' | 'image' | 'pill';
+
+/** `quick_grid` tiles per row: 3, 4 or 5; anything else is today's 4. */
+export function columnsOf(block: LayoutBlock): Columns {
+  const v = block.props.columns;
+  return v === 3 || v === 5 ? v : 4;
+}
+
+/** `quick_grid` tile look; an unknown value is the glyph tile. */
+export function tileStyleOf(block: LayoutBlock): TileStyle {
+  const v = block.props.tileStyle;
+  return v === 'image' || v === 'pill' ? v : 'icon';
 }
 
 export function propStr(block: LayoutBlock, name: string): string {
@@ -209,8 +291,19 @@ export const blockHref = (block: LayoutBlock): string => actionHref(block.action
 
 /* ───────────────────────────────────────────────────────────── items ── */
 
+/** The item's badge, or '' once `badgeUntil` has passed (the item itself stays). */
+export function badgeFor(item: Pick<LayoutItem, 'badge' | 'badgeUntil'>, now: number): string {
+  if (!item.badge) return '';
+  if (item.badgeUntil) {
+    const until = Date.parse(item.badgeUntil);
+    if (!Number.isNaN(until) && now > until) return '';
+  }
+  return item.badge;
+}
+
 /** One inline item, drawn: Hindi where written, link resolved. Null when there is nothing to draw. */
-export function viewItem(item: LayoutItem, hi: boolean, key: string): ViewItem | null {
+export function viewItem(item: LayoutItem, hi: boolean, key: string, now: number = Date.now()): ViewItem | null {
+  if (!item.enabled) return null;
   const title = pick(hi, item.title, item.titleHi).trim();
   if (!title && !item.image && !item.deitySlug) return null;
   return {
@@ -219,7 +312,7 @@ export function viewItem(item: LayoutItem, hi: boolean, key: string): ViewItem |
     subtitle: pick(hi, item.subtitle, item.subtitleHi).trim(),
     icon: item.icon,
     image: item.image,
-    badge: item.badge,
+    badge: badgeFor(item, now),
     liveBadge: item.liveBadge,
     deitySlug: item.deitySlug,
     href: actionHref(item.action, item.href),
@@ -228,12 +321,12 @@ export function viewItem(item: LayoutItem, hi: boolean, key: string): ViewItem |
 }
 
 /** An inline block's items: flag-hidden ones removed, capped at `limit`. */
-export function inlineItems(block: LayoutBlock, flags: Record<string, boolean>, hi: boolean): ViewItem[] {
+export function inlineItems(block: LayoutBlock, flags: Record<string, boolean>, hi: boolean, now: number = Date.now()): ViewItem[] {
   if (block.data?.mode !== 'inline') return [];
   const out: ViewItem[] = [];
   block.data.items.forEach((it, i) => {
     if (!flagOn(it.flag, flags)) return;
-    const v = viewItem(it, hi, `${block.id}:${i}`);
+    const v = viewItem(it, hi, `${block.id}:${i}`, now);
     if (v) out.push(v);
   });
   return out;

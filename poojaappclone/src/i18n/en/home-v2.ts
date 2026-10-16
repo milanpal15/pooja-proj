@@ -58,4 +58,5 @@ export const homeV2 = {
   hv_cat_evening: 'Evening Aarti',
   hv_cat_meditation: 'Meditation Music',
   hv_play: 'Play {title}',
+  hv_live_now: 'Live darshan now',
 } as const;

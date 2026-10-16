@@ -58,4 +58,5 @@ export const homeV2 = {
   hv_cat_evening: 'संध्या आरती',
   hv_cat_meditation: 'ध्यान संगीत',
   hv_play: '{title} चलाएँ',
+  hv_live_now: 'अभी लाइव दर्शन',
 } as const;

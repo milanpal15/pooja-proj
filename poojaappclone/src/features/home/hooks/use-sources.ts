@@ -11,6 +11,7 @@
 import { useMemo } from 'react';
 
 import type { Deity } from '@/constants/deities';
+import { useLiveList } from '@/features/darshan';
 import type { ImageSourcePropType } from 'react-native';
 import { useEventsTeaserFeeds } from './sources-events';
 import { useLanguage } from '@/i18n';
@@ -41,7 +42,7 @@ export type Args = { params: Record<string, unknown>; limit?: number };
 export type Feed<T> = { loading: boolean; data: T };
 
 /** A price card for the "photo3" shelf of poojas / chadhava (the existing MiniCard). */
-export type OfferCard = { seed: string; uri?: string; title: string; line: string; price: string; bannerH?: number };
+export type OfferCard = { seed: string; uri?: string; title: string; line: string; price?: string; chip?: string; bannerH?: number };
 export type ShelfEntry = { key: string; item: ViewItem; card?: OfferCard };
 
 export type NearTemple = { id: string; name: string; location: string; km?: number; distance?: string };
@@ -68,6 +69,7 @@ type SourceData = {
   'bhajans.featured': { aartis: RemoteAarti[]; entries: ShelfEntry[] };
   knowledge: ShelfEntry[];
   'daily.today': DailyData;
+  'live.now': ShelfEntry[];
 };
 
 const enc = encodeURIComponent;
@@ -271,6 +273,31 @@ function useDailyToday(): Feed<DailyData> {
   };
 }
 
+/** Temples live right now (`/api/live`): a card per stream with a LIVE chip; none live = an empty list (the block hides). */
+function useLiveNow({ limit }: Args): Feed<ShelfEntry[]> {
+  const { t, lang } = useLanguage();
+  const q = useLiveList();
+  const n = limit ?? DEFAULT_SHELF_LIMIT;
+  const data = useMemo(() => {
+    const hi = lang === 'hi';
+    return (q.data?.streams ?? [])
+      .filter((s) => s.state === 'live')
+      .slice(0, n)
+      .map((s) => {
+        const title = pick(hi, s.templeName, s.templeNameHi);
+        const line = s.currentAarti ? pick(hi, s.currentAarti.name, s.currentAarti.nameHi) : s.place;
+        const uri = assetUrl(s.cover);
+        const href = `/darshan/${enc(s.slug)}`;
+        return {
+          key: s.slug,
+          item: item(s.slug, { title, subtitle: line, image: uri ?? '', href, liveBadge: true }),
+          card: { seed: s.slug, uri, title, line, bannerH: 96, chip: t('hv_live') },
+        };
+      });
+  }, [q.data, n, lang, t]);
+  return { loading: q.loading && !q.data, data };
+}
+
 /** Source key -> resolver hook. Typed so a key added to `SOURCE_AUTH` without a resolver fails the typecheck. */
 export const SOURCES: { [K in SourceKey]: (args: Args) => Feed<SourceData[K]> } = {
   hero: useHero,
@@ -290,6 +317,7 @@ export const SOURCES: { [K in SourceKey]: (args: Args) => Feed<SourceData[K]> } 
   'bhajans.featured': useBhajansFeatured,
   knowledge: useKnowledge,
   'daily.today': useDailyToday,
+  'live.now': useLiveNow,
 };
 
 /** Resolve one source by key. The key must not change over the caller's lifetime (BlockList remounts on a change). */

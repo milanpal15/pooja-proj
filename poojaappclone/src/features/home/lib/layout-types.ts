@@ -19,6 +19,10 @@ export type LayoutItem = {
   liveBadge: boolean;
   flag: string;
   deitySlug: string;
+  /** False = "Hidden in this layout": never drawn. Absent in older documents = true. */
+  enabled: boolean;
+  /** ISO. `badge` is drawn only until this instant; null = no expiry. */
+  badgeUntil: string | null;
   action: LayoutAction;
   /** Server-resolved; absent in the bundled default (then `actionHref` derives it). */
   href: string;
@@ -36,6 +40,8 @@ export type LayoutBlock = {
   endsAt: string | null;
   language: 'all' | 'en' | 'hi';
   flag: string;
+  /** Segment tags, ANY-of; empty = everyone (docs/HOME_LAYOUT.md §9). Unknown tags are kept and never match. */
+  audience: string[];
   title: string;
   titleHi: string;
   subtitle: string;
@@ -49,11 +55,26 @@ export type LayoutBlock = {
   data: LayoutData | null;
 };
 
+/** One named layout of the set (§9.1). */
+export type Layout = {
+  id: string;
+  name: string;
+  enabled: boolean;
+  audience: string[];
+  startsAt: string | null;
+  endsAt: string | null;
+  blocks: LayoutBlock[];
+};
+
+/** The document: layouts in priority order, `default` as the fallback. A stored v1 document is wrapped as the default layout. */
 export type HomeLayout = {
   schemaVersion: number;
   version?: number;
-  blocks: LayoutBlock[];
+  layouts: Layout[];
 };
+
+/** The device facts audience tags are matched against. */
+export type Segment = 'new_user' | 'has_booking' | 'in_event' | 'lapsed';
 
 /** An item ready to draw: language chosen, link resolved. */
 export type ViewItem = {

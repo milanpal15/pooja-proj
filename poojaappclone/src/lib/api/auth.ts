@@ -16,6 +16,8 @@ export type Profile = {
   /** YYYY-MM-DD. A calendar date, not a timestamp. */
   dob: string | null;
   blocked: boolean;
+  /** ISO account-creation time. Not returned by every API build; absent = unknown (Home treats the devotee as not new). */
+  createdAt?: string | null;
   /** Absent on responses from an older API — treat as `devotee`. */
   role?: 'devotee' | 'astrologer';
   astrologer?: { id: string; name: string } | null;

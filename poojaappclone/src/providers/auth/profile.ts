@@ -3,13 +3,15 @@ import type { FirebaseUser } from '@/lib/firebase-auth';
 
 import type { AuthMethod, User } from './types';
 
-export function toUser(p: Profile): User {
+/** `fallbackCreatedAt`: Firebase's own account-creation time, used while the API does not return `createdAt`. */
+export function toUser(p: Profile, fallbackCreatedAt?: string | null): User {
   return {
     name: p.name,
     method: (p.method === 'google' ? 'google' : 'phone') as AuthMethod,
     contact: p.contact,
     bio: p.bio,
     uid: p.uid,
+    createdAt: p.createdAt ?? fallbackCreatedAt ?? null,
     email: p.email,
     emailVerified: p.emailVerified,
     gender: p.gender,

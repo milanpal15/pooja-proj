@@ -6,14 +6,14 @@ import { fetchHomeLayout } from '@/lib/api';
 
 import { DEFAULT_LAYOUT } from '../constants/default-layout';
 import { parseLayout } from '../lib/layout';
-import { layoutCacheKey, readCache, serialiseCache } from '../lib/layout-cache';
+import { layoutCacheKey, legacyLayoutCacheKey, readCache, serialiseCache } from '../lib/layout-cache';
 import type { HomeLayout } from '../lib/layout-types';
 
 /** Layouts seen this session, so coming back to Home (or a language switch back) paints at once. */
 const memory = new Map<string, HomeLayout>();
 
 /**
- * Home's layout: this session's copy or the cached one (per language) at once,
+ * Home's layout set (docs/HOME_LAYOUT.md §9): this session's copy or the cached one (per language) at once,
  * then a background refresh (`If-None-Match`; 304 keeps the cache). A failed
  * refresh keeps what is shown; with nothing cached the bundled default is used.
  * Never throws and never returns nothing — `ready` only says the cache read has
@@ -38,9 +38,12 @@ export function useHomeLayout(): { layout: HomeLayout; ready: boolean } {
     (async () => {
       let etag: string | null = null;
       try {
-        const cached = readCache(await AsyncStorage.getItem(key));
+        // The v3 cache, else the previous build's (a v1 document, upgraded on parse).
+        const current = readCache(await AsyncStorage.getItem(key));
+        const cached = current ?? readCache(await AsyncStorage.getItem(legacyLayoutCacheKey(l)));
         if (cached) {
-          etag = cached.etag;
+          // A legacy entry's ETag belongs to the old body shape; refetch it fully.
+          etag = current ? current.etag : null;
           if (!memory.has(l)) show(cached.layout);
         } else if (!memory.has(l)) {
           show(DEFAULT_LAYOUT);

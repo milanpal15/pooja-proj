@@ -18,6 +18,8 @@ export type User = {
   emailVerified?: boolean;
   /** Firebase uid. Stable across sign-ins; the backend's real key. */
   uid: string;
+  /** ISO account-creation time, when known (server profile, else Firebase metadata). */
+  createdAt?: string | null;
   email?: string | null;
   photoUrl?: string | null;
   /** Server-granted. A cached profile from before roles existed means `devotee`. */

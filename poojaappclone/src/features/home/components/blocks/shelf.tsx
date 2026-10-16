@@ -33,7 +33,8 @@ function layoutOf(block: LayoutBlock): LayoutKind {
  * Nothing branches on the block's id or title. No entries -> nothing at all.
  */
 function ShelfView({ block, entries, loading }: { block: LayoutBlock; entries: ShelfEntry[]; loading: boolean }) {
-  const { hi, open, title, linkLabel, href } = useBlock(block);
+  const { t, hi, open, title: given, linkLabel, href } = useBlock(block);
+  const title = given || (entries.some((e) => e.item.liveBadge && e.card?.chip) ? t('hv_live_now') : '');
   const layout = layoutOf(block);
   const tone = (TONES as readonly string[]).includes(block.tone) ? (block.tone as RemoteHomeSection['tone']) : undefined;
 

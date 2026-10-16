@@ -2,7 +2,8 @@ import { useMemo } from 'react';
 
 import { useAnyLive } from '@/features/darshan';
 
-import { inlineItems, propNum } from '../../lib/layout';
+import { columnsOf, inlineItems, tileStyleOf } from '../../lib/layout';
+import { useNow } from '../../hooks/use-now';
 import { toIconName } from '../../lib/icons';
 import { Frame } from '../Frame';
 import { QuickGrid, type QuickItem } from '../QuickGrid';
@@ -12,11 +13,13 @@ import { type BlockProps, useBlock } from './use-block';
 export function QuickGridBlock({ block }: BlockProps) {
   const { t, hi, flags, open } = useBlock(block);
   const anyLive = useAnyLive();
-  const columns = propNum(block, 'columns', 4, 3, 4) === 3 ? 3 : 4;
+  const columns = columnsOf(block);
+  const tileStyle = tileStyleOf(block);
+  const now = useNow(60_000); // a badge expires on its own
 
   const items = useMemo<(QuickItem & { href: string })[]>(
     () =>
-      inlineItems(block, flags, hi).map((i) => ({
+      inlineItems(block, flags, hi, now).map((i) => ({
         key: i.key,
         label: i.title,
         icon: toIconName(i.icon),
@@ -24,13 +27,13 @@ export function QuickGridBlock({ block }: BlockProps) {
         href: i.href,
         badge: i.liveBadge ? (anyLive ? t('hv_live') : undefined) : i.badge === 'new' ? t('hv_badge_new') : i.badge === 'soon' ? t('hv_badge_soon') : i.badge === 'special' ? t('hv_badge_special') : undefined,
       })),
-    [block, flags, hi, anyLive, t],
+    [block, flags, hi, now, anyLive, t],
   );
 
   if (!items.length) return null;
   return (
     <Frame>
-      <QuickGrid items={items} columns={columns} onOpen={(href) => void open(href)} />
+      <QuickGrid items={items} columns={columns} tileStyle={tileStyle} onOpen={(href) => void open(href)} />
     </Frame>
   );
 }

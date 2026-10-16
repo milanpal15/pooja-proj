@@ -33,8 +33,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     else await AsyncStorage.removeItem(PROFILE_KEY).catch(() => {});
   }, []);
 
+  // Account-creation time per uid, so a later profile update that omits it does not erase it.
+  const createdRef = useRef<{ uid: string; at: string } | null>(null);
+
   const apply = useCallback(
-    (u: User | null) => {
+    (incoming: User | null) => {
+      let u = incoming;
+      if (u?.createdAt) createdRef.current = { uid: u.uid, at: u.createdAt };
+      else if (u && createdRef.current?.uid === u.uid) u = { ...u, createdAt: createdRef.current.at };
       if (u && !profileComplete(u)) {
         // Verified, but we do not know enough about them yet — hold at
         // Create Profile rather than letting a half-made account through.
@@ -148,7 +154,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           ...(cached?.bio ? { bio: cached.bio } : {}),
         });
         if (activeUid.current !== fu.uid) return; // signed out while we waited
-        apply(toUser(profile));
+        apply(toUser(profile, fu.metadata?.creationTime));
       } catch (e) {
         if (activeUid.current !== fu.uid) return;
         // 403 means an admin blocked this account — not survivable offline-style,

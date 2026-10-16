@@ -2,7 +2,10 @@ import { parseLayout } from './layout';
 import type { HomeLayout } from './layout-types';
 
 /** AsyncStorage key — one entry per language, because the server filters on `?lang=`. */
-export const layoutCacheKey = (lang: 'en' | 'hi') => `home.layout.v2.${lang}`;
+export const layoutCacheKey = (lang: 'en' | 'hi') => `home.layout.v3.${lang}`;
+
+/** The v1-document cache of the previous build; still read (and upgraded by `parseLayout`) when v3 has nothing. */
+export const legacyLayoutCacheKey = (lang: 'en' | 'hi') => `home.layout.v2.${lang}`;
 
 export type CachedLayout = { etag: string | null; layout: HomeLayout };
 

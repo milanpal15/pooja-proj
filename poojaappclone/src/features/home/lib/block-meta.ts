@@ -64,6 +64,7 @@ export const SOURCE_AUTH = {
   'bhajans.featured': false,
   knowledge: false,
   'daily.today': false,
+  'live.now': false,
 } as const satisfies Record<string, boolean>;
 
 export type SourceKey = keyof typeof SOURCE_AUTH;
@@ -83,4 +84,5 @@ export const SHELF_SOURCES: readonly SourceKey[] = [
   'bhajans.featured',
   'knowledge',
   'temples.saved',
+  'live.now',
 ];
