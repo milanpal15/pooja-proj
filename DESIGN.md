@@ -1802,6 +1802,7 @@ from that list, so changing a role is a one-file server change and the UI cannot
 | `orders` | Coin orders, bookings, chadhava orders | edit | view *(masked)* | view *(masked)* |
 | `calls` | Call log, live calls, force-end, goodwill refund | edit | view *(masked)* | view *(masked)* |
 | `payouts` | Earnings summaries, recording a payout | edit | view | view |
+| `events` | Events, event types, badges, participants (docs/EVENTS.md) | edit | **edit** | view *(masked)* |
 | `operators` | Dashboard accounts, roles, passwords | edit | — | — |
 
 "—" means the area is **absent**: no sidebar entry, and the API answers 403. Only

@@ -179,7 +179,7 @@ origin — `api.js` has no absolute base URL any more.
   (Toast + Confirm), and **`tabs.js`**, the single ordered tab registry
   (`tabsFor(isAdmin)`; add a tab by adding one object).
 - `features/<name>/` — overview, flags, coin-orders, visitors, operators, users, policies,
-  login, horoscope, content, offerings, astrologers, coins, calls, bookings, poojas, chadhava, home-layout, home-slider (the "Home slider" tab: slides under Home's search bar; docs/POOJA_AND_HOME.md §1b). Each has a
+  login, horoscope, content, offerings, astrologers, coins, calls, bookings, poojas, chadhava, home-layout, events (the "Events" tab; docs/EVENTS.md §7), home-slider (the "Home slider" tab: slides under Home's search bar; docs/POOJA_AND_HOME.md §1b). Each has a
   `*Page.jsx` container, `components/`, `hooks/`, `lib/`, `index.js`.
   - `features/content/` — `ContentManager` (container) with `components/` (toolbar,
     table, row, row actions, edit modal, `fields/*` registry), `useContentResource`, and
