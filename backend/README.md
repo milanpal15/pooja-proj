@@ -88,7 +88,7 @@ Session-cookie settings (`SESSION_SAMESITE`, `ADMIN_SESSION_SECRET`) stay **on t
 - **Dashboard (dev)**: `pooja-admin/.env` -> `API_ORIGIN=http://127.0.0.1:4020`, restart `npm run dev`.
   **Dashboard (build)**: `VITE_API_BASE=https://<admin-bff-host>` (baked in; rebuild), and set `CORS_ORIGIN` on the admin BFF to the dashboard URL
   and `SESSION_SAMESITE=None` on the monolith.
-- **App**: `poojaappclone/.env` -> `EXPO_PUBLIC_ADMIN_API=http://127.0.0.1:4010` (USB: `adb reverse tcp:4010 tcp:4010`), restart Metro.
+- **App**: `poojaappclone/.env` -> `EXPO_PUBLIC_API_URL=http://127.0.0.1:4010` (USB: `adb reverse tcp:4010 tcp:4010`), restart Metro.
 
 ## Phase 1: the engagement service
 

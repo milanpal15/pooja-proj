@@ -25,7 +25,7 @@ nothing here is irreversible until the "do not do yet" list. Architecture and ev
 * **The monolith stays.** With every `*_URL` set it serves only `GET /api/health`, which both BFFs use as their
   readiness probe — so it must keep running (it is also your rollback). It is not deleted by this runbook.
 * Two clients move: the **dashboard** (`VITE_API_BASE` → admin BFF, a rebuild) and the **app**
-  (`EXPO_PUBLIC_ADMIN_API` → mobile BFF, a rebuild + store release). Until you rebuild them they keep talking to the
+  (`EXPO_PUBLIC_API_URL` → mobile BFF, a rebuild + store release). Until you rebuild them they keep talking to the
   monolith, which is why steps 1–7 are risk-free for users.
 
 ## 1. Prerequisites
@@ -117,7 +117,7 @@ Rules that have bitten before:
   `{sent:1,devices:1}` and a notification on the phone with the app closed = done. `{sent:0,devices:1}` means FCM refused it (API not enabled / role missing: see identity's log line `push to … not delivered (…)`);
   `devices:0` means that account has no registered token. See `docs/MICROSERVICES.md` section 10 for the design and the limits (no ringing UI, default sound, no iOS).
 * **Expo.** The backend reads no Expo credential; pushes go to Expo's public push API (`EXPO_PUSH_URL`, default
-  already right). The only Expo-side change is the app rebuild with the new `EXPO_PUBLIC_ADMIN_API` (step 10).
+  already right). The only Expo-side change is the app rebuild with the new `EXPO_PUBLIC_API_URL` (step 10).
 * **Internal URLs.** `fromService … property: hostport` delivers `bhakti-wallet:10000` (no scheme). Every service's
   `config.js` turns that into `http://bhakti-wallet:10000` (`serviceUrl` in `@bhakti/common`: no dot / localhost / IPv4 →
   `http://`, a public host name → `https://`; tested). **The monolith does not do this** — type full URLs there (step 7).
@@ -289,7 +289,7 @@ webhook share the key `order:<id>`).
 * **Dashboard:** `VITE_API_BASE=https://<admin-bff-host>` on `pooja-admin` (Render → Environment) → **rebuild** (not restart;
   it is baked in at build time) → CI deploy hook or Manual Deploy. The admin BFF's `CORS_ORIGIN` must equal the dashboard's
   exact URL and `SESSION_SAMESITE=None` (already in the blueprint). Sign out/in once.
-* **App:** `poojaappclone/.env` → `EXPO_PUBLIC_ADMIN_API=https://<mobile-bff-host>`; restart Metro; **rebuild the app**
+* **App:** `poojaappclone/.env` → `EXPO_PUBLIC_API_URL=https://<mobile-bff-host>`; restart Metro; **rebuild the app**
   (`EXPO_PUBLIC_*` is embedded at bundle time) and release it. Old installs keep calling the monolith, which — with the
   URLs set — answers 404 to almost everything, so **keep the monolith's URLs unset until the old app versions have aged
   out, or accept that they break** (path B avoids this: the BFFs front the monolith first). This is the one irreversible-ish

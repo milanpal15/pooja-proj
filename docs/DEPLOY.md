@@ -251,7 +251,7 @@ it, so it will start waiting with no change here.
 In `poojaappclone/.env`:
 
 ```
-EXPO_PUBLIC_ADMIN_API=https://pooja-admin.onrender.com
+EXPO_PUBLIC_API_URL=https://pooja-admin.onrender.com
 ```
 
 Then rebuild the app (`npx expo run:android`). This value is baked into the

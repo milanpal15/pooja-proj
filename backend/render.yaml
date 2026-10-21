@@ -363,7 +363,7 @@ services:
   # ── bhakti-mobile-bff ───────────────────────────────────────────────────────────────────────────────────
   # mobile-bff: the phone app's only door (PUBLIC). Verifies Firebase tokens, asks identity "blocked?" per request, composes /api/content.
   # Razorpay's webhook URL: https://<this service's host>/api/webhooks/razorpay (streamed to the wallet byte for byte).
-  # The app's EXPO_PUBLIC_ADMIN_API is this service's URL (a rebuild of the app, not a reload). Optional: ORDERS_TIMEOUT_MS, CALLS_TIMEOUT_MS, SERVICE_TIMEOUT_MS, PROXY_TIMEOUT_MS.
+  # The app's EXPO_PUBLIC_API_URL is this service's URL (a rebuild of the app, not a reload). Optional: ORDERS_TIMEOUT_MS, CALLS_TIMEOUT_MS, SERVICE_TIMEOUT_MS, PROXY_TIMEOUT_MS.
   - type: web
     name: bhakti-mobile-bff
     runtime: node

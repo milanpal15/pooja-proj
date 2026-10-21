@@ -136,7 +136,7 @@ cmd_status() {
   say "admin BFF:   $(curl -s -o /dev/null -w '%{http_code}' --max-time 3 "http://127.0.0.1:$ADMIN_PORT/api/health" 2>/dev/null || true) (http://127.0.0.1:$ADMIN_PORT, local only)"
   local u; u="$(public_url 2>/dev/null || true)"
   say "public URL:  ${u:-none (ngrok is not running)}"
-  [ -n "$u" ] && say "app build:   EXPO_PUBLIC_ADMIN_API=$u"
+  [ -n "$u" ] && say "app build:   EXPO_PUBLIC_API_URL=$u"
   if [ -n "${NGROK_DOMAIN:-}" ]; then say "static name: https://$NGROK_DOMAIN"; else say "static name: NOT SET (address changes on restart)"; fi
   [ -n "$u" ] && say "health deps: $(curl -s --max-time 5 "$u/health/deps" 2>/dev/null | head -c 160)"
   return 0

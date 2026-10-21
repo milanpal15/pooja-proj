@@ -61,7 +61,7 @@ npx expo prebuild --clean && npx expo run:android   # development build; see doc
 ```
 
 > **Important:** the app talks to the admin backend at the URL in
-> `poojaappclone/src/constants/config.ts` (`ADMIN_API`). Read
+> `poojaappclone/src/constants/config.ts` (`API_URL`). Read
 > [Connecting the app to the backend](#connecting-the-app-to-the-backend) — this is
 > the #1 thing that trips people up.
 
@@ -114,7 +114,7 @@ show up in the app, it's almost always because the app can't reach the backend**
 it then falls back to defaults (all features ON). There are two ways to connect:
 
 **Option A — USB (most reliable, and the current default).**
-`ADMIN_API` is set to `http://127.0.0.1:4000`. Run once per session:
+`API_URL` is set to `http://127.0.0.1:4000`. Run once per session:
 ```bash
 adb reverse tcp:4000 tcp:4000     # backend
 adb reverse tcp:8081 tcp:8081     # Metro (Expo dev server)
@@ -122,12 +122,12 @@ adb reverse tcp:8081 tcp:8081     # Metro (Expo dev server)
 This tunnels the phone's `localhost` to your Mac over USB, so it works even on
 cellular.
 
-**Option B — Wi-Fi.** Set `ADMIN_API` to your Mac's LAN IP and keep the phone on
+**Option B — Wi-Fi.** Set `API_URL` to your Mac's LAN IP and keep the phone on
 the **same network**:
 ```bash
 ipconfig getifaddr en0            # e.g. 192.168.1.12
 # then in src/constants/config.ts:
-export const ADMIN_API = 'http://192.168.1.12:4000';
+export const API_URL = 'http://192.168.1.12:4000';
 ```
 This breaks if the phone drops to cellular or joins a different network.
 
@@ -147,7 +147,7 @@ poojaappclone/
       auth.tsx            # user session (+ registers user to backend on sign-in)
       admin.tsx           # feature flags + analytics
       content.tsx         # remote deities/temples/aartis + deity image override
-    constants/config.ts   # ADMIN_API backend URL
+    constants/config.ts   # API_URL backend URL
     components/            # UI (app-tabs, mandir/deity-idol, auth, payment, ...)
 
 pooja-api/
@@ -209,7 +209,7 @@ npx tsc --noEmit
 - **Native crash on Android (`libworklets.so`).** `react-native-reanimated` and
   `react-native-worklets` versions must match; run `npx expo install --fix`.
 - **Uploaded image doesn't load on the phone.** Uploads are stored as relative
-  paths and resolved against `ADMIN_API`; make sure the backend is reachable from
+  paths and resolved against `API_URL`; make sure the backend is reachable from
   the phone (same rule as flags).
 - **Disabling `bhajan` hides the Home card but the Bhajan tab is still there.** The
   tab bar isn't flag-gated (by design).

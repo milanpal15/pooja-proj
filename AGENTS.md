@@ -94,7 +94,7 @@ SMS-Retriever rules are in its hooks' docblocks; pure logic in `lib/` with tests
   host-relative `/uploads/..` paths. Per-resource logic is in `providers/content/resources/`.
 - `providers/wallet` — the live coin balance (`useWallet()`).
 
-**Backend URL:** `src/constants/config.ts` → `ADMIN_API`. See §3 for the
+**Backend URL:** `src/constants/config.ts` → `API_URL`. See §3 for the
 reachability rules — this is the #1 source of "it doesn't work on the phone".
 
 ---
@@ -227,7 +227,7 @@ variable `DEPLOY_MICROSERVICES` is `true` (secrets `RENDER_DEPLOY_HOOK_<SERVICE>
 
 ## 3. How the two connect (READ THIS before debugging "flags/content don't apply")
 
-The app calls the admin backend at `ADMIN_API`:
+The app calls the backend (the mobile gateway) at `API_URL`:
 - `GET /api/flags` → `{flags:{key:bool}}` — drives which Home feature cards show.
 - `GET /api/content` → `{deities,temples,aartis}` — remote content + deity images.
 - `POST /api/auth/sync` — creates/refreshes the account. **Authenticated**
@@ -244,14 +244,14 @@ the app *can* reach the backend, flags apply correctly (a disabled flag hides it
 Home card via `FEATURES.filter(f => flags[f.flag])`).
 
 **Reachability — two modes:**
-1. **USB (most reliable, current default).** `ADMIN_API = http://127.0.0.1:4000`
+1. **USB (most reliable, current default).** `API_URL = http://127.0.0.1:4000`
    plus, once per session:
    ```bash
    adb reverse tcp:4000 tcp:4000   # backend
    adb reverse tcp:8081 tcp:8081   # Metro
    ```
    Works regardless of Wi-Fi/cellular.
-2. **Wi-Fi.** Set `ADMIN_API` to the Mac's LAN IP (`ipconfig getifaddr en0`),
+2. **Wi-Fi.** Set `API_URL` to the Mac's LAN IP (`ipconfig getifaddr en0`),
    phone on the SAME network. Breaks if the phone drops to cellular.
 
 **Auth is the exception to the best-effort rule.** Sign-in needs both Firebase
@@ -300,7 +300,7 @@ backend already had, instead of one i18n string shown on every temple forever.
 Verified end to end: changing Archana from ₹251 to ₹333 in the dashboard
 showed ₹333 in the app on next launch, no rebuild.
 
-**Config moved to `.env`** — `EXPO_PUBLIC_ADMIN_API` and the
+**Config moved to `.env`** — `EXPO_PUBLIC_API_URL` and the
 `EXPO_PUBLIC_SUPPORT_*` set join the Google client id. The literals in
 `constants/` are now development defaults only.
 
@@ -460,7 +460,7 @@ client-generated `requestId` so a retry never double-charges.
   `content` (editor writes); bookings/reviews are `orders` (status/hide need `orders:edit`).
 - Testing the app against a local API: run the API on a throwaway mongod (`MONGODB_URI=… PORT=4400
   PAYMENTS_PROVIDER=mock`), `adb reverse tcp:4400 tcp:4400`, and start a **separate** Metro
-  (`EXPO_PUBLIC_ADMIN_API=http://127.0.0.1:4400 npx expo start --dev-client --port 8082`) so the normal one on
+  (`EXPO_PUBLIC_API_URL=http://127.0.0.1:4400 npx expo start --dev-client --port 8082`) so the normal one on
   8081 is untouched; open it with `exp+bhakti://expo-development-client/?url=http%3A%2F%2F127.0.0.1%3A8082`.
 
 ## 5. Gotchas / conventions
@@ -519,7 +519,7 @@ client-generated `requestId` so a retry never double-charges.
   and loose settings (fees, support contacts) are all admin-managed, each
   with the bundled catalogue as the offline fallback. A price that needs a
   store release to change is a liability, not a constant.
-- **Config belongs in `.env`.** `EXPO_PUBLIC_ADMIN_API`,
+- **Config belongs in `.env`.** `EXPO_PUBLIC_API_URL`,
   `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`, `EXPO_PUBLIC_SUPPORT_*`. The literals
   left in `constants/` are development defaults, not deployment values.
 - **Never hardcode dates that expire.** The festival list did, ran dry, and
@@ -653,7 +653,7 @@ client-generated `requestId` so a retry never double-charges.
   service, neither at the repo root, so each needs its **Blueprint Path**
   set. Two things bite: uploads need a mounted disk
   (`UPLOAD_DIR`) or they are wiped on every release, and
-  `EXPO_PUBLIC_ADMIN_API` is baked into the app bundle at build time, so
+  `EXPO_PUBLIC_API_URL` is baked into the app bundle at build time, so
   pointing the app at the deployed API needs a rebuild, not a reload.
 - **Feature flags default to ON when offline** — never assume a hidden feature
   means the flag is off; confirm the backend is reachable first.
@@ -671,7 +671,7 @@ in the same commit.
 |---|---|---|
 | `pooja-api/` | `MONGODB_URI`, `CORS_ORIGIN`, `SESSION_SAMESITE`, Firebase key, `ADMIN_PASSWORD`, `MAX_UPLOAD_MB` | The only one with real secrets |
 | `pooja-admin/` | `API_ORIGIN` (dev proxy), `VITE_API_BASE` (build) | Static site — nothing secret can live here, it ends up in the bundle |
-| `poojaappclone/` | `EXPO_PUBLIC_ADMIN_API`, `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`, `EXPO_PUBLIC_SUPPORT_*` | `EXPO_PUBLIC_*` is embedded in the bundle, so none of it is secret |
+| `poojaappclone/` | `EXPO_PUBLIC_API_URL`, `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`, `EXPO_PUBLIC_SUPPORT_*` | `EXPO_PUBLIC_*` is embedded in the bundle, so none of it is secret |
 
 Two that catch people out:
 

@@ -15,8 +15,8 @@ leaves your machine. Cost: $0. It is up only while the machine is on and `tools/
 4. Build the tester app against that URL. `EXPO_PUBLIC_*` is baked in at bundle time, so it is a **rebuild**, not a reload:
    ```bash
    cd poojaappclone
-   EXPO_PUBLIC_ADMIN_API=https://<name>.ngrok-free.dev npx expo prebuild --platform android   # first time only
-   cd android && EXPO_PUBLIC_ADMIN_API=https://<name>.ngrok-free.dev ./gradlew assembleRelease
+   EXPO_PUBLIC_API_URL=https://<name>.ngrok-free.dev npx expo prebuild --platform android   # first time only
+   cd android && EXPO_PUBLIC_API_URL=https://<name>.ngrok-free.dev ./gradlew assembleRelease
    ```
    (a shell variable beats `poojaappclone/.env`, so the `.env` is not edited). Share
    `android/app/build/outputs/apk/release/app-release.apk` with the testers.
