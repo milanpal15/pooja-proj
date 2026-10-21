@@ -20,7 +20,7 @@ import {
   SEARCH_MIN_ZOOM,
   VIEW_DEBOUNCE_MS,
 } from '../constants/map';
-import { boundsOf, type LatLng, radiusForBounds, type SearchArea, shouldOfferSearch } from '@/components/map/geometry';
+import { boundsOf, type LatLng, movedFarEnough, radiusForBounds, type SearchArea, shouldOfferSearch } from '@/components/map/geometry';
 import { openDirections as openMapsApp } from '@/components/map/open-directions';
 import { mappableTemples } from '../lib/places-geojson';
 import { useNearbyPlaces } from './use-nearby-places';
@@ -36,6 +36,9 @@ type View = SearchArea & { zoom: number };
  * Location permission is requested ONLY by `locate()` (the Near me button), never on mount; an
  * already-granted permission is used silently via `useGrantedLocation`.
  */
+/** How many of the nearest temples are framed with the devotee after an "around me" search. */
+const FRAME_NEAREST = 6;
+
 export function useLiveMap() {
   const { lang, t } = useLanguage();
   const toast = useToast();
@@ -57,6 +60,8 @@ export function useLiveMap() {
   const viewTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoSearched = useRef(false);
   const wantsLocate = useRef(false);
+  /** The next finished search is the devotee's own "around me" one: frame them AND the nearest temples, or nothing would be in view. */
+  const frameResult = useRef(false);
 
   // Camera commands before the map has loaded throw inside MapLibre; never let that reach the UI.
   const camera = useCallback((run: (c: CameraRef) => void) => {
@@ -91,6 +96,7 @@ export function useLiveMap() {
   useEffect(() => {
     if (!user || autoSearched.current) return;
     autoSearched.current = true;
+    frameResult.current = !userMoved.current;
     void search({ ...user, radius: DEFAULT_RADIUS_M });
   }, [user, search]);
 
@@ -115,12 +121,22 @@ export function useLiveMap() {
     if (user) {
       userMoved.current = true;
       flyToPoint(user);
+      frameResult.current = true;
       if (nearby.status !== 'loading') void search({ ...user, radius: DEFAULT_RADIUS_M });
       return;
     }
     wantsLocate.current = true;
     void loc.request();
   }, [user, flyToPoint, nearby.status, search, loc]);
+
+  useEffect(() => {
+    if (nearby.status !== 'ready' || !frameResult.current) return;
+    frameResult.current = false;
+    if (!user || nearby.places.length === 0) return;
+    const nearest = [...nearby.places].sort((a, b) => a.distanceM - b.distanceM).slice(0, FRAME_NEAREST);
+    const b = boundsOf([user, ...nearest], MIN_FIT_SPAN_DEG);
+    if (b) camera((c) => c.fitBounds(b, { padding: FIT_PADDING, duration: 900 }));
+  }, [nearby.status, nearby.places, user, camera]);
 
   const fitAll = useCallback(() => {
     userMoved.current = true;
@@ -153,6 +169,8 @@ export function useLiveMap() {
   );
 
   const offerSearch = nearby.status !== 'loading' && shouldOfferSearch(nearby.searched, view, SEARCH_MIN_ZOOM);
+  /** A failed search is about ONE place: once the camera has moved on, the "couldn't load" banner is stale (Search this area covers the new view). */
+  const errorStale = nearby.status === 'error' && !!view && !!nearby.failedArea && movedFarEnough(nearby.failedArea, view);
   const zoomHint = nearby.status === 'idle' && !!view && view.zoom < SEARCH_MIN_ZOOM;
 
   const searchHere = useCallback(() => {
@@ -247,6 +265,7 @@ export function useLiveMap() {
     locate,
     fitAll,
     offerSearch,
+    errorStale,
     zoomHint,
     searchHere,
     retry,

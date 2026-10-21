@@ -57,7 +57,7 @@ export function LiveTemplesMap() {
   let status: { kind: MapStatusKind; message: string; action?: string; onAction?: () => void } | null = null;
   if (ctl.styleFailed) status = { kind: 'styleFailed', message: t('map_style_failed') };
   else if (nearby.status === 'loading') status = { kind: 'loading', message: t('map_searching') };
-  else if (nearby.status === 'error')
+  else if (nearby.status === 'error' && !ctl.errorStale)
     status = { kind: 'error', message: t('map_load_failed'), action: t('map_retry'), onAction: ctl.retry };
   else if (nearby.status === 'ready' && osm.features.length === 0)
     status = { kind: 'empty', message: t('map_none_nearby') };
