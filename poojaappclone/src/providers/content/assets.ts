@@ -1,6 +1,6 @@
 import type { ImageSourcePropType } from 'react-native';
 
-import { ADMIN_API } from '@/constants/config';
+import { API_URL } from '@/constants/config';
 
 import type { Content } from './types';
 
@@ -11,7 +11,7 @@ import type { Content } from './types';
  */
 export function assetUrl(url?: string): string | undefined {
   if (!url) return undefined;
-  return /^https?:\/\//.test(url) ? url : `${ADMIN_API}${url}`;
+  return /^https?:\/\//.test(url) ? url : `${API_URL}${url}`;
 }
 
 /** Deity artwork by slug, from the dashboard's `imageUrl` — undefined when none is uploaded. */

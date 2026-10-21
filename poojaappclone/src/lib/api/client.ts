@@ -1,152 +1,94 @@
-import { ADMIN_API } from '@/constants/config';
+import type { AxiosRequestConfig } from 'axios';
+
+import { API_URL } from '@/constants/config';
 import { appHeaders } from '@/lib/app-info';
 import { getIdToken } from '@/lib/firebase-auth';
 
-import { emitBlockSignal, parseBlock } from './block-signal';
-import { emitGateSignal, isGateResponse } from './gate-signal';
+import { emitBlockSignal } from './block-signal';
+import { ApiError, isOffline } from './errors';
+import { emitGateSignal } from './gate-signal';
+import { createHttp } from './interceptors';
 
-/** Raised when the backend rejects the caller; `status` drives what the UI does. */
-export class ApiError extends Error {
-  constructor(
-    public status: number,
-    message: string,
-    /** Machine code from the API's `{error, code}` body, e.g. `insufficient_coins`. */
-    public code?: string,
-    /** The whole error body — carries extras such as `{needed, balance, shortfall}`. */
-    public body?: Record<string, unknown>,
-  ) {
-    super(message);
-    this.name = 'ApiError';
-  }
-}
+export { ApiError, isOffline };
 
 /**
- * True when the request never reached the server (no signal, DNS, timeout).
- * `fetch` rejects with a TypeError for those and an AbortError on our timeout;
- * an HTTP error status is an ApiError instead and is NOT offline.
+ * THE axios instance for our API (see `createHttp` in ./interceptors for what the interceptors do).
+ * Paths are host-relative, so the telemetry headers and the bearer token can never reach another host.
  */
-export function isOffline(e: unknown): boolean {
-  if (e instanceof ApiError) return false;
-  const name = (e as { name?: string } | null)?.name;
-  return e instanceof TypeError || name === 'AbortError';
-}
+export const http = createHttp({
+  baseURL: API_URL,
+  getToken: getIdToken,
+  getHeaders: appHeaders,
+  emitGate: emitGateSignal,
+  emitBlock: emitBlockSignal,
+});
+
+export type ApiResult<T = unknown> = {
+  status: number;
+  statusText: string;
+  ok: boolean;
+  /** Parsed JSON; '' for an empty body, the raw text if the body was not JSON. */
+  data: T;
+  /** Lower-cased header names. */
+  headers: Record<string, string | undefined>;
+};
 
 /**
- * THE one fetch to our API. Every call to `ADMIN_API` goes through here so it carries the build
- * telemetry headers (`X-App-Version`, …; docs/RELEASES.md §1) and so a `426 app_outdated` /
- * `503 maintenance` answer from ANY endpoint reaches the policy gate, and a `403 account_blocked` /
- * `device_blocked` reaches the account-blocked gate. `path` is host-relative, so the
- * headers can never reach another host. The response is returned untouched (its body is still readable).
+ * A raw call for best-effort reads (flags, content, policy, …) that do their own status handling:
+ * NO status is an error, so a 4xx/5xx comes back as `{ ok: false, status }` instead of throwing. A call that
+ * never got a response (offline / timeout / abort) still rejects — see `isOffline`. The gate and block signals
+ * still fire. Not authed: pass your own `Authorization` header if you need one.
  */
-export async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
-  const res = await fetch(`${ADMIN_API}${path}`, {
-    ...init,
-    headers: { ...(init.headers as Record<string, string> | undefined), ...(await appHeaders()) },
-  });
-  if (res.status === 426 || res.status === 503) {
-    res
-      .clone()
-      .json()
-      .then((body: unknown) => {
-        if (isGateResponse(res.status, body)) emitGateSignal({ httpStatus: res.status, body });
-      })
-      .catch(() => {});
-  }
-  if (res.status === 403) {
-    // `403 account_blocked|device_blocked` from ANY call (sign-in sync included) reaches the blocked screen.
-    // Clone-read so the caller can still read the body; an uncoded 403 is not a block (parseBlock -> null).
-    res
-      .clone()
-      .json()
-      .then((body: unknown) => {
-        const block = parseBlock(403, body);
-        if (block) emitBlockSignal(block);
-      })
-      .catch(() => {});
-  }
-  return res;
+export async function apiRequest<T = unknown>(
+  path: string,
+  config: Pick<AxiosRequestConfig, 'method' | 'data' | 'headers' | 'signal' | 'timeout'> = {},
+): Promise<ApiResult<T>> {
+  const res = await http.request<T>({ ...config, url: path, validateStatus: () => true });
+  return {
+    status: res.status,
+    statusText: res.statusText,
+    ok: res.status >= 200 && res.status < 300,
+    data: res.data,
+    headers: (res.headers as { toJSON?: () => Record<string, string> }).toJSON?.() ?? {},
+  };
 }
 
 /**
  * Call the admin backend with the devotee's Firebase ID token attached.
  *
- * On a 401 it retries once with a force-refreshed token, which covers the
- * ordinary case of a token that expired while the app was backgrounded. A
- * second 401 is real — the caller should sign out.
+ * On a 401 the interceptor force-refreshes the token once (shared by parallel calls) and retries once, which
+ * covers a token that expired while the app was backgrounded. A second 401 is real — the caller should sign out.
  *
- * Unlike the flags/content fetches, these calls are NOT best-effort: a failure
- * here means the account did not sync, and swallowing it is how you end up
- * with a devotee signed into an app the backend has never heard of.
+ * Unlike the flags/content fetches, these calls are NOT best-effort: a failure here means the account did not
+ * sync, and swallowing it is how you end up with a devotee signed into an app the backend has never heard of.
+ * Returns the parsed JSON, or null for 204 No Content (e.g. leaving an event). Throws ApiError.
  */
 export async function authedFetch(path: string, init: RequestInit = {}, timeoutMs = 10_000) {
-  const send = async (force: boolean) => {
-    const token = await getIdToken(force);
-    if (!token) throw new ApiError(401, 'not signed in');
-
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      return await apiFetch(path, {
-        ...init,
-        signal: controller.signal,
-        headers: {
-          'Content-Type': 'application/json',
-          ...(init.headers ?? {}),
-          Authorization: `Bearer ${token}`,
-        },
-      });
-    } finally {
-      clearTimeout(timer);
-    }
-  };
-
-  let res = await send(false);
-  if (res.status === 401) res = await send(true);
-
-  if (!res.ok) {
-    const body = await res
-      .json()
-      .catch(() => ({}) as { error?: string; detail?: string; code?: string });
-    throw new ApiError(
-      res.status,
-      body.detail || body.error || `${res.status} ${res.statusText}`,
-      body.code,
-      body,
-    );
-  }
-  // 204 No Content (e.g. leaving an event) has no body to parse.
+  const res = await http.request({
+    url: path,
+    method: init.method ?? 'GET',
+    // A JSON string is sent as-is (Content-Type: application/json is set by the interceptor).
+    data: init.body ?? undefined,
+    headers: init.headers as Record<string, string> | undefined,
+    signal: (init.signal ?? undefined) as AxiosRequestConfig['signal'],
+    timeout: timeoutMs,
+    authed: true,
+  });
   if (res.status === 204) return null;
-  return res.json();
+  return res.data;
 }
 
 /**
- * Public, read-only calls (coin packs, chadhava offerings) need no token, so
- * they skip `authedFetch` — a devotee must be able to see the price list
- * before the token is ready, and a 401 retry loop makes no sense for them.
+ * Public, read-only calls (coin packs, chadhava offerings) need no token, so they skip the authed path — a
+ * devotee must be able to see the price list before the token is ready, and a 401 retry makes no sense for them.
  */
 export async function publicFetch<T>(path: string, timeoutMs = 10_000): Promise<T> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const res = await apiFetch(path, { signal: controller.signal });
-    if (!res.ok) throw new ApiError(res.status, `${res.status} ${res.statusText}`);
-    return (await res.json()) as T;
-  } finally {
-    clearTimeout(timer);
-  }
+  return (await http.get<T>(path, { timeout: timeoutMs })).data;
 }
 
 /** Read-only, no session — the list is public. */
 export async function publicGet<T>(path: string, timeoutMs = 8_000): Promise<T> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const res = await apiFetch(path, { signal: controller.signal });
-    if (!res.ok) throw new ApiError(res.status, `${res.status} ${res.statusText}`);
-    return (await res.json()) as T;
-  } finally {
-    clearTimeout(timer);
-  }
+  return (await http.get<T>(path, { timeout: timeoutMs })).data;
 }
 
 export const post = (path: string, body?: unknown) =>

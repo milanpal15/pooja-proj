@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { View } from 'react-native';
 
-import { ADMIN_API } from '@/constants/config';
+import { API_URL } from '@/constants/config';
 
 import { rewriteUploads, wrapHtml } from '../../lib/html';
 import { propNum, propText } from '../../lib/layout';
@@ -18,7 +18,7 @@ export function HtmlBlock({ block }: BlockProps) {
   const height = propNum(block, 'height', SLIDE_H, 60, 600);
 
   const slide = useMemo<HomeSlide | null>(
-    () => (html ? { id: block.id, kind: 'html', tag: '', title, sub: '', cta: '', href: '', html: wrapHtml(rewriteUploads(html, ADMIN_API), ADMIN_API) } : null),
+    () => (html ? { id: block.id, kind: 'html', tag: '', title, sub: '', cta: '', href: '', html: wrapHtml(rewriteUploads(html, API_URL), API_URL) } : null),
     [html, block.id, title],
   );
 

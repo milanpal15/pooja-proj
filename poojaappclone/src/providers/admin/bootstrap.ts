@@ -3,7 +3,7 @@ import * as Device from 'expo-device';
 import type { MutableRefObject } from 'react';
 import { Platform } from 'react-native';
 
-import { apiFetch } from '@/lib/api/client';
+import { apiRequest } from '@/lib/api/client';
 import { APP_VERSION_NAME, APP_VERSION_CODE, getDeviceId } from '@/lib/app-info';
 
 import { type Analytics, EMPTY_ANALYTICS } from './analytics';
@@ -66,12 +66,10 @@ export async function bootstrapAdmin({
   // the cached flags are already applied above.
   for (const timeoutMs of [6_000, 30_000]) {
     try {
-      const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-      const res = await apiFetch('/api/flags', { signal: ctrl.signal });
-      clearTimeout(timer);
+      const res = await apiRequest<{ flags?: Partial<Record<string, unknown>> } | null>('/api/flags', { timeout: timeoutMs });
       if (!res.ok) continue;
-      const data = (await res.json()) as { flags?: Partial<Record<string, unknown>> };
+      const data = res.data;
+      if (!data || typeof data !== 'object') continue; // a non-JSON 200 counts as a failed attempt, as before
       if (data.flags) {
         // Only accept known keys, coerced to booleans — a malformed remote
         // payload can never replace a flag with a non-boolean.

@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useMemo, useState } from 'react';
 
-import { apiFetch } from '@/lib/api/client';
+import { apiRequest } from '@/lib/api/client';
 
 import { buildContentValue } from './build-value';
 import { CACHE_KEY, normalise } from './cache';
@@ -38,9 +38,8 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
       .catch(() => {});
 
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 5000);
-    apiFetch('/api/content', { signal: controller.signal })
-      .then((r) => (r.ok ? r.json() : null))
+    apiRequest<Record<string, unknown> | null>('/api/content', { signal: controller.signal, timeout: 5000 })
+      .then((r) => (r.ok && r.data && typeof r.data === 'object' ? r.data : null))
       .then((data) => {
         if (!data || !alive) return;
         setContent(normalise(data));
@@ -51,13 +50,11 @@ export function ContentProvider({ children }: { children: React.ReactNode }) {
         // stays on screen; a first-ever launch shows empty states.
       })
       .finally(() => {
-        clearTimeout(timer);
         if (alive) setLoading(false);
       });
 
     return () => {
       alive = false;
-      clearTimeout(timer);
       controller.abort();
     };
   }, []);

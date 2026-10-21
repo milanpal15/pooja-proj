@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useWindowDimensions } from 'react-native';
 
-import { ADMIN_API } from '@/constants/config';
+import { API_URL } from '@/constants/config';
 import { assetUrl } from '@/providers/content';
 
 import { rewriteUploads, wrapHtml } from '../../lib/html';
@@ -24,7 +24,7 @@ export function PromoBlock({ block }: BlockProps) {
     const html = propText(block, 'html', hi);
     if (propStr(block, 'kind') === 'html') {
       if (!html) return null;
-      return { id: block.id, kind: 'html', tag: '', title, sub: '', cta: '', href, html: wrapHtml(rewriteUploads(html, ADMIN_API), ADMIN_API) };
+      return { id: block.id, kind: 'html', tag: '', title, sub: '', cta: '', href, html: wrapHtml(rewriteUploads(html, API_URL), API_URL) };
     }
     const first = inlineItems(block, flags, hi)[0];
     if (!first) return null;

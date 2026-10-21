@@ -1,17 +1,9 @@
-import { apiFetch } from '@/lib/api/client';
+import { apiRequest } from '@/lib/api/client';
 
 /** Fire-and-forget POST to the admin backend (ignores failures/offline). */
 export async function post(path: string, body: unknown) {
   try {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 4000);
-    await apiFetch(path, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: ctrl.signal,
-    });
-    clearTimeout(timer);
+    await apiRequest(path, { method: 'POST', data: body, timeout: 4000 });
   } catch {
     // offline / backend down — the app keeps working with local state
   }

@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 
-import { ADMIN_API } from '@/constants/config';
+import { API_URL } from '@/constants/config';
 import { useLanguage } from '@/i18n';
 import { assetUrl, useContent } from '@/providers/content';
 
@@ -27,7 +27,7 @@ export function useHomeSlides(): HomeSlide[] {
   return useMemo(() => {
     const slides = toSlides(visibleSlides(hero, hi ? 'hi' : 'en', now), hi, {
       image: assetUrl,
-      html: (h) => wrapHtml(rewriteUploads(h, ADMIN_API), ADMIN_API),
+      html: (h) => wrapHtml(rewriteUploads(h, API_URL), API_URL),
     });
     const nothingAtAll = !loading && !hero.length && !deities.length && !temples.length;
     if (!slides.length && nothingAtAll) {

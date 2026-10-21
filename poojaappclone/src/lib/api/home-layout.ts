@@ -1,5 +1,5 @@
 
-import { ApiError, apiFetch } from './client';
+import { ApiError, apiRequest } from './client';
 
 /** Contract: docs/HOME_LAYOUT.md §4. */
 export type HomeLayoutResponse =
@@ -13,17 +13,11 @@ export type HomeLayoutResponse =
  * API is unreachable or answers an error; the caller keeps its cache.
  */
 export async function fetchHomeLayout(lang: 'en' | 'hi', etag?: string | null, timeoutMs = 8_000): Promise<HomeLayoutResponse> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const res = await apiFetch(`/api/home?lang=${lang}`, {
-      signal: controller.signal,
-      headers: etag ? { 'If-None-Match': etag } : undefined,
-    });
-    if (res.status === 304) return { notModified: true };
-    if (!res.ok) throw new ApiError(res.status, `${res.status} ${res.statusText}`);
-    return { notModified: false, body: await res.json(), etag: res.headers.get('ETag') };
-  } finally {
-    clearTimeout(timer);
-  }
+  const res = await apiRequest(`/api/home?lang=${lang}`, {
+    timeout: timeoutMs,
+    headers: etag ? { 'If-None-Match': etag } : undefined,
+  });
+  if (res.status === 304) return { notModified: true };
+  if (!res.ok) throw new ApiError(res.status, `${res.status} ${res.statusText}`);
+  return { notModified: false, body: res.data, etag: res.headers.etag ?? null };
 }

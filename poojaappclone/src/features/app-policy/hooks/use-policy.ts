@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
-import { apiFetch } from '@/lib/api/client';
+import { apiRequest } from '@/lib/api/client';
 import { onGateSignal } from '@/lib/api/gate-signal';
 import { APP_PLATFORM, APP_VERSION_CODE, OS_API } from '@/lib/app-info';
 import { getIdToken } from '@/lib/firebase-auth';
@@ -35,13 +35,13 @@ async function fetchPolicy(signedIn: boolean): Promise<Policy | null> {
     if (signedIn) {
       token = await Promise.race([getIdToken(false).catch(() => null), new Promise<null>((r) => setTimeout(() => r(null), 2_000))]);
     }
-    const res = await apiFetch(`/api/app/policy?${qs.join('&')}`, {
+    const res = await apiRequest<unknown>(`/api/app/policy?${qs.join('&')}`, {
       signal: controller.signal,
       headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     });
     if (!res.ok) return null;
     // A garbled body is "ok" (parsePolicy), not a failure: fail open.
-    const body: unknown = await res.json().catch(() => null);
+    const body: unknown = res.data && typeof res.data === 'object' ? res.data : null;
     return parsePolicy(body);
   } catch {
     return null;

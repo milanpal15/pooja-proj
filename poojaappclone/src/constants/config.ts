@@ -1,7 +1,7 @@
 /**
  * The ONE place the app reads its environment (`EXPO_PUBLIC_*`, set in `.env`; see `.env.example`).
  *
- * Import from here — `import { ADMIN_API } from '@/constants/config'` — and nowhere else touches
+ * Import from here — `import { API_URL } from '@/constants/config'` — and nowhere else touches
  * `process.env`. Two things worth knowing:
  *   - Expo inlines `process.env.EXPO_PUBLIC_X` into the JS bundle at build time, and only when it is
  *     written literally, so each variable is spelled out below rather than looked up by name.
@@ -12,7 +12,9 @@
  */
 
 /**
- * Base URL of the pooja-admin MERN backend.
+ * Base URL of the backend the app talks to: the mobile gateway of `backend/` (4610 in the local
+ * tester stack), or the old single server `pooja-api` (4000). The dashboard is a separate client of
+ * the same backend; the app never talks to it.
  *
  * The phone must be able to reach your Mac. There are two ways:
  *
@@ -23,17 +25,17 @@
  *
  * 2. Wi-Fi. The phone and Mac must be on the SAME network; set this to the
  *    Mac's LAN IP (find it with `ipconfig getifaddr en0`), e.g.
- *        export const ADMIN_API = 'http://192.168.1.12:4000';
+ *        export const API_URL = 'http://192.168.1.12:4000';
  *    If the phone drops to cellular or is on another network, it can't reach
  *    the Mac and the app falls back to default (all-enabled) feature flags.
  *
  * All calls are best-effort: if the backend is unreachable the app falls back
  * to the last-synced flags (or the built-in defaults) and keeps working.
  *
- * Set EXPO_PUBLIC_ADMIN_API in `.env` to point at a deployed backend; the
+ * Set EXPO_PUBLIC_API_URL in `.env` to point at a deployed backend; the
  * literal below is only the USB-tunnel default for local development.
  */
-export const ADMIN_API = process.env.EXPO_PUBLIC_ADMIN_API ?? 'http://127.0.0.1:4000';
+export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://127.0.0.1:4000';
 
 /**
  * The **web** OAuth client id from your Firebase project (google-services.json

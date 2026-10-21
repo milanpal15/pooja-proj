@@ -5,7 +5,7 @@ import { ActivityIndicator, Linking, Pressable, StyleSheet, View } from 'react-n
 import { WebView } from 'react-native-webview';
 
 import { Type } from '@/components/ui';
-import { ADMIN_API } from '@/constants/config';
+import { API_URL } from '@/constants/config';
 import { useTheme } from '@/theme';
 
 import { streamAddress, youTubeId } from '../lib/stream-url';
@@ -41,7 +41,7 @@ export function LivePlayer({ url, height, label }: LivePlayerProps) {
 /* ───────────────────────────────────────────────────────────── youtube ── */
 
 /** The embedding page's origin: the API's own site (https), the one address this app can claim. */
-const PAGE_ORIGIN = /^https:\/\/[^/]+/.exec(ADMIN_API)?.[0] ?? 'https://pooja-api.onrender.com';
+const PAGE_ORIGIN = /^https:\/\/[^/]+/.exec(API_URL)?.[0] ?? 'https://pooja-api.onrender.com';
 
 function YouTubeFeed({ id, height, label }: { id: string; height: number; label?: string }) {
   const { c } = useTheme();

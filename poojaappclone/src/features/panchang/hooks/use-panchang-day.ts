@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { apiFetch } from '@/lib/api/client';
+import { apiRequest } from '@/lib/api/client';
 import { computePanchang } from '@/lib/panchang';
 
 import { dayKey } from '../lib/day-key';
@@ -41,16 +41,14 @@ export function usePanchangDay(place: { lat: number; lng: number }, hi: boolean)
   useEffect(() => {
     let alive = true;
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 8000);
     const key = dayKey(date);
 
-    apiFetch(`/api/panchang?date=${key}`, { signal: controller.signal })
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+    apiRequest<{ override?: Record<string, string> | null }>(`/api/panchang?date=${key}`, { signal: controller.signal, timeout: 8000 })
+      .then((r) => (r.ok && r.data && typeof r.data === 'object' ? r.data : Promise.reject(new Error(String(r.status)))))
       .then((d: { override?: Record<string, string> | null }) => {
         if (alive) setFetched({ key, data: d.override ?? null });
       })
-      .catch(() => {})
-      .finally(() => clearTimeout(timer));
+      .catch(() => {});
 
     return () => {
       alive = false;
