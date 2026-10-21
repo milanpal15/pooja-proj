@@ -66,7 +66,7 @@ export function useLoginFlow(onSignedIn?: (by: SignedInBy) => void) {
   const chooseMobile = () => {
     if (!phoneEnabled) {
       resetError();
-      setError(t('err_sms_billing'));
+      setError(t('err_mobile_off'));
       return;
     }
     otp.setPhone('');

@@ -42,6 +42,7 @@ export const auth = {
   err_signin_failed: 'Sign-in failed. Please try again.',
   err_auth_unavailable: 'Sign-in is temporarily unavailable. Please try again later.',
   err_sms_region: 'SMS sign-in is not enabled for this region yet.',
+  err_mobile_off: 'Mobile sign-in is switched off right now. Please use Google sign-in.',
   err_sms_billing: 'SMS sign-in is not available yet. Please use Google sign-in.',
   err_google_not_configured: 'Google sign-in is not set up in this build.',
   err_play_services: 'Google Play Services is required to sign in with Google.',

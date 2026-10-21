@@ -41,6 +41,7 @@ export const auth = {
   err_signin_failed: 'साइन इन विफल रहा। कृपया पुनः प्रयास करें।',
   err_auth_unavailable: 'साइन इन अभी उपलब्ध नहीं है। कृपया बाद में प्रयास करें।',
   err_sms_region: 'इस क्षेत्र के लिए SMS साइन इन अभी चालू नहीं है।',
+  err_mobile_off: 'मोबाइल साइन-इन अभी बंद है। कृपया Google से साइन-इन करें।',
   err_sms_billing: 'SMS साइन इन अभी उपलब्ध नहीं है। कृपया Google से साइन इन करें।',
   err_google_not_configured: 'इस बिल्ड में Google साइन इन सेट नहीं है।',
   err_play_services: 'Google से साइन इन करने के लिए Google Play Services आवश्यक है।',
