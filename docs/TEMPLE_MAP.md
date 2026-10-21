@@ -37,7 +37,7 @@ The "View on map" screen shows a REAL map and REAL nearby temples without any pa
   requested point. A fresh cache row never triggers an upstream call.
 * **Upstream:** Overpass QL for `node|way|relation` with `amenity=place_of_worship` + `religion=hindu` inside `around:<radius>,<lat>,<lng>`,
   `out center tags` (ways/relations use their centre), timeout ≤ 20 s. Instances come from config `OVERPASS_URLS` (comma list; defaults
-  `https://overpass-api.de/api/interpreter`, `https://overpass.private.coffee/api/interpreter`), tried in order with a 60 s circuit breaker per
+  `https://overpass.openstreetmap.fr/api/interpreter`, `https://overpass-api.de/api/interpreter`, `https://overpass.kumi.systems/api/interpreter`, `https://overpass.private.coffee/api/interpreter`; the public servers go down for days at a time, so several are listed and a failing one is skipped for 60 s), tried in order with a 60 s circuit breaker per
   instance on 429/5xx/timeouts; a descriptive `User-Agent` (`BhaktiApp/1.0 (temples map)`) on every call; never more than one in-flight
   upstream request per cache key (coalesce) and at most 2 upstream calls/second overall.
 * **Errors:** `400 {code:"bad_params"}`; `429 {code:"too_fast"}` (per client: ≤ 30 requests/minute); `503 {code:"places_unavailable"}` only when

@@ -28,7 +28,7 @@ export const loadConfig = (env = process.env) => {
       // Nearby temples map (docs/TEMPLE_MAP.md): the public Overpass instances, tried in order.
       overpassUrls: {
         name: 'OVERPASS_URLS',
-        default: ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter'],
+        default: ['https://overpass.openstreetmap.fr/api/interpreter', 'https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://overpass.private.coffee/api/interpreter'],
         parse: (v) => v.split(',').map((s) => s.trim()).filter(Boolean),
       },
       placesCacheDays: { name: 'PLACES_CACHE_DAYS', default: 7, parse: (v) => Number(v) > 0 ? Number(v) : 7 },
