@@ -1,6 +1,6 @@
 import type { CameraRef, PressEventWithFeatures } from '@maplibre/maplibre-react-native';
 import { useMemo, useRef } from 'react';
-import { type NativeSyntheticEvent, Pressable, StyleSheet, View } from 'react-native';
+import { type NativeSyntheticEvent, Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 
 import { FIT_PADDING, TEXT_FONT, USER_COLOR } from '@/components/map/constants';
 import { singlePoint } from '@/components/map/geojson';
@@ -39,6 +39,8 @@ export function RouteMap({
   onSelect,
   onLoaded,
   onFailed,
+  style,
+  pillStyle,
 }: {
   route: EventRoute;
   stops: readonly ResolvedStop[];
@@ -53,6 +55,10 @@ export function RouteMap({
   onSelect: (key: string | null) => void;
   onLoaded?: () => void;
   onFailed: () => void;
+  /** Frame override (height, or flex:1 / absoluteFill to fill a host). Default: the 340 px block map. */
+  style?: ViewStyle;
+  /** Where the "Whole route" button sits (default: top-right). */
+  pillStyle?: ViewStyle;
 }) {
   const { c } = useTheme();
   const camera = useRef<CameraRef>(null);
@@ -85,7 +91,7 @@ export function RouteMap({
   const GOLD = c.gold;
 
   return (
-    <View style={[styles.wrap, { borderColor: c.outlineVariant }]} accessibilityLabel={a11y}>
+    <View style={[styles.wrap, !style && styles.defaultHeight, { borderColor: c.outlineVariant }, style]} accessibilityLabel={a11y}>
       <ML.Map
         style={StyleSheet.absoluteFill}
         mapStyle={MAP_STYLE_URL}
@@ -197,7 +203,7 @@ export function RouteMap({
         accessibilityRole="button"
         accessibilityLabel={wholeLabel}
         onPress={fit}
-        style={[styles.pill, { backgroundColor: c.containerLowest, borderColor: c.outlineVariant }]}>
+        style={[styles.pill, { backgroundColor: c.containerLowest, borderColor: c.outlineVariant }, pillStyle]}>
         <Type v="labelMd" tone="primary">
           {wholeLabel}
         </Type>
@@ -209,7 +215,9 @@ export function RouteMap({
 // Deliberately NOT `overflow:'hidden'` + a corner radius: that combination clips a native map view to
 // nothing on Android (see AGENTS.md §5). The hairline frame is enough.
 const styles = StyleSheet.create({
-  wrap: { height: 340, borderWidth: StyleSheet.hairlineWidth, backgroundColor: '#E9E4D6' },
+  wrap: { borderWidth: StyleSheet.hairlineWidth, backgroundColor: '#E9E4D6' },
+  /** Only when the caller gives no frame of its own (an absoluteFill / explicit height must not be capped). */
+  defaultHeight: { height: 340 },
   pill: {
     position: 'absolute',
     top: 10,

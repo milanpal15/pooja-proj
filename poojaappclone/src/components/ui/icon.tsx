@@ -63,7 +63,8 @@ export type IconName =
   | 'filter'
   | 'user'
   | 'clock'
-  | 'moon';
+  | 'moon'
+  | 'expand';
 
 export type IconProps = {
   name: IconName;

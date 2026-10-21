@@ -314,6 +314,9 @@ export function renderGlyph(
 
     case 'bag':
       return <Path {...line} d="M5.6 7.6 h12.8 v11 a1.6 1.6 0 0 1-1.6 1.6 H7.2 a1.6 1.6 0 0 1-1.6-1.6 Z M9 7.6 a3 3 0 0 1 6 0" />;
+    case 'expand':
+      // Four corner brackets pointing outward: "full screen".
+      return <Path {...line} d="M4.6 9.4 V4.6 h4.8 M14.6 4.6 h4.8 v4.8 M19.4 14.6 v4.8 h-4.8 M9.4 19.4 H4.6 v-4.8" />;
     case 'chevronDown':
       return <Path {...line} d="M6 9.4 l6 6 6-6" />;
     case 'chevronRight':

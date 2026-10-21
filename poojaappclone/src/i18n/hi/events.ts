@@ -144,6 +144,8 @@ export const events = {
   ev_route_start: 'आरंभ',
   ev_route_end: 'समापन',
   ev_route_whole: 'पूरा मार्ग',
+  ev_route_fullscreen: 'पूरी स्क्रीन पर नक्शा',
+  ev_route_fullscreen_close: 'पूरी स्क्रीन का नक्शा बंद करें',
   ev_route_a11y: 'मार्ग का नक्शा। {stops} पड़ाव।',
   ev_route_no_map: 'नक्शा अभी उपलब्ध नहीं है। पड़ाव क्रम से यहाँ हैं।',
   ev_route_no_stops: 'इस मार्ग पर अभी कोई पड़ाव नहीं है।',

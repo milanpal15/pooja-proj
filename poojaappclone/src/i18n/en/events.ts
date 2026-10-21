@@ -144,6 +144,8 @@ export const events = {
   ev_route_start: 'Start',
   ev_route_end: 'End',
   ev_route_whole: 'Whole route',
+  ev_route_fullscreen: 'Full screen map',
+  ev_route_fullscreen_close: 'Close full screen map',
   ev_route_a11y: 'Route map. {stops} stops.',
   ev_route_no_map: 'The map is not available right now. Here are the stops in order.',
   ev_route_no_stops: 'No stops on this route yet.',
